@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rasteirissima — Mercadorias a Pagar</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box}
+.sp{background:#f3e8ff;color:#6d28d9;border:1px solid #ddd6fe}
+.sv{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.sa{background:#fef9c3;color:#854d0e;border:1px solid #fde68a}
+.sh{background:#ffedd5;color:#9a3412;border:1px solid #fed7aa}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem}
+.modal-box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.3)}
+th{cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{background:#ede9fe!important}
+.si:after{content:' ↕';opacity:.3;font-size:.7em}
+.sa2:after{content:' ↑';opacity:1;font-size:.85em}
+.sd:after{content:' ↓';opacity:1;font-size:.85em}
+.lbl{display:block;font-size:.7rem;font-weight:700;color:#9ca3af;margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.05em}
+.inp{width:100%;border:2px solid #e5e7eb;border-radius:.65rem;padding:.45rem .7rem;font-size:.875rem;transition:border-color .15s;background:#fff}
+.inp:focus{border-color:#7c3aed;outline:none}
+.sel{width:100%;border:2px solid #e5e7eb;border-radius:.65rem;padding:.45rem .7rem;font-size:.875rem;transition:border-color .15s;background:#fff}
+.sel:focus{border-color:#7c3aed;outline:none}
+.fade{animation:fd .18s ease}
+@keyframes fd{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#c4b5fd;border-radius:3px}
+</style>
+</head>
+<body class="bg-slate-100 text-gray-900 min-h-screen">
+
+<!-- ========== LOGIN ========== -->
+<div id="pgLogin" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-950 via-purple-800 to-pink-700">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fade">
+    <div class="text-center mb-6">
+      <div class="text-5xl mb-3">👗</div>
+      <h1 class="text-2xl font-black text-gray-800">Rasteirissima</h1>
+      <p class="text-gray-400 text-sm mt-1">Controle Financeiro</p>
+    </div>
+    <div id="loginErr" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4 text-center border border-red-200"></div>
+    <input type="password" id="loginPwd" placeholder="Senha de acesso"
+      class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm mb-3 focus:border-purple-500 focus:outline-none transition"
+      onkeydown="if(event.key==='Enter')doLogin()" autofocus />
+    <button onclick="doLogin()"
+      class="w-full bg-gradient-to-r from-purple-700 to-pink-600 hover:from-purple-800 hover:to-pink-700 text-white font-black py-3 rounded-xl transition shadow-lg text-sm">
+      Entrar
+    </button>
+    <p class="text-xs text-gray-300 text-center mt-5">Senha padrão: <b>rasteira2024</b></p>
+  </div>
+</div>
+
+<!-- ========== APP ========== -->
+<div id="pgApp" class="hidden min-h-screen flex flex-col">
+
+  <!-- HEADER -->
+  <header class="bg-gradient-to-r from-purple-900 to-pink-700 text-white shadow-xl sticky top-0 z-30">
+    <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">👗</span>
+        <div>
+          <h1 class="font-black text-base leading-none">Rasteirissima</h1>
+          <p class="text-purple-300 text-xs mt-0.5">Mercadorias a Pagar — Lojas Próprias</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1">
+        <button onclick="syncSheets()" id="btnSync"
+          class="hidden text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
+          🔄 Sincronizar
+        </button>
+        <button onclick="openCfg()"
+          class="text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
+          ⚙️ Config
+        </button>
+        <button onclick="doLogout()"
+          class="text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
+          Sair
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4">
+
+    <!-- STATS -->
+    <div id="statsRow" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+
+    <!-- ACTIONS -->
+    <div class="flex flex-wrap gap-2 mb-3 items-center">
+      <button onclick="openBoleto()"
+        class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-sm font-black shadow-md flex items-center gap-1.5 transition">
+        📄 Adicionar Boleto
+      </button>
+      <button onclick="openAdd()"
+        class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-xl text-sm font-black shadow-md flex items-center gap-1.5 transition">
+        ➕ Nova Conta
+      </button>
+      <button onclick="doCSV()"
+        class="bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition">
+        ⬇️ Exportar CSV
+      </button>
+      <span id="recCnt" class="ml-auto text-sm text-gray-400 font-medium"></span>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-3">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div>
+          <label class="lbl">Loja</label>
+          <select id="fLo" onchange="applyF()" class="sel"></select>
+        </div>
+        <div>
+          <label class="lbl">Fornecedor</label>
+          <select id="fFo" onchange="applyF()" class="sel"></select>
+        </div>
+        <div>
+          <label class="lbl">Status</label>
+          <select id="fSt" onchange="applyF()" class="sel">
+            <option value="">Todos</option>
+            <option value="em aberto">Em aberto</option>
+            <option value="vence hoje">Vence hoje</option>
+            <option value="vencida">Vencida</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Mês Vencimento</label>
+          <select id="fMe" onchange="applyF()" class="sel"></select>
+        </div>
+        <div>
+          <label class="lbl">Buscar</label>
+          <input type="search" id="fSq" placeholder="Nota, fornecedor, loja..." oninput="applyF()" class="inp" />
+        </div>
+      </div>
+      <button onclick="clearF()" class="text-xs text-purple-500 hover:text-purple-700 mt-2 underline font-semibold">✕ Limpar filtros</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-purple-50 border-b-2 border-purple-100">
+            <tr>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('lo')" id="th-lo">Loja</th>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('fo')" id="th-fo">Fornecedor</th>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('nn')" id="th-nn">Nº Nota</th>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('de')" id="th-de">Emissão</th>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('dv')" id="th-dv">Vencimento</th>
+              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('vn')" id="th-vn">Valor NF</th>
+              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('mk')" id="th-mk">MKT</th>
+              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('pr')" id="th-pr">Produto</th>
+              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('sv')" id="th-sv">Serviço</th>
+              <th class="px-3 py-3 text-center text-xs font-black text-purple-700 uppercase si" onclick="sBy('st')" id="th-st">Status</th>
+              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('dp')" id="th-dp">Dt. Pagto</th>
+              <th class="px-3 py-3 text-center text-xs font-black text-purple-700 uppercase">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tBody"></tbody>
+        </table>
+      </div>
+      <div id="pgBar" class="border-t border-gray-100 px-4 py-3 flex items-center justify-between bg-gray-50/70 text-sm"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ========== MODAL: BOLETO ========== -->
+<div id="mBoleto" class="modal-overlay hidden">
+  <div class="modal-box fade">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-black text-gray-800">📄 Adicionar Boleto</h2>
+      <button onclick="cm('mBoleto')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+    </div>
+    <div id="bS1">
+      <p class="text-sm text-gray-500 mb-5">Cole a linha digitável ou faça upload do PDF. Os dados serão extraídos automaticamente.</p>
+      <div class="mb-4">
+        <label class="lbl">Linha digitável do boleto</label>
+        <textarea id="bLi" rows="3" placeholder="Ex: 00190.00009 01234.560007 23456.780008 9 94550000100000"
+          class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-purple-400 focus:outline-none transition resize-none"></textarea>
+      </div>
+      <div class="relative flex items-center gap-3 my-4">
+        <div class="flex-1 border-t border-gray-200"></div>
+        <span class="text-xs text-gray-400 font-semibold">OU FAÇA UPLOAD DO PDF</span>
+        <div class="flex-1 border-t border-gray-200"></div>
+      </div>
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/40 transition cursor-pointer"
+        onclick="document.getElementById('bPDF').click()">
+        <p class="text-3xl mb-1">📎</p>
+        <p class="text-sm text-gray-500 font-semibold">Clique para selecionar o PDF do boleto</p>
+        <p class="text-xs text-gray-400 mt-1" id="bPDFNm">Nenhum arquivo selecionado</p>
+      </div>
+      <input type="file" id="bPDF" accept=".pdf" class="hidden" onchange="rdPDF(this)" />
+      <div class="flex gap-3 mt-6">
+        <button onclick="cm('mBoleto')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
+        <button onclick="parseBol()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Analisar Boleto →</button>
+      </div>
+    </div>
+    <div id="bS2" class="hidden">
+      <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5">
+        <p class="text-sm font-black text-purple-700">✅ Dados extraídos com sucesso!</p>
+        <p class="text-xs text-purple-500 mt-1" id="bInf">Confira e complete as informações abaixo antes de confirmar.</p>
+      </div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione a loja</option></select></div>
+          <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel"><option value="">Selecione</option></select></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Nº da Nota</label><input type="text" id="bf_nn" class="inp" /></div>
+          <div><label class="lbl">Data de Emissão</label><input type="date" id="bf_de" class="inp" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Data de Vencimento *</label><input type="date" id="bf_dv" required class="inp" /></div>
+          <div><label class="lbl">Valor da Nota (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" /></div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="bf_mk" value="0" class="inp" /></div>
+          <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="bf_pr" value="0" class="inp" /></div>
+          <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="bf_sv" value="0" class="inp" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="lbl">Status</label>
+            <select id="bf_st" class="sel">
+              <option value="em aberto">Em aberto</option>
+              <option value="vence hoje">Vence hoje</option>
+              <option value="vencida">Vencida</option>
+              <option value="pago">Pago</option>
+            </select>
+          </div>
+          <div><label class="lbl">Data de Pagamento</label><input type="date" id="bf_dp" class="inp" /></div>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="bSt(1)" class="border-2 border-gray-200 text-gray-600 px-5 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">← Voltar</button>
+        <button onclick="saveBol()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">✅ Confirmar e Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL: ADD/EDIT ========== -->
+<div id="mRec" class="modal-overlay hidden">
+  <div class="modal-box fade">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-black text-gray-800" id="mRecTtl">Nova Conta</h2>
+      <button onclick="cm('mRec')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+    </div>
+    <div class="space-y-3">
+      <input type="hidden" id="rf_id" />
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Loja *</label><select id="rf_lo" required class="sel"><option value="">Selecione a loja</option></select></div>
+        <div><label class="lbl">Fornecedor *</label><select id="rf_fo" required class="sel"><option value="">Selecione</option></select></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Nº da Nota</label><input type="text" id="rf_nn" class="inp" /></div>
+        <div><label class="lbl">Data de Emissão</label><input type="date" id="rf_de" class="inp" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Data de Vencimento *</label><input type="date" id="rf_dv" required class="inp" /></div>
+        <div><label class="lbl">Valor da Nota (R$) *</label><input type="number" step="0.01" id="rf_vn" required class="inp" /></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="rf_mk" value="0" class="inp" /></div>
+        <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="rf_pr" value="0" class="inp" /></div>
+        <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="rf_sv" value="0" class="inp" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="lbl">Status</label>
+          <select id="rf_st" class="sel">
+            <option value="em aberto">Em aberto</option>
+            <option value="vence hoje">Vence hoje</option>
+            <option value="vencida">Vencida</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+        <div><label class="lbl">Data de Pagamento</label><input type="date" id="rf_dp" class="inp" /></div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="cm('mRec')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
+      <button onclick="saveRec()" class="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL: CONFIG ========== -->
+<div id="mCfg" class="modal-overlay hidden">
+  <div class="modal-box fade">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-black text-gray-800">⚙️ Configurações</h2>
+      <button onclick="cm('mCfg')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+    </div>
+    <div class="space-y-5">
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <p class="text-sm font-black text-blue-800 mb-1">🔗 Google Sheets (opcional)</p>
+        <p class="text-xs text-blue-600 mb-3">Após criar o Apps Script, cole a URL aqui para sincronizar os dados automaticamente.</p>
+        <input type="url" id="cfUrl" placeholder="https://script.google.com/macros/s/XXXXXXX/exec"
+          class="w-full border border-blue-300 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:outline-none transition bg-white" />
+      </div>
+      <div>
+        <p class="text-sm font-black text-gray-700 mb-2">🏪 Lojas cadastradas</p>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="cfNvLo" placeholder="Nome da nova loja"
+            class="flex-1 inp" onkeydown="if(event.key==='Enter')addLoja()" />
+          <button onclick="addLoja()" class="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-purple-700 transition">+ Add</button>
+        </div>
+        <div id="cfLoList" class="text-xs text-gray-500 leading-relaxed"></div>
+      </div>
+      <div>
+        <p class="text-sm font-black text-gray-700 mb-2">🏭 Fornecedores cadastrados</p>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="cfNvFo" placeholder="Nome do novo fornecedor"
+            class="flex-1 inp" onkeydown="if(event.key==='Enter')addForn()" />
+          <button onclick="addForn()" class="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-purple-700 transition">+ Add</button>
+        </div>
+        <div id="cfFoList" class="text-xs text-gray-500 leading-relaxed"></div>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <p class="text-sm font-black text-amber-800 mb-2">🔑 Alterar senha de acesso</p>
+        <div class="flex gap-2">
+          <input type="password" id="cfPwd" placeholder="Nova senha"
+            class="flex-1 border border-amber-300 rounded-xl px-3 py-2 text-sm focus:border-amber-500 focus:outline-none transition bg-white" />
+          <button onclick="chgPwd()" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-amber-700 transition">Alterar</button>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="cm('mCfg')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
+      <button onclick="saveCfg()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Salvar configurações</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="tst" class="fixed bottom-5 right-5 z-[99] hidden pointer-events-none">
+  <div id="tstMsg" class="text-white text-sm px-5 py-3 rounded-2xl shadow-2xl max-w-xs font-semibold"></div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
+const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
+const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DEF_PWD='rasteira2024';
+
+// ============================================================
+// STATE
+// ============================================================
+const S={
+  recs:[],filt:[],
+  lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],
+  pg:1,pp:50,
+  sc:'dv',sd:'asc',
+  url:'',editId:null,pdfTxt:null
+};
+
+// ============================================================
+// AUTH
+// ============================================================
+function doLogin(){
+  const v=document.getElementById('loginPwd').value;
+  const p=localStorage.getItem('r_pwd')||DEF_PWD;
+  if(v===p){localStorage.setItem('r_ok','1');show('pgApp');hide('pgLogin');init();}
+  else{const e=document.getElementById('loginErr');e.textContent='Senha incorreta. Tente novamente.';e.classList.remove('hidden');}
+}
+function doLogout(){localStorage.removeItem('r_ok');location.reload();}
+function chgPwd(){
+  const np=document.getElementById('cfPwd').value.trim();
+  if(!np)return;
+  localStorage.setItem('r_pwd',np);
+  document.getElementById('cfPwd').value='';
+  toast('Senha alterada com sucesso!');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init(){
+  ldCfg();
+  await ldData();
+  bldSels();
+  bldFilters();
+  applyF();
+  if(S.url)document.getElementById('btnSync').classList.remove('hidden');
+}
+
+function ldCfg(){
+  const r=localStorage.getItem('r_cfg');
+  if(r){const c=JSON.parse(r);S.url=c.url||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
+}
+
+function svCfgStore(){
+  localStorage.setItem('r_cfg',JSON.stringify({url:S.url,lo:S.lojas,fo:S.forns}));
+}
+
+async function ldData(){
+  const raw=localStorage.getItem('r_data');
+  if(raw){S.recs=JSON.parse(raw);return;}
+  // Load from data.json (same folder)
+  try{
+    const res=await fetch('data.json');
+    if(!res.ok)throw new Error('no data.json');
+    const arr=await res.json();
+    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:r.vn,mk:r.mk,pr:r.pr,sv:r.sv,st:r.st,dp:br2iso(r.dp),mv:r.mv}));
+    svData();
+  }catch(e){S.recs=[];console.warn('Could not load data.json',e);}
+}
+
+function svData(){localStorage.setItem('r_data',JSON.stringify(S.recs));}
+
+// ============================================================
+// GOOGLE SHEETS
+// ============================================================
+async function syncSheets(){
+  if(!S.url){toast('Configure a URL do Apps Script.','warn');return;}
+  try{
+    toast('Sincronizando com Google Sheets...','info');
+    const res=await fetch(S.url+'?action=getData');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const j=await res.json();
+    if(j.data&&j.data.length){
+      S.recs=j.data.map((r,i)=>({
+        _id:r._rowIndex||(i+1),
+        lo:r['Loja']||'',fo:r['Fornecedor']||'',nn:r['número_da_nota']||'',
+        de:br2iso(r['data_de_emissão']||''),dv:br2iso(r['data_vencimento']||''),
+        vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),
+        pr:tof(r['Produto']),sv:tof(r['Serviço']),
+        st:r['Status']||'em aberto',dp:br2iso(r['Data_Pagamento']||''),
+        mv:r['Mês_vencimento']||''
+      }));
+      svData();applyF();
+      toast('Sincronizado! '+S.recs.length+' registros.');
+    }
+  }catch(e){toast('Erro: '+e.message,'err');}
+}
+
+async function push2Sheets(rec,rowIdx){
+  if(!S.url)return false;
+  try{
+    const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv];
+    await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row})});
+    return true;
+  }catch(e){return false;}
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+function openCfg(){
+  document.getElementById('cfUrl').value=S.url;
+  document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
+  document.getElementById('cfFoList').textContent=S.forns.join(' · ');
+  document.getElementById('mCfg').classList.remove('hidden');
+}
+function saveCfg(){
+  S.url=document.getElementById('cfUrl').value.trim();
+  svCfgStore();cm('mCfg');
+  if(S.url){document.getElementById('btnSync').classList.remove('hidden');syncSheets();}
+  else document.getElementById('btnSync').classList.add('hidden');
+  toast('Configurações salvas!');
+}
+function addLoja(){
+  const v=document.getElementById('cfNvLo').value.trim();
+  if(!v||S.lojas.includes(v))return;
+  S.lojas.push(v);S.lojas.sort();svCfgStore();
+  bldSels();bldFilters();
+  document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
+  document.getElementById('cfNvLo').value='';
+  toast('Loja "'+v+'" adicionada!');
+}
+function addForn(){
+  const v=document.getElementById('cfNvFo').value.trim();
+  if(!v||S.forns.includes(v))return;
+  S.forns.push(v);S.forns.sort();svCfgStore();
+  bldSels();
+  document.getElementById('cfFoList').textContent=S.forns.join(' · ');
+  document.getElementById('cfNvFo').value='';
+  toast('Fornecedor "'+v+'" adicionado!');
+}
+
+// ============================================================
+// FILTERS & SELECTS
+// ============================================================
+function bldFilters(){
+  const lo=document.getElementById('fLo'),cur=lo.value;
+  lo.innerHTML='<option value="">Todas as lojas</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
+  const fo=document.getElementById('fFo'),curf=fo.value;
+  fo.innerHTML='<option value="">Todos</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===curf?' selected':'')+'>'+xe(v)+'</option>').join('');
+  const me=document.getElementById('fMe'),curm=me.value;
+  me.innerHTML='<option value="">Todos os meses</option>'+MESES.slice(1).map((m,i)=>'<option value="'+(i+1)+'"'+((i+1)+''===curm?' selected':'')+'>'+m+'</option>').join('');
+}
+function bldSels(){
+  ['rf_lo','bf_lo'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML='<option value="">Selecione a loja</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
+  });
+  ['rf_fo','bf_fo'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
+  });
+}
+
+function applyF(){
+  const flo=g('fLo'),ffo=g('fFo'),fst=g('fSt'),fme=g('fMe'),fsq=g('fSq').toLowerCase();
+  S.filt=S.recs.filter(r=>{
+    if(flo&&r.lo!==flo)return false;
+    if(ffo&&r.fo!==ffo)return false;
+    if(fst&&r.st!==fst)return false;
+    if(fme&&String(r.mv)!==fme)return false;
+    if(fsq&&!(r.fo+' '+r.nn+' '+r.lo+' '+r.st).toLowerCase().includes(fsq))return false;
+    return true;
+  });
+  S.filt.sort((a,b)=>{
+    let av=a[S.sc],bv=b[S.sc];
+    if(typeof av==='number')return S.sd==='asc'?av-bv:bv-av;
+    av=String(av||'');bv=String(bv||'');
+    return S.sd==='asc'?av.localeCompare(bv,'pt'):bv.localeCompare(av,'pt');
+  });
+  S.pg=1;rstats();rtable();
+}
+
+function sBy(col){
+  if(S.sc===col)S.sd=S.sd==='asc'?'desc':'asc';else{S.sc=col;S.sd='asc';}
+  document.querySelectorAll('th[id^="th-"]').forEach(th=>th.className=th.className.replace(/\bsi\b|\bsa2\b|\bsd\b/g,'').trim()+' si');
+  const th=document.getElementById('th-'+col);
+  if(th)th.className=th.className.replace('si',S.sd==='asc'?'sa2':'sd');
+  applyF();
+}
+
+function clearF(){
+  ['fLo','fFo','fSt','fMe'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fSq').value='';
+  applyF();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function rstats(){
+  const rs=S.recs;
+  const vAb=rs.filter(r=>r.st==='em aberto'||r.st==='vence hoje').reduce((s,r)=>s+r.vn,0);
+  const vVe=rs.filter(r=>r.st==='vencida').reduce((s,r)=>s+r.vn,0);
+  const vPg=rs.filter(r=>r.st==='pago').reduce((s,r)=>s+r.vn,0);
+  const nHj=rs.filter(r=>r.st==='vence hoje').length;
+  const nVe=rs.filter(r=>r.st==='vencida').length;
+  const nAb=rs.filter(r=>r.st==='em aberto'||r.st==='vence hoje').length;
+  document.getElementById('statsRow').innerHTML=
+    crCard('A PAGAR',fBRL(vAb),nAb+' conta'+(nAb!==1?'s':''),'text-amber-600','border-amber-200','bg-amber-50')+
+    crCard('VENCIDO',fBRL(vVe),nVe+' conta'+(nVe!==1?'s':''),'text-red-600','border-red-200','bg-red-50')+
+    crCard('PAGO',fBRL(vPg),rs.filter(r=>r.st==='pago').length+' contas','text-emerald-600','border-emerald-200','bg-emerald-50')+
+    crCard('VENCE HOJE',nHj,'conta'+(nHj!==1?'s':''),'text-orange-500','border-orange-200','bg-orange-50');
+}
+
+function crCard(lb,val,sub,tc,bc,bg){
+  return '<div class="'+bg+' rounded-2xl shadow-sm border '+bc+' p-4"><p class="text-xs font-black text-gray-400 uppercase tracking-wider">'+lb+'</p><p class="text-xl font-black '+tc+' mt-1 leading-tight">'+val+'</p><p class="text-xs text-gray-400 mt-1">'+sub+'</p></div>';
+}
+
+function rtable(){
+  const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
+  document.getElementById('recCnt').textContent=S.filt.length+' registro'+(S.filt.length!==1?'s':'');
+  const stC={'pago':'sp','vencida':'sv','em aberto':'sa','vence hoje':'sh'};
+  const stL={'pago':'✓ Pago','vencida':'⚠ Vencida','em aberto':'● Em aberto','vence hoje':'! Vence hoje'};
+  if(!rows.length){
+    document.getElementById('tBody').innerHTML='<tr><td colspan="12" class="px-4 py-14 text-center text-gray-300 text-sm">Nenhum registro encontrado com os filtros atuais</td></tr>';
+    rpg();return;
+  }
+  document.getElementById('tBody').innerHTML=rows.map(r=>{
+    const sc=stC[r.st]||'sa',sl=stL[r.st]||r.st;
+    return '<tr class="border-b border-gray-50 hover:bg-purple-50/20 transition-colors">'+
+      '<td class="px-3 py-2.5 text-sm font-bold text-gray-700 whitespace-nowrap">'+xe(r.lo)+'</td>'+
+      '<td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap">'+xe(r.fo)+'</td>'+
+      '<td class="px-3 py-2.5 text-xs text-gray-500 font-mono">'+xe(r.nn)+'</td>'+
+      '<td class="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">'+fDt(r.de)+'</td>'+
+      '<td class="px-3 py-2.5 text-sm text-gray-700 font-semibold whitespace-nowrap">'+fDt(r.dv)+'</td>'+
+      '<td class="px-3 py-2.5 text-sm text-right font-black text-gray-800 whitespace-nowrap">'+fBRL(r.vn)+'</td>'+
+      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.mk?fBRL(r.mk):'-')+'</td>'+
+      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.pr?fBRL(r.pr):'-')+'</td>'+
+      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.sv?fBRL(r.sv):'-')+'</td>'+
+      '<td class="px-3 py-2.5 text-center whitespace-nowrap"><span class="text-xs font-bold px-2 py-0.5 rounded-full '+sc+'">'+sl+'</span></td>'+
+      '<td class="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">'+fDt(r.dp)+'</td>'+
+      '<td class="px-3 py-2.5 text-center whitespace-nowrap">'+
+        '<button onclick="editRec('+r._id+')" class="text-purple-600 hover:text-purple-800 text-xs font-black mr-2">Editar</button>'+
+        '<button onclick="delRec('+r._id+')" class="text-red-400 hover:text-red-600 text-xs font-black">Excluir</button>'+
+      '</td></tr>';
+  }).join('');
+  rpg();
+}
+
+function rpg(){
+  const tot=S.filt.length,tp=Math.ceil(tot/S.pp),bar=document.getElementById('pgBar');
+  if(tp<=1){bar.innerHTML='<span class="text-gray-400">'+tot+' registro'+(tot!==1?'s':'')+'</span>';return;}
+  const s=(S.pg-1)*S.pp+1,e=Math.min(S.pg*S.pp,tot);
+  const btn=(l,p,d)=>'<button onclick="goPg('+p+')"'+(d?' disabled':'')+' class="px-2.5 py-1 rounded-xl border '+(d?'opacity-30 cursor-not-allowed text-gray-400':'hover:bg-purple-50 text-purple-700 font-semibold')+'">'+l+'</button>';
+  bar.innerHTML='<span class="text-gray-400">'+s+'–'+e+' de '+tot+'</span>'+
+    '<div class="flex gap-1">'+btn('«',1,S.pg===1)+btn('‹',S.pg-1,S.pg===1)+
+    '<span class="px-3 py-1 bg-purple-700 text-white rounded-xl font-black text-sm">'+S.pg+'</span>'+
+    btn('›',S.pg+1,S.pg===tp)+btn('»',tp,S.pg===tp)+'</div>';
+}
+
+function goPg(p){S.pg=Math.max(1,Math.min(p,Math.ceil(S.filt.length/S.pp)));rtable();window.scrollTo({top:0,behavior:'smooth'});}
+
+// ============================================================
+// CRUD
+// ============================================================
+function openAdd(){
+  S.editId=null;
+  document.getElementById('mRecTtl').textContent='Nova Conta';
+  ['rf_id','rf_nn','rf_de','rf_dv','rf_dp'].forEach(id=>{document.getElementById(id).value='';});
+  ['rf_mk','rf_pr','rf_sv'].forEach(id=>{document.getElementById(id).value='0';});
+  document.getElementById('rf_lo').value='';
+  document.getElementById('rf_fo').value='';
+  document.getElementById('rf_vn').value='';
+  document.getElementById('rf_st').value='em aberto';
+  document.getElementById('mRec').classList.remove('hidden');
+}
+
+function editRec(id){
+  const r=S.recs.find(x=>x._id===id);if(!r)return;
+  S.editId=id;
+  document.getElementById('mRecTtl').textContent='Editar Conta';
+  document.getElementById('rf_id').value=id;
+  document.getElementById('rf_lo').value=r.lo;
+  document.getElementById('rf_fo').value=r.fo;
+  document.getElementById('rf_nn').value=r.nn;
+  document.getElementById('rf_de').value=r.de;
+  document.getElementById('rf_dv').value=r.dv;
+  document.getElementById('rf_vn').value=r.vn;
+  document.getElementById('rf_mk').value=r.mk||0;
+  document.getElementById('rf_pr').value=r.pr||0;
+  document.getElementById('rf_sv').value=r.sv||0;
+  document.getElementById('rf_st').value=r.st;
+  document.getElementById('rf_dp').value=r.dp||'';
+  document.getElementById('mRec').classList.remove('hidden');
+}
+
+async function saveRec(){
+  const lo=g('rf_lo'),fo=g('rf_fo'),dv=g('rf_dv'),vn=g('rf_vn');
+  if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
+  const rec={
+    lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,
+    vn:parseFloat(vn)||0,mk:parseFloat(g('rf_mk'))||0,
+    pr:parseFloat(g('rf_pr'))||0,sv:parseFloat(g('rf_sv'))||0,
+    st:g('rf_st'),dp:g('rf_dp'),
+    mv:dv?new Date(dv+'T12:00').getMonth()+1:''
+  };
+  let rowIdx=null;
+  if(S.editId){
+    const i=S.recs.findIndex(x=>x._id===S.editId);
+    if(i>=0){rowIdx=S.recs[i]._id;rec._id=S.editId;S.recs[i]={...S.recs[i],...rec};}
+  }else{
+    rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
+    S.recs.push(rec);
+  }
+  svData();
+  const ok=await push2Sheets(rec,rowIdx);
+  cm('mRec');applyF();
+  toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Salvo no Google Sheets':''));
+}
+
+async function delRec(id){
+  if(!confirm('Confirmar exclusão? Esta ação não pode ser desfeita.'))return;
+  S.recs=S.recs.filter(x=>x._id!==id);
+  svData();applyF();toast('Registro excluído!');
+}
+
+// ============================================================
+// BOLETO
+// ============================================================
+function openBoleto(){
+  bSt(1);
+  document.getElementById('bLi').value='';
+  document.getElementById('bPDFNm').textContent='Nenhum arquivo selecionado';
+  S.pdfTxt=null;
+  document.getElementById('mBoleto').classList.remove('hidden');
+}
+
+function bSt(n){
+  document.getElementById('bS1').classList.toggle('hidden',n!==1);
+  document.getElementById('bS2').classList.toggle('hidden',n!==2);
+}
+
+async function rdPDF(input){
+  if(!input.files[0])return;
+  const file=input.files[0];
+  document.getElementById('bPDFNm').textContent=file.name;
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let txt='';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const ct=await pg.getTextContent();
+      txt+=ct.items.map(x=>x.str).join(' ')+'\n';
+    }
+    S.pdfTxt=txt;
+    // Detect linha digitável
+    const m=txt.match(/\d{5}\.?\d{5}\s+\d{5}\.?\d{6}\s+\d{5}\.?\d{6}\s+\d\s+\d{14}/);
+    if(m)document.getElementById('bLi').value=m[0];
+    toast('PDF lido! Verifique a linha digitável.','info');
+  }catch(e){
+    S.pdfTxt=null;
+    toast('Não foi possível ler o PDF. Cole a linha digitável manualmente.','warn');
+  }
+}
+
+function parseBol(){
+  const raw=document.getElementById('bLi').value.trim();
+  const cl=raw.replace(/[\s.\-]/g,'');
+  let prs={tipo:'Manual'};
+
+  if(cl.length===47){
+    // Boleto bancário: campo 5 = posições 32-46 (fator 4 dig + valor 10 dig)
+    const f5=cl.substring(32,47);
+    const fac=parseInt(f5.substring(0,4));
+    const base=new Date(1997,9,7);
+    const due=new Date(base.getTime()+fac*864e5);
+    const amt=parseFloat(f5.substring(4,14))/100;
+    prs={tipo:'Bancário',banco:cl.substring(0,3),dv:toISO(due),vn:amt.toFixed(2)};
+  }else if(cl.length===48){
+    // Concessionária
+    const vid=cl.substring(2,3);
+    let amt=0;
+    if(['6','7','8','9'].includes(vid))amt=parseFloat(cl.substring(4,15))/100;
+    prs={tipo:'Concessionária',vn:amt.toFixed(2)};
+  }else if(cl.length>0&&cl.length<44){
+    toast('Código inválido ('+cl.length+' dígitos). Verifique a linha digitável.','warn');return;
+  }
+
+  // Enrich from PDF
+  if(S.pdfTxt){
+    const tx=S.pdfTxt;
+    const fo=S.forns.find(f=>tx.toUpperCase().includes(f.toUpperCase()));
+    if(fo)prs.fo=fo;
+    const nm=tx.match(/NF[- eE]*[nNºo°]*[:\s]*(\d{4,})/i);
+    if(nm)prs.nn=nm[1];
+  }
+
+  document.getElementById('bInf').textContent=
+    'Tipo: '+prs.tipo+' | Banco: '+(prs.banco||'—')+
+    ' | Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'—')+
+    ' | Vencimento: '+(fDt(prs.dv)||'—');
+
+  if(prs.dv)document.getElementById('bf_dv').value=prs.dv;
+  if(prs.vn)document.getElementById('bf_vn').value=prs.vn;
+  if(prs.fo)document.getElementById('bf_fo').value=prs.fo;
+  if(prs.nn)document.getElementById('bf_nn').value=prs.nn;
+
+  bSt(2);
+}
+
+async function saveBol(){
+  const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
+  if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
+  const rec={
+    lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,
+    vn:parseFloat(vn)||0,mk:parseFloat(g('bf_mk'))||0,
+    pr:parseFloat(g('bf_pr'))||0,sv:parseFloat(g('bf_sv'))||0,
+    st:g('bf_st'),dp:g('bf_dp'),
+    mv:dv?new Date(dv+'T12:00').getMonth()+1:'',
+    _id:Math.max(0,...S.recs.map(x=>x._id))+1
+  };
+  S.recs.push(rec);svData();
+  const ok=await push2Sheets(rec,null);
+  cm('mBoleto');S.pdfTxt=null;applyF();
+  toast('Boleto adicionado!'+(ok?' ✓ Google Sheets':''));
+}
+
+// ============================================================
+// CSV EXPORT
+// ============================================================
+function doCSV(){
+  const hd=['Loja','Fornecedor','Nº Nota','Emissão','Vencimento','Valor NF','MKT','Produto','Serviço','Status','Dt. Pagamento','Mês'];
+  const rows=S.filt.map(r=>[r.lo,r.fo,r.nn,fDt(r.de),fDt(r.dv),r.vn,r.mk,r.pr,r.sv,r.st,fDt(r.dp),r.mv]);
+  const csv=[hd,...rows].map(row=>row.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='mercadorias-pagar-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function g(id){return document.getElementById(id).value;}
+function cm(id){document.getElementById(id).classList.add('hidden');}
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function hide(id){document.getElementById(id).classList.add('hidden');}
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fBRL(v){if(!v&&v!==0)return '-';return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
+function fNum(v){return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2}).format(v);}
+function fDt(iso){
+  if(!iso)return '';
+  if(iso.includes('/'))return iso;
+  const p=iso.split('-');
+  if(p.length!==3)return iso;
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+function br2iso(br){
+  if(!br)return '';
+  if(br.includes('-'))return br;
+  const p=br.split('/');
+  if(p.length!==3||!p[2])return '';
+  return p[2].padStart(4,'0')+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+}
+function i2br(iso){
+  if(!iso)return '';
+  if(iso.includes('/'))return iso;
+  const p=iso.split('-');if(p.length!==3)return '';
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+function toISO(d){
+  if(!d||isNaN(d))return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function tof(v){
+  if(!v&&v!==0)return 0;
+  const s=String(v).replace(/[R$\s]/g,'').replace('.','').replace(',','.');
+  return parseFloat(s)||0;
+}
+function toast(msg,type='ok'){
+  const el=document.getElementById('tst'),mc=document.getElementById('tstMsg');
+  const c={ok:'bg-emerald-600',err:'bg-red-600',warn:'bg-amber-500',info:'bg-blue-600'};
+  mc.className=(c[type]||c.ok)+' text-white text-sm px-5 py-3 rounded-2xl shadow-2xl max-w-xs font-semibold';
+  mc.textContent=msg;el.classList.remove('hidden');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.add('hidden'),3500);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+if(localStorage.getItem('r_ok')==='1'){
+  hide('pgLogin');show('pgApp');init();
+}
+</script>
+</body>
+</html>
