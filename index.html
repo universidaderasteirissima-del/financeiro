@@ -251,16 +251,23 @@ th:hover{background:#EAD9C8!important}
     <!-- Step 2 -->
     <div id="bS2" style="display:none">
       <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.875rem;margin-bottom:1.25rem">
-        <p style="font-size:.8rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete abaixo</p>
-        <p style="font-size:.72rem;color:#7A4F3A;margin-top:.25rem" id="bInf"></p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
+          <p style="font-size:.8rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete abaixo</p>
+          <span id="bQueueBadge" style="display:none;font-size:.72rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.2rem .7rem;border-radius:2px"></span>
+        </div>
+        <p style="font-size:.72rem;color:#7A4F3A" id="bInf"></p>
       </div>
       <div style="display:grid;gap:.75rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
           <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione</option></select></div>
           <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel" onchange="calcFornSplit()"><option value="">Selecione</option></select></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.75rem">
           <div><label class="lbl">Nº da Nota / Documento</label><input type="text" id="bf_nn" class="inp" /></div>
+          <div>
+            <label class="lbl">Parcela <span style="font-weight:400;text-transform:none;letter-spacing:0">(se houver)</span></label>
+            <input type="number" min="1" id="bf_parc" class="inp" placeholder="ex: 2" />
+          </div>
           <div><label class="lbl">Data de Emissão</label><input type="date" id="bf_de" class="inp" /></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
@@ -281,7 +288,13 @@ th:hover{background:#EAD9C8!important}
               <option value="pago">Pago</option>
             </select>
           </div>
-          <div><label class="lbl">Data de Pagamento</label><input type="date" id="bf_dp" class="inp" /></div>
+          <div>
+            <label class="lbl">Data de Pagamento</label>
+            <div style="display:flex;gap:.4rem;align-items:center">
+              <input type="date" id="bf_dp" class="inp" onchange="autoStatusOnPay('bf_dp','bf_st')" />
+              <button type="button" onclick="setToday('bf_dp','bf_st')" title="Marcar como pago hoje" style="white-space:nowrap;padding:.45rem .7rem;background:#1E6B3A;color:#fff;border:none;border-radius:3px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">✓ Hoje</button>
+            </div>
+          </div>
         </div>
       </div>
       <div style="display:flex;gap:.75rem;margin-top:1.5rem">
@@ -327,7 +340,13 @@ th:hover{background:#EAD9C8!important}
             <option value="pago">Pago</option>
           </select>
         </div>
-        <div><label class="lbl">Data de Pagamento</label><input type="date" id="rf_dp" class="inp" /></div>
+        <div>
+          <label class="lbl">Data de Pagamento</label>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input type="date" id="rf_dp" class="inp" onchange="autoStatusOnPay('rf_dp','rf_st')" />
+            <button type="button" onclick="setToday('rf_dp','rf_st')" title="Marcar como pago hoje" style="white-space:nowrap;padding:.45rem .7rem;background:#1E6B3A;color:#fff;border:none;border-radius:3px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">✓ Hoje</button>
+          </div>
+        </div>
       </div>
     </div>
     <div style="display:flex;gap:.75rem;margin-top:1.5rem">
@@ -490,7 +509,7 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 // CONSTANTS
 // ============================================================
-const APP_VER='6'; // bump to force localStorage refresh
+const APP_VER='7'; // bump to force localStorage refresh
 const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
 const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -501,7 +520,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');lo
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,lastId:null};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],boletoQueue:[],boletoQueueIdx:0,lastId:null};
 
 // ============================================================
 // AUTH
@@ -779,10 +798,17 @@ async function saveRec(){
   if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
   const rec={lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,vn:+vn||0,mk:+g('rf_mk')||0,pr:+g('rf_pr')||0,sv:+g('rf_sv')||0,st:g('rf_st'),dp:g('rf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0};
   let rowIdx=null;
-  if(S.editId){const i=S.recs.findIndex(x=>x._id===S.editId);if(i>=0){rowIdx=S.recs[i]._id;rec._id=S.editId;S.recs[i]={...S.recs[i],...rec};}}
-  else{rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;S.recs.push(rec);}
+  const editId=S.editId?parseInt(S.editId):null;
+  if(editId){
+    const i=S.recs.findIndex(x=>parseInt(x._id)===editId);
+    if(i<0){toast('Erro: registro não encontrado.','err');return;}
+    rowIdx=S.recs[i]._id;rec._id=editId;S.recs[i]={...S.recs[i],...rec};
+  }else{
+    rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
+    S.recs.push(rec);
+    S.lastId=rec._id;
+  }
   svData();const ok=await push2Sheets(rec,rowIdx);
-  if(!S.editId)S.lastId=rec._id;
   cm('mRec');applyF();
   toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
@@ -792,14 +818,32 @@ async function delRec(id){
 }
 
 // ============================================================
-// BOLETO
+// PAYMENT HELPERS
+// ============================================================
+function setToday(dpId,stId){
+  const d=new Date();
+  const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  document.getElementById(dpId).value=iso;
+  if(stId)document.getElementById(stId).value='pago';
+}
+function autoStatusOnPay(dpId,stId){
+  if(document.getElementById(dpId).value&&stId)document.getElementById(stId).value='pago';
+}
+
+// ============================================================
+// BOLETO — MULTI-BOLETO QUEUE SYSTEM
 // ============================================================
 function openBoleto(){
-  bSt(1);document.getElementById('bLi').value='';
+  bSt(1);
+  document.getElementById('bLi').value='';
   document.getElementById('bPDFNm').textContent='Nenhum arquivo selecionado';
-  S.pdfTxt=null;document.getElementById('mBoleto').style.display='flex';
+  S.pdfTxt=null;S.pdfPages=[];S.boletoQueue=[];S.boletoQueueIdx=0;
+  document.getElementById('mBoleto').style.display='flex';
 }
-function bSt(n){document.getElementById('bS1').style.display=n===1?'block':'none';document.getElementById('bS2').style.display=n===2?'block':'none';}
+function bSt(n){
+  document.getElementById('bS1').style.display=n===1?'block':'none';
+  document.getElementById('bS2').style.display=n===2?'block':'none';
+}
 
 async function rdPDF(input){
   if(!input.files[0])return;
@@ -809,21 +853,259 @@ async function rdPDF(input){
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-    let txt='';
+    S.pdfPages=[];
     for(let i=1;i<=pdf.numPages;i++){
       const pg=await pdf.getPage(i);
       const ct=await pg.getTextContent();
-      txt+=ct.items.map(x=>x.str).join(' ')+'\n';
+      S.pdfPages.push(ct.items.map(x=>x.str).join(' '));
     }
-    S.pdfTxt=txt;
-    // Auto-detect linha digitável (47 or 48 consecutive digits, possibly with spaces/dots)
-    const m=txt.match(/(?:\d[\s.]?){47,48}(?=\s|$)/g);
-    if(m){
-      const cands=m.map(x=>x.replace(/[\s.]/g,'')).filter(x=>x.length===47||x.length===48);
-      if(cands.length)document.getElementById('bLi').value=cands[0];
+    S.pdfTxt=S.pdfPages.join('\n\n===PAGINA===\n\n');
+    // Auto-detect first linha digitável
+    const allLinhas=findLinhasDigitaveis(S.pdfTxt);
+    if(allLinhas.length)document.getElementById('bLi').value=allLinhas[0];
+    toast('PDF lido! '+S.pdfPages.length+' página(s), '+allLinhas.length+' boleto(s) detectado(s).','info');
+  }catch(e){S.pdfTxt=null;S.pdfPages=[];toast('Não foi possível ler o PDF. Cole a linha digitável.','warn');}
+}
+
+function findLinhasDigitaveis(txt){
+  const matches=[];
+  // Pattern: groups of digits separated by dots/spaces forming 47-48 digit sequences
+  const raw=txt.match(/[\d][\d\s.]{45,60}[\d]/g)||[];
+  for(const m of raw){
+    const cl=m.replace(/[\s.]/g,'');
+    if(cl.length===47||cl.length===48)matches.push(cl);
+  }
+  return [...new Set(matches)]; // deduplicate
+}
+
+function parseBol(){
+  const manualLinha=document.getElementById('bLi').value.trim();
+
+  // Build queue: one entry per detected boleto (one per PDF page, or just one from manual input)
+  S.boletoQueue=[];
+
+  if(S.pdfPages&&S.pdfPages.length>1){
+    // Try to extract one boleto per page
+    for(let p=0;p<S.pdfPages.length;p++){
+      const pageTxt=S.pdfPages[p];
+      const linhas=findLinhasDigitaveis(pageTxt);
+      const linha=linhas.length?linhas[0]:(p===0?manualLinha.replace(/[\s.]/g,''):'');
+      const prs=extractBoletoData(pageTxt,linha);
+      // Only add if we found meaningful data on this page
+      if(prs.dv||prs.vn||(prs.nn&&prs.nn.length>0)){
+        S.boletoQueue.push(prs);
+      }
     }
-    toast('PDF lido! Verifique os dados.','info');
-  }catch(e){S.pdfTxt=null;toast('Não foi possível ler o PDF. Cole a linha digitável.','warn');}
+  }
+
+  // Fallback: single boleto from manual input or first page
+  if(S.boletoQueue.length===0){
+    const cl=manualLinha.replace(/[\s.]/g,'');
+    const prs=extractBoletoData(S.pdfTxt||'',cl);
+    S.boletoQueue.push(prs);
+  }
+
+  if(S.boletoQueue.length===0){toast('Não foi possível extrair dados. Preencha manualmente.','warn');bSt(2);return;}
+
+  S.boletoQueueIdx=0;
+  showQueueItem(0);
+}
+
+function showQueueItem(idx){
+  const prs=S.boletoQueue[idx];
+  const total=S.boletoQueue.length;
+
+  // Update queue badge
+  const badge=document.getElementById('bQueueBadge');
+  if(total>1){badge.style.display='inline-block';badge.textContent='Boleto '+(idx+1)+' de '+total;}
+  else badge.style.display='none';
+
+  // Build info string
+  const parts=[
+    prs.banco?'Banco: '+prs.banco:'',
+    'Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado'),
+    'Vencimento: '+(fDt(prs.dv)||'não detectado'),
+    prs.de?'Emissão: '+fDt(prs.de):'',
+    prs.nn?'NF: '+prs.nn+(prs.parcel?'/'+prs.parcel:''):'',
+    prs.fo?'Fornecedor: '+prs.fo:'',
+  ];
+  document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
+
+  // Fill form
+  document.getElementById('bf_dv').value=prs.dv||'';
+  document.getElementById('bf_de').value=prs.de||'';
+  document.getElementById('bf_vn').value=prs.vn||'';
+  document.getElementById('bf_fo').value=prs.fo||'';
+  document.getElementById('bf_nn').value=prs.nn||'';
+  document.getElementById('bf_parc').value=prs.parcel||'';
+  document.getElementById('bf_mk').value='0';
+  document.getElementById('bf_pr').value='0';
+  document.getElementById('bf_sv').value='0';
+  document.getElementById('bf_st').value='em aberto';
+  document.getElementById('bf_dp').value='';
+  document.getElementById('bf_lo').value='';
+
+  calcFornSplit();
+  bSt(2);
+}
+
+// Master boleto data extractor — handles all banks
+function extractBoletoData(txt,barcode){
+  const prs={};
+
+  // --- BANK IDENTIFICATION ---
+  const cl=String(barcode||'').replace(/[\s.]/g,'');
+  const bankCode=cl.length>=3?cl.substring(0,3):'';
+  const bankNames={'001':'Banco do Brasil','033':'Santander','104':'Caixa','237':'Bradesco','341':'Itaú','422':'Safra','756':'Sicoob','077':'Inter'};
+  prs.banco=bankNames[bankCode]||(bankCode?'Banco '+bankCode:'');
+
+  // Try text-based bank detection
+  if(!prs.banco&&txt){
+    const t=txt.toUpperCase();
+    if(t.includes('SICOOB')||t.includes('BANCOOB'))prs.banco='Sicoob';
+    else if(t.includes('BRADESCO'))prs.banco='Bradesco';
+    else if(t.includes('BANCO DO BRASIL'))prs.banco='Banco do Brasil';
+    else if(t.includes('ITAÚ')||t.includes('ITAU'))prs.banco='Itaú';
+    else if(t.includes('SANTANDER'))prs.banco='Santander';
+    else if(t.includes('INTER'))prs.banco='Inter';
+    else if(t.includes('CAIXA'))prs.banco='Caixa';
+  }
+
+  // --- AMOUNT FROM BARCODE (reliable) ---
+  if(cl.length===47){
+    const f5=cl.substring(33,47);
+    const amt=parseFloat(f5.substring(4,14))/100;
+    if(amt>0&&amt<999999)prs.vn=amt.toFixed(2);
+  }else if(cl.length===48){
+    const vid=cl.substring(2,3);
+    if(['6','7','8','9'].includes(vid)){const amt=parseFloat(cl.substring(4,15))/100;if(amt>0)prs.vn=amt.toFixed(2);}
+  }
+
+  if(!txt)return prs;
+
+  // === PDF TEXT EXTRACTION (always overrides barcode for dates) ===
+
+  // --- DUE DATE ---
+  const dvPat=[
+    /[Dd]ata\s+de\s+[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,  // BB
+    /[Vv]encimento\s*[\r\n\s]+(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+  ];
+  for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[1]);break;}}
+
+  // --- EMISSION DATE ---
+  const dePat=[
+    /[Dd]ata\s+do\s+[Dd]ocumento\s*[\r\n\s]+(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+[Dd]ocumento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+[Dd]o\s+[Dd]ocumento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+de\s+[Ee]miss[aã]o\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+  ];
+  for(const p of dePat){const m=txt.match(p);if(m){prs.de=br2iso(m[1]);break;}}
+
+  // --- VALUE from PDF (overrides barcode) ---
+  const vnPat=[
+    /[Vv]alor\s+do\s+[Dd]ocumento\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
+    /\(=\s*\)\s*[Vv]alor\s+do\s+[Dd]ocumento\s+([\d\.]+,\d{2})/i,
+    /[Vv]alor\s*[Cc]obra[dt]o\s+([\d\.]+,\d{2})/i,
+    /R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/,
+  ];
+  for(const p of vnPat){
+    const m=txt.match(p);
+    if(m&&m[1]){const v=parseFloat(m[1].replace(/\./g,'').replace(',','.'));if(v>0&&v<999999){prs.vn=v.toFixed(2);break;}}
+  }
+
+  // --- NF NUMBER ---
+  // Priority 1: REF. NF XXX in informações section
+  const nfPat=[
+    /REF\.?\s+NF\s+(\d+)/i,
+    /REF\.?\s*NF[:\-\s]+(\d+)/i,
+  ];
+  for(const p of nfPat){const m=txt.match(p);if(m){prs.nn=m[1];break;}}
+
+  // Priority 2: Número/N. do Documento — but handle "87086 2/3" (nota + parcel)
+  if(!prs.nn){
+    // Sicoob pattern: "N. documento\n87086 2/3"
+    const sicoobDoc=/N\.?\s*[Dd]ocumento\s+(\d+)\s+(\d+)\/(\d+)/;
+    const sd=txt.match(sicoobDoc);
+    if(sd){prs.nn=sd[1];if(!prs.parcel)prs.parcel=parseInt(sd[2]);}
+    else{
+      // Generic nota patterns
+      const genPat=[
+        /[Nn][rR]\.?\s*do\s*[Dd]ocumento\s+(\S+)/i,
+        /[Nn][úu]mero\s+do\s+[Dd]ocumento\s+(\S+)/i,
+        /N[°º]\s*do\s*[Dd]ocumento\s+(\S+)/i,
+        /[Nn]\.\s*documento\s+(\S+)/i,
+      ];
+      for(const p of genPat){
+        const m=txt.match(p);
+        if(m&&m[1]&&m[1].length>=1&&m[1].length<=20&&!/^\d{2}\/\d{2}\/\d{4}$/.test(m[1])){
+          prs.nn=m[1];break;
+        }
+      }
+    }
+  }
+
+  // --- PARCEL DETECTION ---
+  if(!prs.parcel){
+    const parcPat=[
+      /parcela\s+(\d+)\/(\d+)/i,           // "parcela 2/2"
+      /(\d+)[aª]\s*parcela/i,              // "2ª parcela"
+      /(\d+)\s*\/\s*(\d+)\s+parcela/i,    // "2/3 parcela"
+    ];
+    for(const p of parcPat){const m=txt.match(p);if(m){prs.parcel=parseInt(m[1]);break;}}
+    // Also from N. documento "87086 2/3" — already handled above
+    if(!prs.parcel){
+      // Generic X/Y pattern near nota number (like "87086 2/3" or "005906-02")
+      const docWithParcel=/(?:documento|documento)\s+[\d]+\s+(\d+)\/(\d+)/i;
+      const dwp=txt.match(docWithParcel);
+      if(dwp)prs.parcel=parseInt(dwp[1]);
+    }
+  }
+
+  // --- FORNECEDOR matching ---
+  const nt=norm(txt);
+  const fo=S.forns.find(f=>nt.includes(norm(f)));
+  if(fo)prs.fo=fo;
+
+  return prs;
+}
+
+// Legacy compatibility
+function extractFromPDF(txt){return extractBoletoData(txt,'');}
+function extractNF(txt){return extractBoletoData(txt,'').nn||'';}
+function extractValue(txt){return extractBoletoData(txt,'').vn||'';}
+
+async function saveBol(){
+  const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
+  if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
+
+  const parcel=g('bf_parc');
+  const baseNn=g('bf_nn');
+  const nn=baseNn&&parcel?baseNn+'-'+parcel:baseNn;
+
+  const rec={
+    lo,fo,nn,de:g('bf_de'),dv,
+    vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,
+    st:g('bf_st'),dp:g('bf_dp'),
+    mv:dv?new Date(dv+'T12:00').getMonth()+1:0,
+    _id:Math.max(0,...S.recs.map(x=>x._id))+1
+  };
+  S.recs.push(rec);svData();
+  S.lastId=rec._id;
+  const ok=await push2Sheets(rec,null);
+
+  // Advance queue or close
+  const nextIdx=S.boletoQueueIdx+1;
+  if(nextIdx<S.boletoQueue.length){
+    S.boletoQueueIdx=nextIdx;
+    applyF();
+    showQueueItem(nextIdx);
+    toast('Boleto '+(S.boletoQueueIdx)+'/'+S.boletoQueue.length+' salvo!'+(ok?' ✓':'')+'  Confirme o próximo.');
+  }else{
+    cm('mBoleto');S.pdfTxt=null;S.pdfPages=[];S.boletoQueue=[];
+    applyF();
+    toast((S.boletoQueue.length>1?S.boletoQueue.length+' boletos salvos!':'Boleto salvo!')+(ok?' ✓ Google Sheets':''));
+  }
 }
 
 // Normalize string: remove accents, uppercase (for fornecedor matching)
