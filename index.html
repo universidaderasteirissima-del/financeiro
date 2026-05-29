@@ -3,111 +3,135 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rasteirissima — Mercadorias a Pagar</title>
+<title>Rasteirissima — Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
-*{box-sizing:border-box}
-.sp{background:#f3e8ff;color:#6d28d9;border:1px solid #ddd6fe}
-.sv{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-.sa{background:#fef9c3;color:#854d0e;border:1px solid #fde68a}
-.sh{background:#ffedd5;color:#9a3412;border:1px solid #fed7aa}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem}
-.modal-box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.3)}
-th{cursor:pointer;user-select:none;white-space:nowrap}
-th:hover{background:#ede9fe!important}
-.si:after{content:' ↕';opacity:.3;font-size:.7em}
-.sa2:after{content:' ↑';opacity:1;font-size:.85em}
-.sd:after{content:' ↓';opacity:1;font-size:.85em}
-.lbl{display:block;font-size:.7rem;font-weight:700;color:#9ca3af;margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.05em}
-.inp{width:100%;border:2px solid #e5e7eb;border-radius:.65rem;padding:.45rem .7rem;font-size:.875rem;transition:border-color .15s;background:#fff}
-.inp:focus{border-color:#7c3aed;outline:none}
-.sel{width:100%;border:2px solid #e5e7eb;border-radius:.65rem;padding:.45rem .7rem;font-size:.875rem;transition:border-color .15s;background:#fff}
-.sel:focus{border-color:#7c3aed;outline:none}
-.fade{animation:fd .18s ease}
-@keyframes fd{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#F5EFE6;color:#2C1810;min-height:100vh}
+
+/* COLORS */
+:root{
+  --br9:#2C1810;--br8:#3D2B1F;--br7:#5C3D2E;--br6:#7A4F3A;
+  --br5:#9B6B50;--br4:#B8896A;--br3:#D4B499;--br2:#EAD9C8;
+  --br1:#F2EAE0;--cr:#FAF7F4;
+  --border:#DDD0BC;
+}
+
+/* STATUS BADGES */
+.sp{background:#EEF7F0;color:#1E6B3A;border:1px solid #B8DFC8;font-weight:600}
+.sv{background:#FDF0F0;color:#8B1A1A;border:1px solid #F0C0C0;font-weight:600}
+.sa{background:#FDFBF0;color:#6B5500;border:1px solid #E8D880;font-weight:600}
+.sh{background:#FDF5EE;color:#7A3300;border:1px solid #F0C898;font-weight:600}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem;backdrop-filter:blur(2px)}
+.modal-box{background:#fff;border-radius:4px;padding:28px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(44,24,16,.2);border:1px solid var(--border)}
+
+/* INPUTS */
+.lbl{display:block;font-size:.7rem;font-weight:700;color:#9B6B50;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em}
+.inp{width:100%;border:1.5px solid var(--border);border-radius:3px;padding:.5rem .75rem;font-size:.875rem;font-family:'Plus Jakarta Sans',sans-serif;transition:border-color .15s;background:#fff;color:#2C1810}
+.inp:focus{border-color:#9B6B50;outline:none}
+.sel{width:100%;border:1.5px solid var(--border);border-radius:3px;padding:.5rem .75rem;font-size:.875rem;font-family:'Plus Jakarta Sans',sans-serif;background:#fff;color:#2C1810;transition:border-color .15s}
+.sel:focus{border-color:#9B6B50;outline:none}
+
+/* BUTTONS */
+.btn-primary{background:#5C3D2E;color:#fff;border:none;border-radius:3px;padding:.55rem 1.2rem;font-size:.825rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:background .15s;letter-spacing:.02em}
+.btn-primary:hover{background:#3D2B1F}
+.btn-secondary{background:#FAF7F4;color:#5C3D2E;border:1.5px solid var(--border);border-radius:3px;padding:.5rem 1.1rem;font-size:.825rem;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .15s}
+.btn-secondary:hover{background:#F2EAE0;border-color:#B8896A}
+.btn-accent{background:#9B6B50;color:#fff;border:none;border-radius:3px;padding:.5rem 1rem;font-size:.8rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:background .15s}
+.btn-accent:hover{background:#7A4F3A}
+
+/* TABLE */
+th{cursor:pointer;user-select:none;white-space:nowrap;transition:background .1s}
+th:hover{background:#EAD9C8!important}
+.si:after{content:' ↕';opacity:.25;font-size:.65em}
+.sa2:after{content:' ↑';opacity:.8;font-size:.75em}
+.sd:after{content:' ↓';opacity:.8;font-size:.75em}
+
+/* CARD */
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:1.25rem 1.5rem}
+
+/* SCROLLBAR */
 ::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-thumb{background:#c4b5fd;border-radius:3px}
+::-webkit-scrollbar-track{background:#F2EAE0}
+::-webkit-scrollbar-thumb{background:#D4B499;border-radius:2px}
+
+/* FADE */
+.fade{animation:fd .2s ease}
+@keyframes fd{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* DIVIDER */
+.hdiv{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:.5rem 0}
 </style>
 </head>
-<body class="bg-slate-100 text-gray-900 min-h-screen">
+<body>
 
-<!-- ========== LOGIN ========== -->
-<div id="pgLogin" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-950 via-purple-800 to-pink-700">
-  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fade">
-    <div class="text-center mb-6">
-      <div class="text-5xl mb-3">👗</div>
-      <h1 class="text-2xl font-black text-gray-800">Rasteirissima</h1>
-      <p class="text-gray-400 text-sm mt-1">Controle Financeiro</p>
+<!-- ===== LOGIN ===== -->
+<div id="pgLogin" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2C1810 0%,#5C3D2E 50%,#9B6B50 100%)">
+  <div style="background:#fff;border-radius:4px;padding:2.5rem;width:100%;max-width:360px;box-shadow:0 24px 60px rgba(0,0,0,.3)" class="fade">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810;line-height:1">RASTEIRISSIMA</div>
+      <div style="width:40px;height:2px;background:#9B6B50;margin:.75rem auto 0"></div>
+      <p style="font-size:.75rem;color:#9B6B50;margin-top:.5rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase">Sistema Financeiro</p>
     </div>
-    <div id="loginErr" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4 text-center border border-red-200"></div>
+    <div id="loginErr" style="display:none;background:#FDF0F0;color:#8B1A1A;font-size:.8rem;padding:.75rem;border-radius:3px;margin-bottom:1rem;border:1px solid #F0C0C0;text-align:center"></div>
     <input type="password" id="loginPwd" placeholder="Senha de acesso"
-      class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm mb-3 focus:border-purple-500 focus:outline-none transition"
+      style="width:100%;border:1.5px solid #DDD0BC;border-radius:3px;padding:.75rem 1rem;font-size:.875rem;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:.75rem;color:#2C1810"
       onkeydown="if(event.key==='Enter')doLogin()" autofocus />
-    <button onclick="doLogin()"
-      class="w-full bg-gradient-to-r from-purple-700 to-pink-600 hover:from-purple-800 hover:to-pink-700 text-white font-black py-3 rounded-xl transition shadow-lg text-sm">
-      Entrar
+    <button onclick="doLogin()" style="width:100%;background:#2C1810;color:#fff;border:none;border-radius:3px;padding:.875rem;font-size:.875rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;letter-spacing:.04em;transition:background .15s" onmouseover="this.style.background='#5C3D2E'" onmouseout="this.style.background='#2C1810'">
+      ENTRAR
     </button>
-    <p class="text-xs text-gray-300 text-center mt-5">Senha padrão: <b>rasteira2024</b></p>
+    <p style="font-size:.7rem;color:#C8A882;text-align:center;margin-top:1.25rem">Senha padrão: <strong>rasteira2024</strong></p>
   </div>
 </div>
 
-<!-- ========== APP ========== -->
-<div id="pgApp" class="hidden min-h-screen flex flex-col">
+<!-- ===== APP ===== -->
+<div id="pgApp" style="display:none;min-height:100vh;flex-direction:column">
 
   <!-- HEADER -->
-  <header class="bg-gradient-to-r from-purple-900 to-pink-700 text-white shadow-xl sticky top-0 z-30">
-    <div class="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl">👗</span>
-        <div>
-          <h1 class="font-black text-base leading-none">Rasteirissima</h1>
-          <p class="text-purple-300 text-xs mt-0.5">Mercadorias a Pagar — Lojas Próprias</p>
+  <header style="background:#2C1810;color:#fff;position:sticky;top:0;z-index:30;border-bottom:2px solid #5C3D2E">
+    <div style="max-width:1600px;margin:0 auto;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <div id="logoArea">
+          <div style="font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff;line-height:1">RASTEIRISSIMA</div>
+          <div style="font-size:.65rem;color:#C8A882;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;font-weight:500">Mercadorias a Pagar — Lojas Próprias</div>
         </div>
       </div>
-      <div class="flex items-center gap-1">
-        <button onclick="syncSheets()" id="btnSync"
-          class="hidden text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
-          🔄 Sincronizar
-        </button>
-        <button onclick="openCfg()"
-          class="text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
-          ⚙️ Config
-        </button>
-        <button onclick="doLogout()"
-          class="text-xs text-purple-200 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/15 transition">
-          Sair
-        </button>
+      <div style="display:flex;align-items:center;gap:.25rem">
+        <button onclick="syncSheets()" id="btnSync" style="display:none;color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">↻ Sincronizar</button>
+        <button onclick="openCfg()" style="color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">⚙ Config</button>
+        <button onclick="doLogout()" style="color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">Sair</button>
       </div>
     </div>
   </header>
 
   <!-- MAIN -->
-  <main class="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4">
+  <main style="flex:1;max-width:1600px;margin:0 auto;width:100%;padding:1.5rem">
 
     <!-- STATS -->
-    <div id="statsRow" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+    <div id="statsRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem"></div>
 
     <!-- ACTIONS -->
-    <div class="flex flex-wrap gap-2 mb-3 items-center">
-      <button onclick="openBoleto()"
-        class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-sm font-black shadow-md flex items-center gap-1.5 transition">
-        📄 Adicionar Boleto
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:center">
+      <button onclick="openBoleto()" class="btn-primary" style="display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:.9rem">+</span> Adicionar Boleto
       </button>
-      <button onclick="openAdd()"
-        class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-xl text-sm font-black shadow-md flex items-center gap-1.5 transition">
-        ➕ Nova Conta
+      <button onclick="openAdd()" class="btn-accent" style="display:flex;align-items:center;gap:.5rem">
+        <span>+</span> Nova Conta
       </button>
-      <button onclick="doCSV()"
-        class="bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition">
-        ⬇️ Exportar CSV
-      </button>
-      <span id="recCnt" class="ml-auto text-sm text-gray-400 font-medium"></span>
+      <button onclick="doCSV()" class="btn-secondary">⬇ Exportar CSV</button>
+      <span id="recCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
     </div>
 
     <!-- FILTERS -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-3">
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:4px;padding:1.25rem;margin-bottom:1rem">
+      <!-- Row 1: Loja, Fornecedor, Status, Buscar -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:.75rem">
         <div>
           <label class="lbl">Loja</label>
           <select id="fLo" onchange="applyF()" class="sel"></select>
@@ -127,102 +151,126 @@ th:hover{background:#ede9fe!important}
           </select>
         </div>
         <div>
-          <label class="lbl">Mês Vencimento</label>
-          <select id="fMe" onchange="applyF()" class="sel"></select>
-        </div>
-        <div>
           <label class="lbl">Buscar</label>
           <input type="search" id="fSq" placeholder="Nota, fornecedor, loja..." oninput="applyF()" class="inp" />
         </div>
       </div>
-      <button onclick="clearF()" class="text-xs text-purple-500 hover:text-purple-700 mt-2 underline font-semibold">✕ Limpar filtros</button>
+      <!-- Row 2: Date range -->
+      <div style="background:#FAF7F4;border:1px solid var(--border);border-radius:3px;padding:.875rem;display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem">
+        <div>
+          <label class="lbl" style="color:#7A4F3A">Filtrar por período de vencimento</label>
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <div>
+              <span style="font-size:.7rem;color:#9B6B50;font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.2rem">De</span>
+              <input type="date" id="fDe" onchange="applyF()" class="inp" style="width:150px" />
+            </div>
+            <span style="color:#C8A882;font-size:1rem;margin-top:1rem">→</span>
+            <div>
+              <span style="font-size:.7rem;color:#9B6B50;font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.2rem">Até</span>
+              <input type="date" id="fAte" onchange="applyF()" class="inp" style="width:150px" />
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-left:.5rem">
+          <button onclick="setPeriod('mes')" class="btn-secondary" style="font-size:.75rem;padding:.35rem .7rem">Este mês</button>
+          <button onclick="setPeriod('ano')" class="btn-secondary" style="font-size:.75rem;padding:.35rem .7rem">Este ano</button>
+          <button onclick="setPeriod('30')" class="btn-secondary" style="font-size:.75rem;padding:.35rem .7rem">30 dias</button>
+          <button onclick="setPeriod('vencidas')" class="btn-secondary" style="font-size:.75rem;padding:.35rem .7rem;color:#8B1A1A;border-color:#F0C0C0">Vencidas</button>
+          <button onclick="clearF()" style="font-size:.75rem;padding:.35rem .7rem;color:#9B6B50;background:transparent;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-decoration:underline">✕ Limpar</button>
+        </div>
+      </div>
     </div>
 
     <!-- TABLE -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-purple-50 border-b-2 border-purple-100">
-            <tr>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('lo')" id="th-lo">Loja</th>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('fo')" id="th-fo">Fornecedor</th>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('nn')" id="th-nn">Nº Nota</th>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('de')" id="th-de">Emissão</th>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('dv')" id="th-dv">Vencimento</th>
-              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('vn')" id="th-vn">Valor NF</th>
-              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('mk')" id="th-mk">MKT</th>
-              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('pr')" id="th-pr">Produto</th>
-              <th class="px-3 py-3 text-right text-xs font-black text-purple-700 uppercase si" onclick="sBy('sv')" id="th-sv">Serviço</th>
-              <th class="px-3 py-3 text-center text-xs font-black text-purple-700 uppercase si" onclick="sBy('st')" id="th-st">Status</th>
-              <th class="px-3 py-3 text-left text-xs font-black text-purple-700 uppercase si" onclick="sBy('dp')" id="th-dp">Dt. Pagto</th>
-              <th class="px-3 py-3 text-center text-xs font-black text-purple-700 uppercase">Ações</th>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.825rem">
+          <thead>
+            <tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">
+              <th class="si" onclick="sBy('lo')" id="th-lo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Loja</th>
+              <th class="si" onclick="sBy('fo')" id="th-fo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Fornecedor</th>
+              <th class="si" onclick="sBy('nn')" id="th-nn" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Nº Nota</th>
+              <th class="si" onclick="sBy('de')" id="th-de" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Emissão</th>
+              <th class="si" onclick="sBy('dv')" id="th-dv" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Vencimento</th>
+              <th class="si" onclick="sBy('vn')" id="th-vn" style="padding:.75rem 1rem;text-align:right;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Valor NF</th>
+              <th class="si" onclick="sBy('mk')" id="th-mk" style="padding:.75rem 1rem;text-align:right;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">MKT</th>
+              <th class="si" onclick="sBy('pr')" id="th-pr" style="padding:.75rem 1rem;text-align:right;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Produto</th>
+              <th class="si" onclick="sBy('sv')" id="th-sv" style="padding:.75rem 1rem;text-align:right;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Serviço</th>
+              <th class="si" onclick="sBy('st')" id="th-st" style="padding:.75rem 1rem;text-align:center;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Status</th>
+              <th class="si" onclick="sBy('dp')" id="th-dp" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Dt. Pagto</th>
+              <th style="padding:.75rem 1rem;text-align:center;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Ações</th>
             </tr>
           </thead>
           <tbody id="tBody"></tbody>
         </table>
       </div>
-      <div id="pgBar" class="border-t border-gray-100 px-4 py-3 flex items-center justify-between bg-gray-50/70 text-sm"></div>
+      <div id="pgBar" style="border-top:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;background:#FAF7F4;font-size:.8rem"></div>
     </div>
   </main>
 </div>
 
-<!-- ========== MODAL: BOLETO ========== -->
-<div id="mBoleto" class="modal-overlay hidden">
-  <div class="modal-box fade">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="text-lg font-black text-gray-800">📄 Adicionar Boleto</h2>
-      <button onclick="cm('mBoleto')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+<!-- ===== MODAL: BOLETO ===== -->
+<div id="mBoleto" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" style="max-width:600px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Adicionar Boleto</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de linha digitável ou PDF</p>
+      </div>
+      <button onclick="cm('mBoleto')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
+    <!-- Step 1 -->
     <div id="bS1">
-      <p class="text-sm text-gray-500 mb-5">Cole a linha digitável ou faça upload do PDF. Os dados serão extraídos automaticamente.</p>
-      <div class="mb-4">
-        <label class="lbl">Linha digitável do boleto</label>
-        <textarea id="bLi" rows="3" placeholder="Ex: 00190.00009 01234.560007 23456.780008 9 94550000100000"
-          class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-purple-400 focus:outline-none transition resize-none"></textarea>
+      <div style="margin-bottom:1rem">
+        <label class="lbl">Linha digitável do boleto (47 ou 48 dígitos)</label>
+        <textarea id="bLi" rows="3" placeholder="Cole aqui: 00190.00009 01234.560007 23456.780008 9 94550000100000"
+          style="width:100%;border:1.5px solid var(--border);border-radius:3px;padding:.6rem .75rem;font-size:.8rem;font-family:monospace;resize:none;color:#2C1810;background:#fff" onchange="this.style.borderColor='#9B6B50'" onfocus="this.style.borderColor='#9B6B50'" onblur="this.style.borderColor='var(--border)'"></textarea>
       </div>
-      <div class="relative flex items-center gap-3 my-4">
-        <div class="flex-1 border-t border-gray-200"></div>
-        <span class="text-xs text-gray-400 font-semibold">OU FAÇA UPLOAD DO PDF</span>
-        <div class="flex-1 border-t border-gray-200"></div>
+      <div style="display:flex;align-items:center;gap:.75rem;margin:.875rem 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:.7rem;color:#B8896A;font-weight:600;letter-spacing:.06em;text-transform:uppercase">ou envie o PDF</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
       </div>
-      <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/40 transition cursor-pointer"
-        onclick="document.getElementById('bPDF').click()">
-        <p class="text-3xl mb-1">📎</p>
-        <p class="text-sm text-gray-500 font-semibold">Clique para selecionar o PDF do boleto</p>
-        <p class="text-xs text-gray-400 mt-1" id="bPDFNm">Nenhum arquivo selecionado</p>
+      <div onclick="document.getElementById('bPDF').click()"
+        style="border:1.5px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s"
+        onmouseover="this.style.borderColor='#9B6B50';this.style.background='#F2EAE0'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.background='#FAF7F4'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.25rem">📎</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF do boleto</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="bPDFNm">Nenhum arquivo selecionado</p>
       </div>
-      <input type="file" id="bPDF" accept=".pdf" class="hidden" onchange="rdPDF(this)" />
-      <div class="flex gap-3 mt-6">
-        <button onclick="cm('mBoleto')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
-        <button onclick="parseBol()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Analisar Boleto →</button>
+      <input type="file" id="bPDF" accept=".pdf" style="display:none" onchange="rdPDF(this)" />
+      <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+        <button onclick="cm('mBoleto')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="parseBol()" class="btn-primary" style="flex:2">Analisar Boleto →</button>
       </div>
     </div>
-    <div id="bS2" class="hidden">
-      <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5">
-        <p class="text-sm font-black text-purple-700">✅ Dados extraídos com sucesso!</p>
-        <p class="text-xs text-purple-500 mt-1" id="bInf">Confira e complete as informações abaixo antes de confirmar.</p>
+    <!-- Step 2 -->
+    <div id="bS2" style="display:none">
+      <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.875rem;margin-bottom:1.25rem">
+        <p style="font-size:.8rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete abaixo</p>
+        <p style="font-size:.72rem;color:#7A4F3A;margin-top:.25rem" id="bInf"></p>
       </div>
-      <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione a loja</option></select></div>
+      <div style="display:grid;gap:.75rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+          <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione</option></select></div>
           <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel"><option value="">Selecione</option></select></div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="lbl">Nº da Nota</label><input type="text" id="bf_nn" class="inp" /></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+          <div><label class="lbl">Nº da Nota / Documento</label><input type="text" id="bf_nn" class="inp" /></div>
           <div><label class="lbl">Data de Emissão</label><input type="date" id="bf_de" class="inp" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
           <div><label class="lbl">Data de Vencimento *</label><input type="date" id="bf_dv" required class="inp" /></div>
-          <div><label class="lbl">Valor da Nota (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" /></div>
+          <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" /></div>
         </div>
-        <div class="grid grid-cols-3 gap-3">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
           <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="bf_mk" value="0" class="inp" /></div>
           <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="bf_pr" value="0" class="inp" /></div>
           <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="bf_sv" value="0" class="inp" /></div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="lbl">Status</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+          <div><label class="lbl">Status</label>
             <select id="bf_st" class="sel">
               <option value="em aberto">Em aberto</option>
               <option value="vence hoje">Vence hoje</option>
@@ -233,43 +281,42 @@ th:hover{background:#ede9fe!important}
           <div><label class="lbl">Data de Pagamento</label><input type="date" id="bf_dp" class="inp" /></div>
         </div>
       </div>
-      <div class="flex gap-3 mt-6">
-        <button onclick="bSt(1)" class="border-2 border-gray-200 text-gray-600 px-5 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">← Voltar</button>
-        <button onclick="saveBol()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">✅ Confirmar e Salvar</button>
+      <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+        <button onclick="bSt(1)" class="btn-secondary" style="padding:.5rem 1.1rem">← Voltar</button>
+        <button onclick="saveBol()" class="btn-primary" style="flex:1">✓ Confirmar e Salvar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ========== MODAL: ADD/EDIT ========== -->
-<div id="mRec" class="modal-overlay hidden">
+<!-- ===== MODAL: ADD/EDIT ===== -->
+<div id="mRec" class="modal-overlay" style="display:none">
   <div class="modal-box fade">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="text-lg font-black text-gray-800" id="mRecTtl">Nova Conta</h2>
-      <button onclick="cm('mRec')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:1rem;font-weight:700;color:#2C1810" id="mRecTtl">Nova Conta</h2>
+      <button onclick="cm('mRec')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
-    <div class="space-y-3">
+    <div style="display:grid;gap:.75rem">
       <input type="hidden" id="rf_id" />
-      <div class="grid grid-cols-2 gap-3">
-        <div><label class="lbl">Loja *</label><select id="rf_lo" required class="sel"><option value="">Selecione a loja</option></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div><label class="lbl">Loja *</label><select id="rf_lo" required class="sel"><option value="">Selecione</option></select></div>
         <div><label class="lbl">Fornecedor *</label><select id="rf_fo" required class="sel"><option value="">Selecione</option></select></div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div><label class="lbl">Nº da Nota</label><input type="text" id="rf_nn" class="inp" /></div>
         <div><label class="lbl">Data de Emissão</label><input type="date" id="rf_de" class="inp" /></div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div><label class="lbl">Data de Vencimento *</label><input type="date" id="rf_dv" required class="inp" /></div>
-        <div><label class="lbl">Valor da Nota (R$) *</label><input type="number" step="0.01" id="rf_vn" required class="inp" /></div>
+        <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="rf_vn" required class="inp" /></div>
       </div>
-      <div class="grid grid-cols-3 gap-3">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
         <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="rf_mk" value="0" class="inp" /></div>
         <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="rf_pr" value="0" class="inp" /></div>
         <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="rf_sv" value="0" class="inp" /></div>
       </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="lbl">Status</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div><label class="lbl">Status</label>
           <select id="rf_st" class="sel">
             <option value="em aberto">Em aberto</option>
             <option value="vence hoje">Vence hoje</option>
@@ -280,64 +327,65 @@ th:hover{background:#ede9fe!important}
         <div><label class="lbl">Data de Pagamento</label><input type="date" id="rf_dp" class="inp" /></div>
       </div>
     </div>
-    <div class="flex gap-3 mt-6">
-      <button onclick="cm('mRec')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
-      <button onclick="saveRec()" class="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Salvar</button>
+    <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+      <button onclick="cm('mRec')" class="btn-secondary" style="flex:1">Cancelar</button>
+      <button onclick="saveRec()" class="btn-accent" style="flex:1">Salvar</button>
     </div>
   </div>
 </div>
 
-<!-- ========== MODAL: CONFIG ========== -->
-<div id="mCfg" class="modal-overlay hidden">
+<!-- ===== MODAL: CONFIG ===== -->
+<div id="mCfg" class="modal-overlay" style="display:none">
   <div class="modal-box fade">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="text-lg font-black text-gray-800">⚙️ Configurações</h2>
-      <button onclick="cm('mCfg')" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl font-bold">×</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Configurações</h2>
+      <button onclick="cm('mCfg')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
-    <div class="space-y-5">
-      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p class="text-sm font-black text-blue-800 mb-1">🔗 Google Sheets (opcional)</p>
-        <p class="text-xs text-blue-600 mb-3">Após criar o Apps Script, cole a URL aqui para sincronizar os dados automaticamente.</p>
-        <input type="url" id="cfUrl" placeholder="https://script.google.com/macros/s/XXXXXXX/exec"
-          class="w-full border border-blue-300 rounded-xl px-3 py-2 text-xs focus:border-blue-500 focus:outline-none transition bg-white" />
+    <div style="display:grid;gap:1.25rem">
+      <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:1rem">
+        <p style="font-size:.8rem;font-weight:700;color:#5C3D2E;margin-bottom:.5rem">Google Sheets — Sincronização</p>
+        <p style="font-size:.72rem;color:#7A4F3A;margin-bottom:.6rem">Cole a URL do Apps Script para sincronizar dados com a planilha.</p>
+        <input type="url" id="cfUrl" placeholder="https://script.google.com/macros/s/.../exec" class="inp" style="font-size:.78rem" />
       </div>
       <div>
-        <p class="text-sm font-black text-gray-700 mb-2">🏪 Lojas cadastradas</p>
-        <div class="flex gap-2 mb-2">
-          <input type="text" id="cfNvLo" placeholder="Nome da nova loja"
-            class="flex-1 inp" onkeydown="if(event.key==='Enter')addLoja()" />
-          <button onclick="addLoja()" class="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-purple-700 transition">+ Add</button>
-        </div>
-        <div id="cfLoList" class="text-xs text-gray-500 leading-relaxed"></div>
+        <p style="font-size:.8rem;font-weight:700;color:#2C1810;margin-bottom:.6rem">Logo (URL de imagem)</p>
+        <input type="text" id="cfLogo" placeholder="https://... (link direto para imagem PNG/JPG)" class="inp" style="font-size:.78rem" />
+        <p style="font-size:.7rem;color:#9B6B50;margin-top:.3rem">Informe o link da logo para exibir no cabeçalho</p>
       </div>
       <div>
-        <p class="text-sm font-black text-gray-700 mb-2">🏭 Fornecedores cadastrados</p>
-        <div class="flex gap-2 mb-2">
-          <input type="text" id="cfNvFo" placeholder="Nome do novo fornecedor"
-            class="flex-1 inp" onkeydown="if(event.key==='Enter')addForn()" />
-          <button onclick="addForn()" class="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-purple-700 transition">+ Add</button>
+        <p style="font-size:.8rem;font-weight:700;color:#2C1810;margin-bottom:.6rem">Lojas</p>
+        <div style="display:flex;gap:.5rem;margin-bottom:.4rem">
+          <input type="text" id="cfNvLo" placeholder="Nome da nova loja" class="inp" style="font-size:.8rem" onkeydown="if(event.key==='Enter')addLoja()" />
+          <button onclick="addLoja()" class="btn-accent">+ Add</button>
         </div>
-        <div id="cfFoList" class="text-xs text-gray-500 leading-relaxed"></div>
+        <div id="cfLoList" style="font-size:.72rem;color:#7A4F3A;line-height:1.8"></div>
       </div>
-      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <p class="text-sm font-black text-amber-800 mb-2">🔑 Alterar senha de acesso</p>
-        <div class="flex gap-2">
-          <input type="password" id="cfPwd" placeholder="Nova senha"
-            class="flex-1 border border-amber-300 rounded-xl px-3 py-2 text-sm focus:border-amber-500 focus:outline-none transition bg-white" />
-          <button onclick="chgPwd()" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-black hover:bg-amber-700 transition">Alterar</button>
+      <div>
+        <p style="font-size:.8rem;font-weight:700;color:#2C1810;margin-bottom:.6rem">Fornecedores</p>
+        <div style="display:flex;gap:.5rem;margin-bottom:.4rem">
+          <input type="text" id="cfNvFo" placeholder="Nome do novo fornecedor" class="inp" style="font-size:.8rem" onkeydown="if(event.key==='Enter')addForn()" />
+          <button onclick="addForn()" class="btn-accent">+ Add</button>
+        </div>
+        <div id="cfFoList" style="font-size:.72rem;color:#7A4F3A;line-height:1.8"></div>
+      </div>
+      <div style="background:#FDF8F5;border:1px solid #E8D0B8;border-radius:3px;padding:1rem">
+        <p style="font-size:.8rem;font-weight:700;color:#7A3300;margin-bottom:.5rem">Alterar Senha</p>
+        <div style="display:flex;gap:.5rem">
+          <input type="password" id="cfPwd" placeholder="Nova senha" class="inp" style="font-size:.8rem" />
+          <button onclick="chgPwd()" class="btn-secondary" style="white-space:nowrap">Alterar</button>
         </div>
       </div>
     </div>
-    <div class="flex gap-3 mt-6">
-      <button onclick="cm('mCfg')" class="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl hover:bg-gray-50 font-semibold text-sm transition">Cancelar</button>
-      <button onclick="saveCfg()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl font-black text-sm transition shadow">Salvar configurações</button>
+    <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+      <button onclick="cm('mCfg')" class="btn-secondary" style="flex:1">Cancelar</button>
+      <button onclick="saveCfg()" class="btn-primary" style="flex:1">Salvar configurações</button>
     </div>
   </div>
 </div>
 
 <!-- TOAST -->
-<div id="tst" class="fixed bottom-5 right-5 z-[99] hidden pointer-events-none">
-  <div id="tstMsg" class="text-white text-sm px-5 py-3 rounded-2xl shadow-2xl max-w-xs font-semibold"></div>
+<div id="tst" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:99;display:none;pointer-events:none">
+  <div id="tstMsg" style="font-size:.8rem;padding:.7rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);max-width:280px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600"></div>
 </div>
 
 <script>
@@ -352,13 +400,7 @@ const DEF_PWD='rasteira2024';
 // ============================================================
 // STATE
 // ============================================================
-const S={
-  recs:[],filt:[],
-  lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],
-  pg:1,pp:50,
-  sc:'dv',sd:'asc',
-  url:'',editId:null,pdfTxt:null
-};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null};
 
 // ============================================================
 // AUTH
@@ -366,52 +408,40 @@ const S={
 function doLogin(){
   const v=document.getElementById('loginPwd').value;
   const p=localStorage.getItem('r_pwd')||DEF_PWD;
-  if(v===p){localStorage.setItem('r_ok','1');show('pgApp');hide('pgLogin');init();}
-  else{const e=document.getElementById('loginErr');e.textContent='Senha incorreta. Tente novamente.';e.classList.remove('hidden');}
+  if(v===p){localStorage.setItem('r_ok','1');document.getElementById('pgLogin').style.display='none';document.getElementById('pgApp').style.display='flex';init();}
+  else{const e=document.getElementById('loginErr');e.textContent='Senha incorreta.';e.style.display='block';}
 }
 function doLogout(){localStorage.removeItem('r_ok');location.reload();}
-function chgPwd(){
-  const np=document.getElementById('cfPwd').value.trim();
-  if(!np)return;
-  localStorage.setItem('r_pwd',np);
-  document.getElementById('cfPwd').value='';
-  toast('Senha alterada com sucesso!');
-}
+function chgPwd(){const np=document.getElementById('cfPwd').value.trim();if(!np)return;localStorage.setItem('r_pwd',np);document.getElementById('cfPwd').value='';toast('Senha alterada!');}
 
 // ============================================================
 // INIT
 // ============================================================
-async function init(){
-  ldCfg();
-  await ldData();
-  bldSels();
-  bldFilters();
-  applyF();
-  if(S.url)document.getElementById('btnSync').classList.remove('hidden');
+async function init(){ldCfg();await ldData();bldSels();bldFilters();applyF();if(S.url)document.getElementById('btnSync').style.display='inline-block';applyLogo();}
+
+function applyLogo(){
+  if(S.logoUrl){
+    document.getElementById('logoArea').innerHTML='<img src="'+xe(S.logoUrl)+'" style="height:36px;object-fit:contain" alt="Rasteirissima" />';
+  }
 }
 
 function ldCfg(){
   const r=localStorage.getItem('r_cfg');
-  if(r){const c=JSON.parse(r);S.url=c.url||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
+  if(r){const c=JSON.parse(r);S.url=c.url||'';S.logoUrl=c.logo||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
 }
-
-function svCfgStore(){
-  localStorage.setItem('r_cfg',JSON.stringify({url:S.url,lo:S.lojas,fo:S.forns}));
-}
+function svCfgStore(){localStorage.setItem('r_cfg',JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns}));}
 
 async function ldData(){
   const raw=localStorage.getItem('r_data');
   if(raw){S.recs=JSON.parse(raw);return;}
-  // Load from data.json (same folder)
   try{
     const res=await fetch('data.json');
-    if(!res.ok)throw new Error('no data.json');
+    if(!res.ok)throw new Error();
     const arr=await res.json();
-    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:r.vn,mk:r.mk,pr:r.pr,sv:r.sv,st:r.st,dp:br2iso(r.dp),mv:r.mv}));
+    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0}));
     svData();
-  }catch(e){S.recs=[];console.warn('Could not load data.json',e);}
+  }catch(e){S.recs=[];console.warn('data.json not loaded',e);}
 }
-
 function svData(){localStorage.setItem('r_data',JSON.stringify(S.recs));}
 
 // ============================================================
@@ -420,26 +450,20 @@ function svData(){localStorage.setItem('r_data',JSON.stringify(S.recs));}
 async function syncSheets(){
   if(!S.url){toast('Configure a URL do Apps Script.','warn');return;}
   try{
-    toast('Sincronizando com Google Sheets...','info');
+    toast('Sincronizando...','info');
     const res=await fetch(S.url+'?action=getData');
-    if(!res.ok)throw new Error('HTTP '+res.status);
     const j=await res.json();
     if(j.data&&j.data.length){
       S.recs=j.data.map((r,i)=>({
-        _id:r._rowIndex||(i+1),
-        lo:r['Loja']||'',fo:r['Fornecedor']||'',nn:r['número_da_nota']||'',
+        _id:r._rowIndex||(i+1),lo:r['Loja']||'',fo:r['Fornecedor']||'',nn:r['número_da_nota']||'',
         de:br2iso(r['data_de_emissão']||''),dv:br2iso(r['data_vencimento']||''),
-        vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),
-        pr:tof(r['Produto']),sv:tof(r['Serviço']),
-        st:r['Status']||'em aberto',dp:br2iso(r['Data_Pagamento']||''),
-        mv:r['Mês_vencimento']||''
+        vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),pr:tof(r['Produto']),sv:tof(r['Serviço']),
+        st:r['Status']||'em aberto',dp:br2iso(r['Data_Pagamento']||''),mv:+r['Mês_vencimento']||0
       }));
-      svData();applyF();
-      toast('Sincronizado! '+S.recs.length+' registros.');
+      svData();applyF();toast('Sincronizado! '+S.recs.length+' registros.');
     }
   }catch(e){toast('Erro: '+e.message,'err');}
 }
-
 async function push2Sheets(rec,rowIdx){
   if(!S.url)return false;
   try{
@@ -454,68 +478,69 @@ async function push2Sheets(rec,rowIdx){
 // ============================================================
 function openCfg(){
   document.getElementById('cfUrl').value=S.url;
+  document.getElementById('cfLogo').value=S.logoUrl;
   document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
   document.getElementById('cfFoList').textContent=S.forns.join(' · ');
-  document.getElementById('mCfg').classList.remove('hidden');
+  document.getElementById('mCfg').style.display='flex';
 }
 function saveCfg(){
   S.url=document.getElementById('cfUrl').value.trim();
+  S.logoUrl=document.getElementById('cfLogo').value.trim();
   svCfgStore();cm('mCfg');
-  if(S.url){document.getElementById('btnSync').classList.remove('hidden');syncSheets();}
-  else document.getElementById('btnSync').classList.add('hidden');
+  applyLogo();
+  if(S.url){document.getElementById('btnSync').style.display='inline-block';syncSheets();}
+  else document.getElementById('btnSync').style.display='none';
   toast('Configurações salvas!');
 }
-function addLoja(){
-  const v=document.getElementById('cfNvLo').value.trim();
-  if(!v||S.lojas.includes(v))return;
-  S.lojas.push(v);S.lojas.sort();svCfgStore();
-  bldSels();bldFilters();
-  document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
-  document.getElementById('cfNvLo').value='';
-  toast('Loja "'+v+'" adicionada!');
-}
-function addForn(){
-  const v=document.getElementById('cfNvFo').value.trim();
-  if(!v||S.forns.includes(v))return;
-  S.forns.push(v);S.forns.sort();svCfgStore();
-  bldSels();
-  document.getElementById('cfFoList').textContent=S.forns.join(' · ');
-  document.getElementById('cfNvFo').value='';
-  toast('Fornecedor "'+v+'" adicionado!');
-}
+function addLoja(){const v=document.getElementById('cfNvLo').value.trim();if(!v||S.lojas.includes(v))return;S.lojas.push(v);S.lojas.sort();svCfgStore();bldSels();bldFilters();document.getElementById('cfLoList').textContent=S.lojas.join(' · ');document.getElementById('cfNvLo').value='';toast('"'+v+'" adicionada!');}
+function addForn(){const v=document.getElementById('cfNvFo').value.trim();if(!v||S.forns.includes(v))return;S.forns.push(v);S.forns.sort();svCfgStore();bldSels();document.getElementById('cfFoList').textContent=S.forns.join(' · ');document.getElementById('cfNvFo').value='';toast('"'+v+'" adicionado!');}
 
 // ============================================================
-// FILTERS & SELECTS
+// FILTERS
 // ============================================================
 function bldFilters(){
   const lo=document.getElementById('fLo'),cur=lo.value;
   lo.innerHTML='<option value="">Todas as lojas</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
   const fo=document.getElementById('fFo'),curf=fo.value;
   fo.innerHTML='<option value="">Todos</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===curf?' selected':'')+'>'+xe(v)+'</option>').join('');
-  const me=document.getElementById('fMe'),curm=me.value;
-  me.innerHTML='<option value="">Todos os meses</option>'+MESES.slice(1).map((m,i)=>'<option value="'+(i+1)+'"'+((i+1)+''===curm?' selected':'')+'>'+m+'</option>').join('');
 }
 function bldSels(){
-  ['rf_lo','bf_lo'].forEach(id=>{
-    const el=document.getElementById(id);if(!el)return;
-    const cur=el.value;
-    el.innerHTML='<option value="">Selecione a loja</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
-  });
-  ['rf_fo','bf_fo'].forEach(id=>{
-    const el=document.getElementById(id);if(!el)return;
-    const cur=el.value;
-    el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
-  });
+  ['rf_lo','bf_lo'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
+  ['rf_fo','bf_fo'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
+}
+
+function setPeriod(preset){
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  let de='',ate='';
+  if(preset==='mes'){
+    de=toISO(new Date(y,m,1));
+    ate=toISO(new Date(y,m+1,0));
+  }else if(preset==='ano'){
+    de=y+'-01-01';
+    ate=y+'-12-31';
+  }else if(preset==='30'){
+    de=toISO(new Date(now.getTime()-30*864e5));
+    ate=toISO(now);
+  }else if(preset==='vencidas'){
+    document.getElementById('fSt').value='vencida';
+    applyF();return;
+  }
+  document.getElementById('fDe').value=de;
+  document.getElementById('fAte').value=ate;
+  applyF();
 }
 
 function applyF(){
-  const flo=g('fLo'),ffo=g('fFo'),fst=g('fSt'),fme=g('fMe'),fsq=g('fSq').toLowerCase();
+  const flo=g('fLo'),ffo=g('fFo'),fst=g('fSt'),fsq=g('fSq').toLowerCase();
+  const fde=g('fDe'),fate=g('fAte');
   S.filt=S.recs.filter(r=>{
     if(flo&&r.lo!==flo)return false;
     if(ffo&&r.fo!==ffo)return false;
     if(fst&&r.st!==fst)return false;
-    if(fme&&String(r.mv)!==fme)return false;
     if(fsq&&!(r.fo+' '+r.nn+' '+r.lo+' '+r.st).toLowerCase().includes(fsq))return false;
+    // Date range filter on dv (due date)
+    if(fde&&r.dv&&r.dv<fde)return false;
+    if(fate&&r.dv&&r.dv>fate)return false;
     return true;
   });
   S.filt.sort((a,b)=>{
@@ -529,14 +554,14 @@ function applyF(){
 
 function sBy(col){
   if(S.sc===col)S.sd=S.sd==='asc'?'desc':'asc';else{S.sc=col;S.sd='asc';}
-  document.querySelectorAll('th[id^="th-"]').forEach(th=>th.className=th.className.replace(/\bsi\b|\bsa2\b|\bsd\b/g,'').trim()+' si');
+  document.querySelectorAll('th[id^="th-"]').forEach(th=>{th.className=th.className.replace(/\bsi\b|\bsa2\b|\bsd\b/g,'').trim()+' si';});
   const th=document.getElementById('th-'+col);
   if(th)th.className=th.className.replace('si',S.sd==='asc'?'sa2':'sd');
   applyF();
 }
 
 function clearF(){
-  ['fLo','fFo','fSt','fMe'].forEach(id=>document.getElementById(id).value='');
+  ['fLo','fFo','fSt','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fSq').value='';
   applyF();
 }
@@ -553,42 +578,43 @@ function rstats(){
   const nVe=rs.filter(r=>r.st==='vencida').length;
   const nAb=rs.filter(r=>r.st==='em aberto'||r.st==='vence hoje').length;
   document.getElementById('statsRow').innerHTML=
-    crCard('A PAGAR',fBRL(vAb),nAb+' conta'+(nAb!==1?'s':''),'text-amber-600','border-amber-200','bg-amber-50')+
-    crCard('VENCIDO',fBRL(vVe),nVe+' conta'+(nVe!==1?'s':''),'text-red-600','border-red-200','bg-red-50')+
-    crCard('PAGO',fBRL(vPg),rs.filter(r=>r.st==='pago').length+' contas','text-emerald-600','border-emerald-200','bg-emerald-50')+
-    crCard('VENCE HOJE',nHj,'conta'+(nHj!==1?'s':''),'text-orange-500','border-orange-200','bg-orange-50');
+    scrd('A PAGAR',fBRL(vAb),nAb+' conta'+(nAb!==1?'s':''),'#6B5500','#E8D880','#FDFBF0')+
+    scrd('VENCIDO',fBRL(vVe),nVe+' conta'+(nVe!==1?'s':''),'#8B1A1A','#F0C0C0','#FDF0F0')+
+    scrd('PAGO',fBRL(vPg),rs.filter(r=>r.st==='pago').length+' contas','#1E6B3A','#B8DFC8','#EEF7F0')+
+    scrd('VENCE HOJE',nHj,'conta'+(nHj!==1?'s':''),'#7A3300','#F0C898','#FDF5EE');
 }
 
-function crCard(lb,val,sub,tc,bc,bg){
-  return '<div class="'+bg+' rounded-2xl shadow-sm border '+bc+' p-4"><p class="text-xs font-black text-gray-400 uppercase tracking-wider">'+lb+'</p><p class="text-xl font-black '+tc+' mt-1 leading-tight">'+val+'</p><p class="text-xs text-gray-400 mt-1">'+sub+'</p></div>';
+function scrd(lb,val,sub,tc,bc,bg){
+  return '<div style="background:'+bg+';border:1px solid '+bc+';border-radius:4px;padding:1.25rem 1.5rem"><p style="font-size:.65rem;font-weight:700;color:'+tc+';text-transform:uppercase;letter-spacing:.08em;opacity:.7">'+lb+'</p><p style="font-size:1.4rem;font-weight:800;color:'+tc+';margin:.3rem 0 .2rem;line-height:1">'+val+'</p><p style="font-size:.72rem;color:'+tc+';opacity:.6">'+sub+'</p></div>';
 }
 
 function rtable(){
   const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
   document.getElementById('recCnt').textContent=S.filt.length+' registro'+(S.filt.length!==1?'s':'');
   const stC={'pago':'sp','vencida':'sv','em aberto':'sa','vence hoje':'sh'};
-  const stL={'pago':'✓ Pago','vencida':'⚠ Vencida','em aberto':'● Em aberto','vence hoje':'! Vence hoje'};
+  const stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
   if(!rows.length){
-    document.getElementById('tBody').innerHTML='<tr><td colspan="12" class="px-4 py-14 text-center text-gray-300 text-sm">Nenhum registro encontrado com os filtros atuais</td></tr>';
+    document.getElementById('tBody').innerHTML='<tr><td colspan="12" style="padding:3rem;text-align:center;color:#C8A882;font-size:.875rem">Nenhum registro encontrado</td></tr>';
     rpg();return;
   }
-  document.getElementById('tBody').innerHTML=rows.map(r=>{
+  document.getElementById('tBody').innerHTML=rows.map((r,i)=>{
+    const bg=i%2===0?'#fff':'#FAF7F4';
     const sc=stC[r.st]||'sa',sl=stL[r.st]||r.st;
-    return '<tr class="border-b border-gray-50 hover:bg-purple-50/20 transition-colors">'+
-      '<td class="px-3 py-2.5 text-sm font-bold text-gray-700 whitespace-nowrap">'+xe(r.lo)+'</td>'+
-      '<td class="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap">'+xe(r.fo)+'</td>'+
-      '<td class="px-3 py-2.5 text-xs text-gray-500 font-mono">'+xe(r.nn)+'</td>'+
-      '<td class="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">'+fDt(r.de)+'</td>'+
-      '<td class="px-3 py-2.5 text-sm text-gray-700 font-semibold whitespace-nowrap">'+fDt(r.dv)+'</td>'+
-      '<td class="px-3 py-2.5 text-sm text-right font-black text-gray-800 whitespace-nowrap">'+fBRL(r.vn)+'</td>'+
-      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.mk?fBRL(r.mk):'-')+'</td>'+
-      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.pr?fBRL(r.pr):'-')+'</td>'+
-      '<td class="px-3 py-2.5 text-xs text-right text-gray-400">'+(r.sv?fBRL(r.sv):'-')+'</td>'+
-      '<td class="px-3 py-2.5 text-center whitespace-nowrap"><span class="text-xs font-bold px-2 py-0.5 rounded-full '+sc+'">'+sl+'</span></td>'+
-      '<td class="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">'+fDt(r.dp)+'</td>'+
-      '<td class="px-3 py-2.5 text-center whitespace-nowrap">'+
-        '<button onclick="editRec('+r._id+')" class="text-purple-600 hover:text-purple-800 text-xs font-black mr-2">Editar</button>'+
-        '<button onclick="delRec('+r._id+')" class="text-red-400 hover:text-red-600 text-xs font-black">Excluir</button>'+
+    return '<tr style="border-bottom:1px solid #F2EAE0;background:'+bg+'" onmouseover="this.style.background=\'#F5EFE6\'" onmouseout="this.style.background=\''+bg+'\'">'+
+      '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:600;color:#2C1810;white-space:nowrap">'+xe(r.lo)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.8rem;color:#5C3D2E;white-space:nowrap">'+xe(r.fo)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#7A4F3A;font-family:monospace">'+xe(r.nn)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.de)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:600;color:#2C1810;white-space:nowrap">'+fDt(r.dv)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:700;color:#2C1810;text-align:right;white-space:nowrap">'+fBRL(r.vn)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.mk?fBRL(r.mk):'-')+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.pr?fBRL(r.pr):'-')+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.sv?fBRL(r.sv):'-')+'</td>'+
+      '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap"><span style="font-size:.7rem;padding:.25rem .6rem;border-radius:2px" class="'+sc+'">'+sl+'</span></td>'+
+      '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.dp)+'</td>'+
+      '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap">'+
+        '<button onclick="editRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
+        '<button onclick="delRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td></tr>';
   }).join('');
   rpg();
@@ -596,12 +622,12 @@ function rtable(){
 
 function rpg(){
   const tot=S.filt.length,tp=Math.ceil(tot/S.pp),bar=document.getElementById('pgBar');
-  if(tp<=1){bar.innerHTML='<span class="text-gray-400">'+tot+' registro'+(tot!==1?'s':'')+'</span>';return;}
+  if(tp<=1){bar.innerHTML='<span style="color:#9B6B50">'+tot+' registro'+(tot!==1?'s':'')+'</span>';return;}
   const s=(S.pg-1)*S.pp+1,e=Math.min(S.pg*S.pp,tot);
-  const btn=(l,p,d)=>'<button onclick="goPg('+p+')"'+(d?' disabled':'')+' class="px-2.5 py-1 rounded-xl border '+(d?'opacity-30 cursor-not-allowed text-gray-400':'hover:bg-purple-50 text-purple-700 font-semibold')+'">'+l+'</button>';
-  bar.innerHTML='<span class="text-gray-400">'+s+'–'+e+' de '+tot+'</span>'+
-    '<div class="flex gap-1">'+btn('«',1,S.pg===1)+btn('‹',S.pg-1,S.pg===1)+
-    '<span class="px-3 py-1 bg-purple-700 text-white rounded-xl font-black text-sm">'+S.pg+'</span>'+
+  const btn=(l,p,d)=>'<button onclick="goPg('+p+')"'+(d?' disabled':'')+' style="padding:.3rem .7rem;border-radius:2px;border:1px solid '+(d?'#EAD9C8':'#D4B499')+';background:'+(d?'#FAF7F4':'#fff')+';color:'+(d?'#C8A882':'#5C3D2E')+';cursor:'+(d?'default':'pointer')+';font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;font-size:.78rem">'+l+'</button>';
+  bar.innerHTML='<span style="color:#9B6B50;font-size:.78rem">'+s+'–'+e+' de '+tot+'</span>'+
+    '<div style="display:flex;gap:.3rem">'+btn('«',1,S.pg===1)+btn('‹',S.pg-1,S.pg===1)+
+    '<span style="padding:.3rem .8rem;background:#2C1810;color:#fff;border-radius:2px;font-size:.78rem;font-weight:700">'+S.pg+'</span>'+
     btn('›',S.pg+1,S.pg===tp)+btn('»',tp,S.pg===tp)+'</div>';
 }
 
@@ -613,79 +639,47 @@ function goPg(p){S.pg=Math.max(1,Math.min(p,Math.ceil(S.filt.length/S.pp)));rtab
 function openAdd(){
   S.editId=null;
   document.getElementById('mRecTtl').textContent='Nova Conta';
-  ['rf_id','rf_nn','rf_de','rf_dv','rf_dp'].forEach(id=>{document.getElementById(id).value='';});
-  ['rf_mk','rf_pr','rf_sv'].forEach(id=>{document.getElementById(id).value='0';});
-  document.getElementById('rf_lo').value='';
-  document.getElementById('rf_fo').value='';
-  document.getElementById('rf_vn').value='';
-  document.getElementById('rf_st').value='em aberto';
-  document.getElementById('mRec').classList.remove('hidden');
+  ['rf_id','rf_nn','rf_de','rf_dv','rf_dp'].forEach(id=>document.getElementById(id).value='');
+  ['rf_mk','rf_pr','rf_sv'].forEach(id=>document.getElementById(id).value='0');
+  document.getElementById('rf_lo').value='';document.getElementById('rf_fo').value='';
+  document.getElementById('rf_vn').value='';document.getElementById('rf_st').value='em aberto';
+  document.getElementById('mRec').style.display='flex';
 }
-
 function editRec(id){
-  const r=S.recs.find(x=>x._id===id);if(!r)return;
-  S.editId=id;
+  const r=S.recs.find(x=>x._id===id);if(!r)return;S.editId=id;
   document.getElementById('mRecTtl').textContent='Editar Conta';
-  document.getElementById('rf_id').value=id;
-  document.getElementById('rf_lo').value=r.lo;
-  document.getElementById('rf_fo').value=r.fo;
-  document.getElementById('rf_nn').value=r.nn;
-  document.getElementById('rf_de').value=r.de;
-  document.getElementById('rf_dv').value=r.dv;
-  document.getElementById('rf_vn').value=r.vn;
-  document.getElementById('rf_mk').value=r.mk||0;
-  document.getElementById('rf_pr').value=r.pr||0;
-  document.getElementById('rf_sv').value=r.sv||0;
-  document.getElementById('rf_st').value=r.st;
-  document.getElementById('rf_dp').value=r.dp||'';
-  document.getElementById('mRec').classList.remove('hidden');
+  document.getElementById('rf_id').value=id;document.getElementById('rf_lo').value=r.lo;
+  document.getElementById('rf_fo').value=r.fo;document.getElementById('rf_nn').value=r.nn;
+  document.getElementById('rf_de').value=r.de;document.getElementById('rf_dv').value=r.dv;
+  document.getElementById('rf_vn').value=r.vn;document.getElementById('rf_mk').value=r.mk||0;
+  document.getElementById('rf_pr').value=r.pr||0;document.getElementById('rf_sv').value=r.sv||0;
+  document.getElementById('rf_st').value=r.st;document.getElementById('rf_dp').value=r.dp||'';
+  document.getElementById('mRec').style.display='flex';
 }
-
 async function saveRec(){
   const lo=g('rf_lo'),fo=g('rf_fo'),dv=g('rf_dv'),vn=g('rf_vn');
   if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
-  const rec={
-    lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,
-    vn:parseFloat(vn)||0,mk:parseFloat(g('rf_mk'))||0,
-    pr:parseFloat(g('rf_pr'))||0,sv:parseFloat(g('rf_sv'))||0,
-    st:g('rf_st'),dp:g('rf_dp'),
-    mv:dv?new Date(dv+'T12:00').getMonth()+1:''
-  };
+  const rec={lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,vn:+vn||0,mk:+g('rf_mk')||0,pr:+g('rf_pr')||0,sv:+g('rf_sv')||0,st:g('rf_st'),dp:g('rf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0};
   let rowIdx=null;
-  if(S.editId){
-    const i=S.recs.findIndex(x=>x._id===S.editId);
-    if(i>=0){rowIdx=S.recs[i]._id;rec._id=S.editId;S.recs[i]={...S.recs[i],...rec};}
-  }else{
-    rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
-    S.recs.push(rec);
-  }
-  svData();
-  const ok=await push2Sheets(rec,rowIdx);
-  cm('mRec');applyF();
-  toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Salvo no Google Sheets':''));
+  if(S.editId){const i=S.recs.findIndex(x=>x._id===S.editId);if(i>=0){rowIdx=S.recs[i]._id;rec._id=S.editId;S.recs[i]={...S.recs[i],...rec};}}
+  else{rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;S.recs.push(rec);}
+  svData();const ok=await push2Sheets(rec,rowIdx);cm('mRec');applyF();
+  toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
-
 async function delRec(id){
-  if(!confirm('Confirmar exclusão? Esta ação não pode ser desfeita.'))return;
-  S.recs=S.recs.filter(x=>x._id!==id);
-  svData();applyF();toast('Registro excluído!');
+  if(!confirm('Excluir este registro?'))return;
+  S.recs=S.recs.filter(x=>x._id!==id);svData();applyF();toast('Excluído!');
 }
 
 // ============================================================
 // BOLETO
 // ============================================================
 function openBoleto(){
-  bSt(1);
-  document.getElementById('bLi').value='';
+  bSt(1);document.getElementById('bLi').value='';
   document.getElementById('bPDFNm').textContent='Nenhum arquivo selecionado';
-  S.pdfTxt=null;
-  document.getElementById('mBoleto').classList.remove('hidden');
+  S.pdfTxt=null;document.getElementById('mBoleto').style.display='flex';
 }
-
-function bSt(n){
-  document.getElementById('bS1').classList.toggle('hidden',n!==1);
-  document.getElementById('bS2').classList.toggle('hidden',n!==2);
-}
+function bSt(n){document.getElementById('bS1').style.display=n===1?'block':'none';document.getElementById('bS2').style.display=n===2?'block':'none';}
 
 async function rdPDF(input){
   if(!input.files[0])return;
@@ -702,14 +696,49 @@ async function rdPDF(input){
       txt+=ct.items.map(x=>x.str).join(' ')+'\n';
     }
     S.pdfTxt=txt;
-    // Detect linha digitável
-    const m=txt.match(/\d{5}\.?\d{5}\s+\d{5}\.?\d{6}\s+\d{5}\.?\d{6}\s+\d\s+\d{14}/);
-    if(m)document.getElementById('bLi').value=m[0];
-    toast('PDF lido! Verifique a linha digitável.','info');
-  }catch(e){
-    S.pdfTxt=null;
-    toast('Não foi possível ler o PDF. Cole a linha digitável manualmente.','warn');
+    // Auto-detect linha digitável (47 or 48 consecutive digits, possibly with spaces/dots)
+    const m=txt.match(/(?:\d[\s.]?){47,48}(?=\s|$)/g);
+    if(m){
+      const cands=m.map(x=>x.replace(/[\s.]/g,'')).filter(x=>x.length===47||x.length===48);
+      if(cands.length)document.getElementById('bLi').value=cands[0];
+    }
+    toast('PDF lido! Verifique os dados.','info');
+  }catch(e){S.pdfTxt=null;toast('Não foi possível ler o PDF. Cole a linha digitável.','warn');}
+}
+
+function extractNF(txt){
+  if(!txt)return '';
+  const patterns=[
+    /N[ºo°\.]\s*[Dd]o\s*[Dd]ocumento\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
+    /[Nn][uú]mero\s*do\s*[Dd]ocumento\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
+    /[Nn][uú]m\.?\s*[Dd]oc\.?\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
+    /\bNF[- eE\-]*([0-9]{4,10})\b/i,
+    /[Nn]ota\s*[Ff]iscal\s*[nNºo°#]*\s*[:\-]?\s*([0-9]{4,10})/i,
+    /[Dd]ocumento\s*[:\-]?\s*([0-9]{5,10})/i,
+    /[Nn]os?\s*[:\-]?\s*([0-9]{4,10})/i,
+  ];
+  for(const p of patterns){const m=txt.match(p);if(m&&m[1]&&m[1].length>=3)return m[1].trim();}
+  return '';
+}
+
+function extractValue(txt){
+  if(!txt)return '';
+  const patterns=[
+    /[Vv]alor\s*[Cc]obra[dt]o\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
+    /[Vv]alor\s*do\s*[Dd]ocumento\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
+    /[Vv]alor\s*do\s*[Tt][ií]tulo\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
+    /[Vv]alor\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
+    /R\$\s*([\d\.]+,\d{2})/,
+    /([\d]{1,3}(?:\.[\d]{3})+,\d{2})/,
+  ];
+  for(const p of patterns){
+    const m=txt.match(p);
+    if(m&&m[1]){
+      const v=parseFloat(m[1].replace(/\./g,'').replace(',','.'));
+      if(v>0)return v.toFixed(2);
+    }
   }
+  return '';
 }
 
 function parseBol(){
@@ -718,36 +747,35 @@ function parseBol(){
   let prs={tipo:'Manual'};
 
   if(cl.length===47){
-    // Boleto bancário: campo 5 = posições 32-46 (fator 4 dig + valor 10 dig)
     const f5=cl.substring(32,47);
     const fac=parseInt(f5.substring(0,4));
     const base=new Date(1997,9,7);
     const due=new Date(base.getTime()+fac*864e5);
     const amt=parseFloat(f5.substring(4,14))/100;
-    prs={tipo:'Bancário',banco:cl.substring(0,3),dv:toISO(due),vn:amt.toFixed(2)};
+    prs={tipo:'Bancário',banco:bancoNome(cl.substring(0,3)),dv:toISO(due),vn:amt>0?amt.toFixed(2):''};
   }else if(cl.length===48){
-    // Concessionária
     const vid=cl.substring(2,3);
     let amt=0;
     if(['6','7','8','9'].includes(vid))amt=parseFloat(cl.substring(4,15))/100;
-    prs={tipo:'Concessionária',vn:amt.toFixed(2)};
+    prs={tipo:'Concessionária',vn:amt>0?amt.toFixed(2):''};
   }else if(cl.length>0&&cl.length<44){
-    toast('Código inválido ('+cl.length+' dígitos). Verifique a linha digitável.','warn');return;
+    toast('Linha digitável inválida ('+cl.length+' dígitos). Verifique.','warn');return;
   }
 
-  // Enrich from PDF
+  // Enrich from PDF text
   if(S.pdfTxt){
     const tx=S.pdfTxt;
+    if(!prs.vn){const v=extractValue(tx);if(v)prs.vn=v;}
+    prs.nn=extractNF(tx);
     const fo=S.forns.find(f=>tx.toUpperCase().includes(f.toUpperCase()));
     if(fo)prs.fo=fo;
-    const nm=tx.match(/NF[- eE]*[nNºo°]*[:\s]*(\d{4,})/i);
-    if(nm)prs.nn=nm[1];
   }
 
   document.getElementById('bInf').textContent=
-    'Tipo: '+prs.tipo+' | Banco: '+(prs.banco||'—')+
-    ' | Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'—')+
-    ' | Vencimento: '+(fDt(prs.dv)||'—');
+    'Tipo: '+prs.tipo+(prs.banco?' | '+prs.banco:'')+
+    ' | Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado')+
+    ' | Vencimento: '+(fDt(prs.dv)||'não detectado')+
+    (prs.nn?' | NF: '+prs.nn:'');
 
   if(prs.dv)document.getElementById('bf_dv').value=prs.dv;
   if(prs.vn)document.getElementById('bf_vn').value=prs.vn;
@@ -757,89 +785,88 @@ function parseBol(){
   bSt(2);
 }
 
+function bancoNome(code){
+  const bancos={'001':'BB','033':'Santander','104':'CEF','237':'Bradesco','341':'Itaú','356':'Real','389':'Mercantil','399':'HSBC','422':'Safra','453':'Rural','633':'Rendimento','652':'Itaú Unibanco','745':'Citibank','756':'Sicoob'};
+  return bancos[code]?'Banco '+bancos[code]+' ('+code+')':'Banco '+code;
+}
+
 async function saveBol(){
   const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
   if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
-  const rec={
-    lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,
-    vn:parseFloat(vn)||0,mk:parseFloat(g('bf_mk'))||0,
-    pr:parseFloat(g('bf_pr'))||0,sv:parseFloat(g('bf_sv'))||0,
-    st:g('bf_st'),dp:g('bf_dp'),
-    mv:dv?new Date(dv+'T12:00').getMonth()+1:'',
-    _id:Math.max(0,...S.recs.map(x=>x._id))+1
-  };
+  const rec={lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,st:g('bf_st'),dp:g('bf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
   S.recs.push(rec);svData();
   const ok=await push2Sheets(rec,null);
   cm('mBoleto');S.pdfTxt=null;applyF();
-  toast('Boleto adicionado!'+(ok?' ✓ Google Sheets':''));
+  toast('Boleto salvo!'+(ok?' ✓ Google Sheets':''));
 }
 
 // ============================================================
-// CSV EXPORT
+// CSV
 // ============================================================
 function doCSV(){
   const hd=['Loja','Fornecedor','Nº Nota','Emissão','Vencimento','Valor NF','MKT','Produto','Serviço','Status','Dt. Pagamento','Mês'];
   const rows=S.filt.map(r=>[r.lo,r.fo,r.nn,fDt(r.de),fDt(r.dv),r.vn,r.mk,r.pr,r.sv,r.st,fDt(r.dp),r.mv]);
   const csv=[hd,...rows].map(row=>row.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='mercadorias-pagar-'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='mercadorias-pagar-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
 // ============================================================
 // HELPERS
 // ============================================================
 function g(id){return document.getElementById(id).value;}
-function cm(id){document.getElementById(id).classList.add('hidden');}
-function show(id){document.getElementById(id).classList.remove('hidden');}
-function hide(id){document.getElementById(id).classList.add('hidden');}
+function cm(id){document.getElementById(id).style.display='none';}
 function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function fBRL(v){if(!v&&v!==0)return '-';return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
-function fNum(v){return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2}).format(v);}
+function fBRL(v){if(!v&&v!==0)return '—';return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
+function fNum(v){return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);}
+
+// fDt: always returns DD/MM/YYYY or empty
 function fDt(iso){
   if(!iso)return '';
-  if(iso.includes('/'))return iso;
-  const p=iso.split('-');
-  if(p.length!==3)return iso;
-  return p[2]+'/'+p[1]+'/'+p[0];
+  iso=String(iso).trim();
+  // Already in DD/MM/YYYY
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(iso))return iso;
+  // ISO: YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){const p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+  return iso;
 }
+
+// br2iso: DD/MM/YYYY → YYYY-MM-DD
 function br2iso(br){
   if(!br)return '';
-  if(br.includes('-'))return br;
-  const p=br.split('/');
-  if(p.length!==3||!p[2])return '';
-  return p[2].padStart(4,'0')+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+  br=String(br).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(br))return br;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(br)){const p=br.split('/');return p[2]+'-'+p[1]+'-'+p[0];}
+  return '';
 }
+
+// i2br: YYYY-MM-DD → DD/MM/YYYY
 function i2br(iso){
   if(!iso)return '';
-  if(iso.includes('/'))return iso;
-  const p=iso.split('-');if(p.length!==3)return '';
-  return p[2]+'/'+p[1]+'/'+p[0];
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(iso))return iso;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){const p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+  return '';
 }
-function toISO(d){
-  if(!d||isNaN(d))return '';
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function tof(v){
-  if(!v&&v!==0)return 0;
-  const s=String(v).replace(/[R$\s]/g,'').replace('.','').replace(',','.');
-  return parseFloat(s)||0;
-}
+
+function toISO(d){if(!d||isNaN(d))return '';return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function tof(v){if(!v&&v!==0)return 0;const s=String(v).replace(/[R$\s]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.');return parseFloat(s)||0;}
+
 function toast(msg,type='ok'){
   const el=document.getElementById('tst'),mc=document.getElementById('tstMsg');
-  const c={ok:'bg-emerald-600',err:'bg-red-600',warn:'bg-amber-500',info:'bg-blue-600'};
-  mc.className=(c[type]||c.ok)+' text-white text-sm px-5 py-3 rounded-2xl shadow-2xl max-w-xs font-semibold';
-  mc.textContent=msg;el.classList.remove('hidden');
-  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.add('hidden'),3500);
+  const c={ok:'background:#2C1810;color:#FAF7F4',err:'background:#8B1A1A;color:#fff',warn:'background:#6B5500;color:#fff',info:'background:#5C3D2E;color:#FAF7F4'};
+  mc.style.cssText=(c[type]||c.ok)+';font-size:.8rem;padding:.65rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600';
+  mc.textContent=msg;el.style.display='block';
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',3500);
 }
 
 // ============================================================
 // BOOT
 // ============================================================
 if(localStorage.getItem('r_ok')==='1'){
-  hide('pgLogin');show('pgApp');init();
+  document.getElementById('pgLogin').style.display='none';
+  document.getElementById('pgApp').style.display='flex';
+  init();
 }
 </script>
 </body>
