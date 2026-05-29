@@ -126,6 +126,7 @@ th:hover{background:#EAD9C8!important}
       <button onclick="openAdd()" class="btn-accent" style="display:flex;align-items:center;gap:.5rem">
         <span>+</span> Nova Conta
       </button>
+      <button onclick="openFornMgmt()" class="btn-secondary">🏭 Fornecedores</button>
       <button onclick="doCSV()" class="btn-secondary">⬇ Exportar CSV</button>
       <span id="recCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
     </div>
@@ -256,7 +257,7 @@ th:hover{background:#EAD9C8!important}
       <div style="display:grid;gap:.75rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
           <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione</option></select></div>
-          <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel"><option value="">Selecione</option></select></div>
+          <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel" onchange="calcFornSplit()"><option value="">Selecione</option></select></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
           <div><label class="lbl">Nº da Nota / Documento</label><input type="text" id="bf_nn" class="inp" /></div>
@@ -264,7 +265,7 @@ th:hover{background:#EAD9C8!important}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
           <div><label class="lbl">Data de Vencimento *</label><input type="date" id="bf_dv" required class="inp" /></div>
-          <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" /></div>
+          <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" oninput="calcFornSplit()" /></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
           <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="bf_mk" value="0" class="inp" /></div>
@@ -385,6 +386,101 @@ th:hover{background:#EAD9C8!important}
   </div>
 </div>
 
+<!-- ===== MODAL: FORNECEDORES/LOJAS MANAGEMENT ===== -->
+<div id="mForn" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" style="max-width:860px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Cadastro de Fornecedores e Lojas</h2>
+        <p style="font-size:.72rem;color:#9B6B50;margin-top:.15rem">Gerencie os parâmetros de divisão por fornecedor</p>
+      </div>
+      <button onclick="cm('mForn')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:1.25rem">
+      <button id="tabFornBtn" onclick="switchFornTab('forn')" style="padding:.5rem 1.25rem;font-size:.8rem;font-weight:700;border:none;background:transparent;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:#2C1810;border-bottom:2px solid #2C1810;margin-bottom:-1.5px">Fornecedores</button>
+      <button id="tabLojaBtn" onclick="switchFornTab('loja')" style="padding:.5rem 1.25rem;font-size:.8rem;font-weight:600;border:none;background:transparent;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;color:#9B6B50;border-bottom:2px solid transparent;margin-bottom:-1.5px">Lojas</button>
+    </div>
+
+    <!-- Tab: Fornecedores -->
+    <div id="tabForn">
+      <!-- Add/Edit form -->
+      <div style="background:#FAF7F4;border:1px solid var(--border);border-radius:3px;padding:1rem;margin-bottom:1rem">
+        <p style="font-size:.75rem;font-weight:700;color:#5C3D2E;margin-bottom:.75rem" id="fornFormTitle">Adicionar Fornecedor</p>
+        <input type="hidden" id="ff_orig" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem">
+          <div><label class="lbl">Nome *</label><input type="text" id="ff_nome" class="inp" placeholder="Ex: ADDAN 5" /></div>
+          <div><label class="lbl">CNPJ</label><input type="text" id="ff_cnpj" class="inp" placeholder="00.000.000/0001-00" /></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.6rem;margin-bottom:.75rem">
+          <div><label class="lbl">MKT %</label><input type="number" step="0.01" min="0" max="100" id="ff_mkt" value="0" class="inp" /></div>
+          <div><label class="lbl">Produto %</label><input type="number" step="0.01" min="0" max="100" id="ff_pr" value="0" class="inp" /></div>
+          <div><label class="lbl">Serviço %</label><input type="number" step="0.01" min="0" max="100" id="ff_sv" value="0" class="inp" /></div>
+          <div style="display:flex;align-items:flex-end;gap:.4rem">
+            <button onclick="saveForn()" class="btn-primary" style="flex:1;padding:.5rem">Salvar</button>
+            <button onclick="cancelFornEdit()" class="btn-secondary" style="padding:.5rem .6rem" id="ff_cancel" style="display:none">✕</button>
+          </div>
+        </div>
+        <p style="font-size:.68rem;color:#B8896A">Os percentuais são calculados sobre o Valor da Nota Fiscal. Ex: MKT 3% de R$ 1.000 = R$ 30,00</p>
+      </div>
+      <!-- Table -->
+      <div style="overflow:auto;max-height:320px">
+        <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+          <thead style="position:sticky;top:0">
+            <tr style="background:#F2EAE0">
+              <th style="padding:.5rem .75rem;text-align:left;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Nome</th>
+              <th style="padding:.5rem .75rem;text-align:left;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">CNPJ</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">MKT %</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">Produto %</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">Serviço %</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="fornMgmtTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab: Lojas -->
+    <div id="tabLoja" style="display:none">
+      <div style="background:#FAF7F4;border:1px solid var(--border);border-radius:3px;padding:1rem;margin-bottom:1rem">
+        <p style="font-size:.75rem;font-weight:700;color:#5C3D2E;margin-bottom:.75rem">Adicionar Loja</p>
+        <div style="display:flex;gap:.6rem">
+          <input type="text" id="lf_nome" class="inp" placeholder="Nome da loja" onkeydown="if(event.key==='Enter')saveLoja()" />
+          <button onclick="saveLoja()" class="btn-primary" style="white-space:nowrap">+ Adicionar</button>
+        </div>
+      </div>
+      <div style="overflow:auto;max-height:320px">
+        <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+          <thead style="position:sticky;top:0">
+            <tr style="background:#F2EAE0">
+              <th style="padding:.5rem .75rem;text-align:left;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">Nome da Loja</th>
+              <th style="padding:.5rem .75rem;text-align:center;font-size:.68rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.05em">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="lojaMgmtTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: CONFIRM DELETE ===== -->
+<div id="mConfDel" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" style="max-width:420px">
+    <div style="text-align:center;padding:.5rem 0 1.25rem">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">⚠️</div>
+      <h2 style="font-size:1rem;font-weight:700;color:#2C1810;margin-bottom:.5rem">Confirmar Exclusão</h2>
+      <p style="font-size:.85rem;color:#7A4F3A" id="mConfDelMsg">Deseja excluir este item?</p>
+      <p style="font-size:.72rem;color:#B8896A;margin-top:.4rem">Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.</p>
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:.5rem">
+      <button onclick="cm('mConfDel')" class="btn-secondary" style="flex:1">Cancelar</button>
+      <button id="mConfDelBtn" style="flex:1;background:#8B1A1A;color:#fff;border:none;border-radius:3px;padding:.65rem;font-size:.85rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer">Excluir</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="tst" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:99;display:none;pointer-events:none">
   <div id="tstMsg" style="font-size:.8rem;padding:.7rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);max-width:280px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600"></div>
@@ -394,7 +490,7 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 // CONSTANTS
 // ============================================================
-const APP_VER='4'; // bump to force localStorage refresh
+const APP_VER='5'; // bump to force localStorage refresh
 const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
 const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -422,7 +518,10 @@ function chgPwd(){const np=document.getElementById('cfPwd').value.trim();if(!np)
 // ============================================================
 // INIT
 // ============================================================
-async function init(){ldCfg();await ldData();bldSels();bldFilters();applyF();if(S.url)document.getElementById('btnSync').style.display='inline-block';applyLogo();}
+async function init(){ldCfg();ldFornData();await ldData();bldSels();bldFilters();applyF();if(S.url)document.getElementById('btnSync').style.display='inline-block';applyLogo();}
+
+// Add fornData to state
+S.fornData={};
 
 function applyLogo(){
   // Try native logo.png first, then configured URL
@@ -743,12 +842,12 @@ function extractFromPDF(txt){
 
   // --- VALUE: "Valor do Documento" (priority), then R$ at top ---
   const vnPat=[
-    /[Vv]alor\s+do\s+[Dd]ocumento\s*[\r\n]+\s*([\d\.]+,\d{2})/,
-    /[Vv]alor\s+do\s+[Dd]ocumento\s*[:\|]?\s*([\d\.]+,\d{2})/,
-    /[Vv]alor\s*[Cc]obra[dt]o\s*[\r\n\s]*([\d\.]+,\d{2})/i,
-    /[Vv]alor\s+do\s+[Tt][ií]tulo\s*[:\|]?\s*([\d\.]+,\d{2})/,
-    /R\$\s*([\d\.]+,\d{2})/,
-    /([\d]{1,3}(?:\.[\d]{3})+,\d{2})/,
+    /[Vv]alor\s+do\s+[Dd]ocumento\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,  // "Valor do Documento 1.532,67"
+    /[Vv]alor\s+do\s+[Dd]ocumento\s*[:\|]\s*(\d{1,3}(?:\.\d{3})*,\d{2})/,
+    /[Vv]alor\s*[Cc]obra[dt]o\s+(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+    /[Vv]alor\s+do\s+[Tt][ií]tulo\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
+    /R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/,
+    /(\d{1,3}(?:\.\d{3})+,\d{2})/,  // any BR-formatted number with thousands sep
   ];
   for(const p of vnPat){
     const m=txt.match(p);
@@ -788,9 +887,9 @@ function parseBol(){
 
   // --- Extract from barcode (linha digitável) ---
   if(cl.length===47){
-    // Standard 47-digit bank boleto
-    // Amount is at positions 32-41 of field 5 (last 14 chars): factor(4)+amount(10)
-    const f5=cl.substring(32,47);
+    // Field layout (cleaned): Field1(10)+Field2(11)+Field3(11)+CheckDigit(1)+Field5(14)
+    // Field5 starts at position 33 (not 32 — position 32 is the general check digit)
+    const f5=cl.substring(33,47); // positions 33-46 = 14 chars
     const fac=parseInt(f5.substring(0,4));
     const amt=parseFloat(f5.substring(4,14))/100;
     // Due date from factor (only valid if factor > 1000, Boleto Pix may use 0000)
@@ -814,11 +913,10 @@ function parseBol(){
   // --- Enrich/override from PDF text (PDF data is more reliable than barcode for dates) ---
   if(S.pdfTxt){
     const ext=extractFromPDF(S.pdfTxt);
-    // PDF dates ALWAYS override barcode dates (Boleto Pix doesn't encode date in barcode)
+    // PDF data ALWAYS overrides barcode (PDF text is the authoritative source)
     if(ext.dv)prs.dv=ext.dv;
     if(ext.de)prs.de=ext.de;
-    // PDF value overrides if barcode had no value
-    if(ext.vn&&!prs.vn)prs.vn=ext.vn;
+    if(ext.vn)prs.vn=ext.vn; // PDF value always wins over barcode
     // NF, fornecedor always from PDF
     if(ext.nn)prs.nn=ext.nn;
     if(ext.fo)prs.fo=ext.fo;
@@ -935,6 +1033,180 @@ function toast(msg,type='ok'){
   mc.style.cssText=(c[type]||c.ok)+';font-size:.8rem;padding:.65rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600';
   mc.textContent=msg;el.style.display='block';
   clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',3500);
+}
+
+// ============================================================
+// FORNECEDOR MANAGEMENT
+// ============================================================
+
+function ldFornData(){
+  const raw=localStorage.getItem('r_forn_data');
+  if(raw){S.fornData=JSON.parse(raw);}
+  else{
+    // Seed with defaults (empty params)
+    S.fornData={};
+    DEF_FORNS.forEach(f=>{S.fornData[f]={cnpj:'',mkt:0,produto:0,servico:0};});
+    svFornData();
+  }
+}
+function svFornData(){localStorage.setItem('r_forn_data',JSON.stringify(S.fornData));}
+
+function openFornMgmt(){
+  switchFornTab('forn');
+  renderFornTable();
+  renderLojaTable();
+  cm('mCfg');
+  document.getElementById('mForn').style.display='flex';
+}
+
+function switchFornTab(tab){
+  document.getElementById('tabForn').style.display=tab==='forn'?'block':'none';
+  document.getElementById('tabLoja').style.display=tab==='loja'?'block':'none';
+  const fb=document.getElementById('tabFornBtn'),lb=document.getElementById('tabLojaBtn');
+  fb.style.color=tab==='forn'?'#2C1810':'#9B6B50';
+  fb.style.borderBottomColor=tab==='forn'?'#2C1810':'transparent';
+  fb.style.fontWeight=tab==='forn'?'700':'600';
+  lb.style.color=tab==='loja'?'#2C1810':'#9B6B50';
+  lb.style.borderBottomColor=tab==='loja'?'#2C1810':'transparent';
+  lb.style.fontWeight=tab==='loja'?'700':'600';
+}
+
+function renderFornTable(){
+  const tbody=document.getElementById('fornMgmtTable');
+  if(!tbody)return;
+  if(!S.forns.length){tbody.innerHTML='<tr><td colspan="6" style="padding:1.5rem;text-align:center;color:#C8A882">Nenhum fornecedor cadastrado</td></tr>';return;}
+  tbody.innerHTML=S.forns.map((f,i)=>{
+    const d=S.fornData[f]||{cnpj:'',mkt:0,produto:0,servico:0};
+    const bg=i%2===0?'#fff':'#FAF7F4';
+    return '<tr style="border-bottom:1px solid #F2EAE0;background:'+bg+'">'+
+      '<td style="padding:.5rem .75rem;font-weight:600;color:#2C1810">'+xe(f)+'</td>'+
+      '<td style="padding:.5rem .75rem;color:#7A4F3A;font-size:.75rem">'+xe(d.cnpj||'—')+'</td>'+
+      '<td style="padding:.5rem .75rem;text-align:center;color:#6B5500">'+fPct(d.mkt)+'</td>'+
+      '<td style="padding:.5rem .75rem;text-align:center;color:#1E6B3A">'+fPct(d.produto)+'</td>'+
+      '<td style="padding:.5rem .75rem;text-align:center;color:#5C3D2E">'+fPct(d.servico)+'</td>'+
+      '<td style="padding:.5rem .75rem;text-align:center;white-space:nowrap">'+
+        '<button onclick="editForn(\''+xe(f)+'\')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
+        '<button onclick="delForn(\''+xe(f)+'\')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function renderLojaTable(){
+  const tbody=document.getElementById('lojaMgmtTable');
+  if(!tbody)return;
+  tbody.innerHTML=S.lojas.map((l,i)=>{
+    const bg=i%2===0?'#fff':'#FAF7F4';
+    return '<tr style="border-bottom:1px solid #F2EAE0;background:'+bg+'">'+
+      '<td style="padding:.5rem .75rem;font-weight:600;color:#2C1810">'+xe(l)+'</td>'+
+      '<td style="padding:.5rem .75rem;text-align:center">'+
+        '<button onclick="delLoja(\''+xe(l)+'\')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function saveForn(){
+  const nome=document.getElementById('ff_nome').value.trim();
+  if(!nome){toast('Informe o nome do fornecedor.','warn');return;}
+  const orig=document.getElementById('ff_orig').value;
+  const data={
+    cnpj:document.getElementById('ff_cnpj').value.trim(),
+    mkt:parseFloat(document.getElementById('ff_mkt').value)||0,
+    produto:parseFloat(document.getElementById('ff_pr').value)||0,
+    servico:parseFloat(document.getElementById('ff_sv').value)||0
+  };
+  if(orig&&orig!==nome){
+    // Rename: remove old, add new
+    S.forns=S.forns.filter(f=>f!==orig);
+    delete S.fornData[orig];
+  }
+  if(!S.forns.includes(nome))S.forns.push(nome);
+  S.forns.sort();
+  S.fornData[nome]=data;
+  svFornData();svCfgStore();
+  bldSels();bldFilters();
+  cancelFornEdit();
+  renderFornTable();
+  toast('Fornecedor "'+(orig&&orig!==nome?orig+' → ':'')+nome+'" salvo!');
+}
+
+function editForn(nome){
+  const d=S.fornData[nome]||{cnpj:'',mkt:0,produto:0,servico:0};
+  document.getElementById('fornFormTitle').textContent='Editar: '+nome;
+  document.getElementById('ff_orig').value=nome;
+  document.getElementById('ff_nome').value=nome;
+  document.getElementById('ff_cnpj').value=d.cnpj||'';
+  document.getElementById('ff_mkt').value=d.mkt||0;
+  document.getElementById('ff_pr').value=d.produto||0;
+  document.getElementById('ff_sv').value=d.servico||0;
+  document.getElementById('ff_cancel').style.display='inline-block';
+  document.getElementById('ff_nome').focus();
+}
+
+function cancelFornEdit(){
+  document.getElementById('fornFormTitle').textContent='Adicionar Fornecedor';
+  document.getElementById('ff_orig').value='';
+  document.getElementById('ff_nome').value='';
+  document.getElementById('ff_cnpj').value='';
+  document.getElementById('ff_mkt').value='0';
+  document.getElementById('ff_pr').value='0';
+  document.getElementById('ff_sv').value='0';
+  document.getElementById('ff_cancel').style.display='none';
+}
+
+function delForn(nome){
+  confirmDel(
+    'Excluir o fornecedor "'+nome+'"?',
+    ()=>{
+      S.forns=S.forns.filter(f=>f!==nome);
+      delete S.fornData[nome];
+      svFornData();svCfgStore();
+      bldSels();bldFilters();
+      renderFornTable();
+      toast('Fornecedor excluído. Registros existentes não foram alterados.');
+    }
+  );
+}
+
+function saveLoja(){
+  const nome=document.getElementById('lf_nome').value.trim();
+  if(!nome||S.lojas.includes(nome))return;
+  S.lojas.push(nome);S.lojas.sort();svCfgStore();
+  bldSels();bldFilters();renderLojaTable();
+  document.getElementById('lf_nome').value='';
+  toast('Loja "'+nome+'" adicionada!');
+}
+
+function delLoja(nome){
+  confirmDel(
+    'Excluir a loja "'+nome+'"?',
+    ()=>{
+      S.lojas=S.lojas.filter(l=>l!==nome);
+      svCfgStore();bldSels();bldFilters();renderLojaTable();
+      toast('Loja excluída. Registros existentes não foram alterados.');
+    }
+  );
+}
+
+function confirmDel(msg,fn){
+  document.getElementById('mConfDelMsg').textContent=msg;
+  document.getElementById('mConfDelBtn').onclick=()=>{cm('mConfDel');fn();};
+  document.getElementById('mConfDel').style.display='flex';
+}
+
+function fPct(v){return v?'<strong>'+parseFloat(v).toFixed(2).replace('.',',')+'%</strong>':'<span style="color:#C8A882">0%</span>';}
+
+// ============================================================
+// AUTO-CALCULATE SPLIT IN BOLETO FORM
+// ============================================================
+function calcFornSplit(){
+  const fo=document.getElementById('bf_fo').value;
+  const vn=parseFloat(document.getElementById('bf_vn').value)||0;
+  if(!fo||!vn)return;
+  const d=S.fornData[fo];
+  if(!d)return;
+  if(d.mkt)document.getElementById('bf_mk').value=((vn*(d.mkt||0))/100).toFixed(2);
+  if(d.produto)document.getElementById('bf_pr').value=((vn*(d.produto||0))/100).toFixed(2);
+  if(d.servico)document.getElementById('bf_sv').value=((vn*(d.servico||0))/100).toFixed(2);
 }
 
 // ============================================================
