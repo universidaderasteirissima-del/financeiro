@@ -965,7 +965,7 @@ function showQueueItem(idx){
   document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
   // Debug: show raw extracted text
   const dbg=document.getElementById('bDebug');
-  if(dbg){const pageText=S.boletoQueue[idx]&&S.boletoQueue[idx]._raw?S.boletoQueue[idx]._raw:(S.pdfPages&&S.pdfPages[idx])||S.pdfTxt||'';dbg.value=pageText.substring(0,2000);}
+  if(dbg){const qi=S.boletoQueue[idx];dbg.value=(qi&&qi._raw?qi._raw:S.pdfTxt||'').substring(0,2000);}
 
   // Fill form
   document.getElementById('bf_dv').value=prs.dv||'';
@@ -1193,80 +1193,6 @@ function extractFromPDF(txt){
 // Keep legacy wrappers for barcode-only flow
 function extractNF(txt){return extractFromPDF(txt).nn||'';}
 function extractValue(txt){return extractFromPDF(txt).vn||'';}
-
-function parseBol(){
-  const raw=document.getElementById('bLi').value.trim();
-  const cl=raw.replace(/[\s.\-]/g,'');
-  let prs={tipo:'Manual',banco:''};
-
-  // --- Extract from barcode (linha digitável) ---
-  if(cl.length===47){
-    // Field layout (cleaned): Field1(10)+Field2(11)+Field3(11)+CheckDigit(1)+Field5(14)
-    // Field5 starts at position 33 (not 32 — position 32 is the general check digit)
-    const f5=cl.substring(33,47); // positions 33-46 = 14 chars
-    const fac=parseInt(f5.substring(0,4));
-    const amt=parseFloat(f5.substring(4,14))/100;
-    // Due date from factor (only valid if factor > 1000, Boleto Pix may use 0000)
-    if(fac>1000){
-      const base=new Date(1997,9,7);
-      prs.dv=toISO(new Date(base.getTime()+fac*864e5));
-    }
-    if(amt>0)prs.vn=amt.toFixed(2);
-    prs.tipo='Bancário';
-    prs.banco=bancoNome(cl.substring(0,3));
-  }else if(cl.length===48){
-    const vid=cl.substring(2,3);
-    let amt=0;
-    if(['6','7','8','9'].includes(vid))amt=parseFloat(cl.substring(4,15))/100;
-    if(amt>0)prs.vn=amt.toFixed(2);
-    prs.tipo='Concessionária';
-  }else if(cl.length>0&&cl.length<44){
-    toast('Linha digitável inválida ('+cl.length+' dígitos). Verifique.','warn');return;
-  }
-
-  // --- Enrich/override from PDF text (PDF data is more reliable than barcode for dates) ---
-  if(S.pdfTxt){
-    const ext=extractFromPDF(S.pdfTxt);
-    // PDF data ALWAYS overrides barcode (PDF text is the authoritative source)
-    if(ext.dv)prs.dv=ext.dv;
-    if(ext.de)prs.de=ext.de;
-    if(ext.vn)prs.vn=ext.vn; // PDF value always wins over barcode
-    // NF, fornecedor always from PDF
-    if(ext.nn)prs.nn=ext.nn;
-    if(ext.fo)prs.fo=ext.fo;
-  }
-
-  // Build info summary
-  const parts=[
-    'Tipo: '+prs.tipo,
-    prs.banco?'Banco: '+prs.banco:'',
-    'Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado'),
-    'Vencimento: '+(fDt(prs.dv)||'não detectado'),
-    prs.de?'Emissão: '+fDt(prs.de):'',
-    prs.nn?'NF: '+prs.nn:'',
-    prs.fo?'Fornecedor: '+prs.fo:'',
-  ];
-  document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
-  // Debug: show raw extracted text
-  const dbg=document.getElementById('bDebug');
-  if(dbg){const pageText=S.boletoQueue[idx]&&S.boletoQueue[idx]._raw?S.boletoQueue[idx]._raw:(S.pdfPages&&S.pdfPages[idx])||S.pdfTxt||'';dbg.value=pageText.substring(0,2000);}
-
-  // Fill form fields
-  if(prs.dv)document.getElementById('bf_dv').value=prs.dv;
-  if(prs.de)document.getElementById('bf_de').value=prs.de;
-  if(prs.vn)document.getElementById('bf_vn').value=prs.vn;
-  if(prs.fo)document.getElementById('bf_fo').value=prs.fo;
-  if(prs.nn)document.getElementById('bf_nn').value=prs.nn;
-
-  // Trigger split calculation after form is filled (onchange won't fire on programmatic setValue)
-  calcFornSplit();
-  bSt(2);
-}
-
-function bancoNome(code){
-  const bancos={'001':'BB','033':'Santander','104':'CEF','237':'Bradesco','341':'Itaú','356':'Real','389':'Mercantil','399':'HSBC','422':'Safra','453':'Rural','633':'Rendimento','652':'Itaú Unibanco','745':'Citibank','756':'Sicoob'};
-  return bancos[code]?'Banco '+bancos[code]+' ('+code+')':'Banco '+code;
-}
 
 async function saveBol(){
   const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
