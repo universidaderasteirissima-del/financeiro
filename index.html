@@ -976,6 +976,43 @@ function showQueueItem(idx){
   bSt(2);
 }
 
+// Robust document number extractor — handles Bradesco, Sicoob, Inter formats
+function findDocNumber(txt,bankCode){
+  if(bankCode==='001')return null; // BB: no meaningful NF
+
+  // P1: "REF. NF 705" (Inter/Fabrica in informacoes section)
+  const refNf=txt.match(/REF\.?\s+NF\s+(\d+)/i);
+  if(refNf)return{nn:refNf[1],parcel:null};
+
+  // Collect positions of "documento" labels in text
+  const docPos=[];
+  const re1=/[Nn][.o]?\s*[Dd]ocumento/g;
+  const re2=/[Nn][uU]\s*[Mm]ero\s+[Dd]o\s+[Dd]ocumento/gi;
+  let m;
+  while((m=re1.exec(txt))!==null)docPos.push(m.index+m[0].length);
+  while((m=re2.exec(txt))!==null)docPos.push(m.index+m[0].length);
+  // Also start from position 0 as catch-all
+  docPos.push(0);
+
+  for(const pos of docPos){
+    const w=txt.substring(pos,pos+700);
+
+    // Sicoob "87086 2/3": number SPACE number/number
+    const sc=w.match(/\b(\d{4,8})\s+(\d{1,2})\/(\d{1,2})\b/);
+    if(sc){const base=parseInt(sc[1]),par=parseInt(sc[2]);if(base>999&&par>=1&&par<=30)return{nn:String(base)+'-'+par,parcel:par};}
+
+    // Bradesco "005906-02" or "005906 -02" or "005906 - 02" or en-dash
+    // \s*[-–—]\s* handles: hyphen, en-dash, em-dash, with optional spaces
+    const bd=w.match(/(\d{3,8})\s*[\-–—]\s*(\d{1,2})(?=\s|[A-Za-z]|$)/);
+    if(bd){
+      const base=parseInt(bd[1]),sub=parseInt(bd[2]);
+      if(base>99&&sub>=1&&sub<=30&&!(base>=1990&&base<=2100))
+        return{nn:String(base)+'-'+sub,parcel:sub};
+    }
+  }
+  return null;
+}
+
 // ============================================================
 // BOLETO DATA EXTRACTOR — multi-bank robust version
 // ============================================================
@@ -1024,38 +1061,15 @@ function extractBoletoData(txt,barcode){
     if(v>0&&v<999999){prs.vn=v.toFixed(2);break;}
   }
 
-  // NF / DOCUMENT NUMBER
-  // P1: "REF. NF 705" (Inter / Fabrica)
-  const refNf=txt.match(/REF\.?\s+NF\s+(\d+)/i);
-  if(refNf)prs.nn=refNf[1];
+  // NF / DOCUMENT NUMBER + PARCEL
+  // Uses a window-based search starting from "documento" label positions,
+  // handling: spaces around dash, en-dash, Sicoob X/Y format, Bradesco NNNNN-NN
+  const docResult=findDocNumber(txt,bk);
+  if(docResult){prs.nn=docResult.nn;if(docResult.parcel)prs.parcel=docResult.parcel;}
 
-  // P2: Sicoob "N. documento 87086 2/3" -> nota "87086-2", parcela 2
-  if(!prs.nn){
-    const sc=txt.match(/N\.?\s*[Dd]ocumento\s+(\d+)\s+(\d+)\/(\d+)/);
-    if(sc){const base=String(parseInt(sc[1])),par=parseInt(sc[2]);prs.nn=base+'-'+par;prs.parcel=par;}
-  }
-
-  // P3: Bradesco "005906-02" anywhere (negative lookbehind for / to avoid agency codes)
-  // -> parseInt("005906")=5906, parseInt("02")=2 -> "5906-2", parcela 2
-  if(!prs.nn){
-    const cands=[...txt.matchAll(/(?<![\/\d])(\d{4,8})-(\d{1,2})(?![\/\d])/g)];
-    for(const m of cands){
-      const base=parseInt(m[1]),sub=parseInt(m[2]);
-      if(base>999&&base<9999999&&sub>=1&&sub<=30&&!(base>=1990&&base<=2100)){
-        prs.nn=String(base)+'-'+sub;prs.parcel=sub;break;
-      }
-    }
-  }
-
-  // P4: Generic label-based (skip BB — no meaningful NF)
-  if(!prs.nn&&bk!=='001'){
-    const gp=[/[Nn][rR]\.?\s*do\s*[Dd]ocumento\s+([\w\-]{2,20})/i,/[Nn][Uu]mero\s+do\s+[Dd]ocumento\s+([\w\-]{2,20})/i];
-    for(const p of gp){const m=txt.match(p);if(m&&m[1]&&!/^\d{2}\/\d{2}\/\d{4}$/.test(m[1])&&m[1].length<=15){prs.nn=m[1];break;}}
-  }
-
-  // PARCEL (if not already from nota parsing)
+  // PARCEL (if not from nota)
   if(!prs.parcel){
-    const pm=txt.match(/parcela\s+(\d+)\/(\d+)/i)||txt.match(/(\d+)[aaa]\s*parcela/i);
+    const pm=txt.match(/parcela\s+(\d+)\/(\d+)/i);
     if(pm)prs.parcel=parseInt(pm[1]);
   }
 
