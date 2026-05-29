@@ -863,19 +863,44 @@ async function rdPDF(input){
     // Auto-detect first linha digitável
     const allLinhas=findLinhasDigitaveis(S.pdfTxt);
     if(allLinhas.length)document.getElementById('bLi').value=allLinhas[0];
-    toast('PDF lido! '+S.pdfPages.length+' página(s), '+allLinhas.length+' boleto(s) detectado(s).','info');
+    const digitCount=S.pdfTxt.replace(/[^\d]/g,'').length;
+    if(allLinhas.length>0){
+      toast('PDF lido! '+S.pdfPages.length+' pág., '+allLinhas.length+' boleto(s) detectado(s).','info');
+    }else{
+      toast('PDF lido ('+S.pdfPages.length+' pág., '+digitCount+' dígitos). Cole a linha digitável manualmente se não preencher.','warn');
+    }
   }catch(e){S.pdfTxt=null;S.pdfPages=[];toast('Não foi possível ler o PDF. Cole a linha digitável.','warn');}
 }
 
 function findLinhasDigitaveis(txt){
-  const matches=[];
-  // Pattern: groups of digits separated by dots/spaces forming 47-48 digit sequences
-  const raw=txt.match(/[\d][\d\s.]{45,60}[\d]/g)||[];
-  for(const m of raw){
-    const cl=m.replace(/[\s.]/g,'');
-    if(cl.length===47||cl.length===48)matches.push(cl);
+  const results=[];
+
+  // Method 1: standard barcode text pattern (works when barcode is contiguous in text)
+  const pats=[
+    /\d{5}\.?\d{5}\s+\d{5}\.?\d{6}\s+\d{5}\.?\d{6}\s+\d\s+\d{14}/g,
+    /[\d][\d\s.]{45,60}[\d]/g,
+  ];
+  for(const pat of pats){
+    const ms=txt.match(pat)||[];
+    for(const m of ms){const cl=m.replace(/[\s.]/g,'');if(cl.length===47||cl.length===48)results.push(cl);}
+    if(results.length)break;
   }
-  return [...new Set(matches)]; // deduplicate
+
+  // Method 2: brute force — extract ALL digits, slide window of 47
+  // Handles PDFs where other text is interspersed between barcode groups
+  if(!results.length){
+    const digits=txt.replace(/[^\d]/g,'');
+    for(let i=0;i<=digits.length-47;i++){
+      const s=digits.substring(i,i+47);
+      const f5=s.substring(33,47);
+      const factor=parseInt(f5.substring(0,4));
+      const amt=parseFloat(f5.substring(4,14))/100;
+      // Valid if amount is plausible (R$1 - R$999,999) and factor > 0
+      if(amt>=1&&amt<999999&&factor>0){results.push(s);i+=46;}
+    }
+  }
+
+  return [...new Set(results)];
 }
 
 function parseBol(){
