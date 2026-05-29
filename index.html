@@ -985,49 +985,43 @@ function showQueueItem(idx){
   bSt(2);
 }
 
-// Robust document number extractor — handles Bradesco, Sicoob, Inter, any bank
-function findDocNumber(txt,bankCode){
-  if(bankCode==='001')return null; // BB: no meaningful NF
+// findDocNumber: extracts NF and parcel from boleto text
+// Uses indexOf for labels (avoids encoding issues with accented chars)
+function findDocNumber(txt,bk){
+  if(bk==='001')return null;
 
-  // P1: "REF. NF 705" (Inter/Fabrica in informacoes section)
-  const refNf=txt.match(/REF\.?\s+NF\s+(\d+)/i);
-  if(refNf)return{nn:refNf[1],parcel:null};
+  // P1: Inter/Fabrica "REF. NF 705" or "REF NF 705"
+  var m=txt.match(/REF[\s.]+NF[\s]+(\d+)/i);
+  if(m)return{nn:m[1],parcel:null};
 
-  // P2: Sicoob "87086 2/3" — number SPACE number/number near "documento" label
-  const sc=txt.match(/\b(\d{4,8})\s+(\d{1,2})\/(\d{1,2})\b/);
-  if(sc){const base=parseInt(sc[1]),par=parseInt(sc[2]);if(base>999&&par>=1&&par<=30)return{nn:String(base)+'-'+par,parcel:par};}
+  // P2: Sicoob "87086 2/3" (5-6 digit base, space, X/Y parcel)
+  m=txt.match(/\b(\d{5,6})\s+(\d{1,2})\/\d+\b/);
+  if(m){var b2=parseInt(m[1]),p2=parseInt(m[2]);if(b2>9999&&p2>=1&&p2<=20)return{nn:String(b2)+'-'+p2,parcel:p2};}
 
-  // Collect ALL "digits-dash-digits" candidates in the text
-  // Key filter: char before match must NOT be "/" or digit (excludes agency codes like "2455-0/0053012-3")
-  const re=/\d[\d\s]*[-–—][\s\d]*\d/g;
-  const candidates=[];
-  let m;
-  while((m=re.exec(txt))!==null){
-    const charBefore=m.index>0?txt[m.index-1]:' ';
-    if(charBefore==='/'||/\d/.test(charBefore))continue; // skip: part of agency code or nosso numero
-    const clean=m[0].replace(/\s/g,'');
-    const parts=clean.split(/[-–—]/);
-    if(parts.length!==2)continue;
-    const base=parseInt(parts[0]),sub=parseInt(parts[1]);
-    // Valid nota: base 1000+, parcel 1-30, not a year
-    if(base>=1000&&base<9999999&&sub>=1&&sub<=30&&!(base>=1990&&base<=2100)){
-      candidates.push({base,sub,index:m.index});
-    }
+  // P3: Bradesco "005906-1" — search after "Número do Documento" or similar label
+  // indexOf avoids regex encoding issues with accented characters
+  var labelPos=-1;
+  var labels=['mero do Documento','N. documento','Nr. do Documento','N documento','do Documento'];
+  for(var i=0;i<labels.length;i++){
+    var lp=txt.indexOf(labels[i]);
+    if(lp>=0){labelPos=lp+labels[i].length;break;}
   }
 
-  if(!candidates.length)return null;
+  // Search in 800-char window after label (or full text if no label found)
+  var searchIn=labelPos>=0?txt.substring(labelPos,Math.min(txt.length,labelPos+800)):txt;
 
-  // Prefer candidates that appear within 700 chars AFTER a "documento" label
-  const docRe=/[Nn][.o]?\s*[Dd]ocumento/g;
-  while((m=docRe.exec(txt))!==null){
-    const labelEnd=m.index+m[0].length;
-    const near=candidates.filter(c=>c.index>labelEnd&&c.index<labelEnd+700);
-    if(near.length)return{nn:String(near[0].base)+'-'+near[0].sub,parcel:near[0].sub};
+  // Find NNNN-NN: 4-8 digits, ASCII hyphen, 1-2 digits
+  var re2=/(\d{4,8})-(\d{1,2})(?=\s|[A-Za-z]|$)/g;
+  while((m=re2.exec(searchIn))!==null){
+    var cb=m.index>0?searchIn[m.index-1]:' ';
+    if(cb==='/'||/\d/.test(cb))continue; // skip agency codes
+    var base=parseInt(m[1]),sub=parseInt(m[2]);
+    if(base>=1000&&sub>=1&&sub<=30&&!(base>=1990&&base<=2100))
+      return{nn:String(base)+'-'+sub,parcel:sub};
   }
-
-  // Fallback: first valid candidate anywhere
-  return{nn:String(candidates[0].base)+'-'+candidates[0].sub,parcel:candidates[0].sub};
+  return null;
 }
+
 // ============================================================
 // BOLETO DATA EXTRACTOR — multi-bank robust version
 // ============================================================
