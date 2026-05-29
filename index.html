@@ -75,8 +75,10 @@ th:hover{background:#EAD9C8!important}
 <div id="pgLogin" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2C1810 0%,#5C3D2E 50%,#9B6B50 100%)">
   <div style="background:#fff;border-radius:4px;padding:2.5rem;width:100%;max-width:360px;box-shadow:0 24px 60px rgba(0,0,0,.3)" class="fade">
     <div style="text-align:center;margin-bottom:2rem">
-      <div style="font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810;line-height:1">RASTEIRISSIMA</div>
-      <div style="width:40px;height:2px;background:#9B6B50;margin:.75rem auto 0"></div>
+      <div id="loginLogo" style="min-height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:.5rem">
+        <div style="font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810;line-height:1">RASTEIRISSIMA</div>
+      </div>
+      <div style="width:40px;height:2px;background:#9B6B50;margin:.25rem auto 0"></div>
       <p style="font-size:.75rem;color:#9B6B50;margin-top:.5rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase">Sistema Financeiro</p>
     </div>
     <div id="loginErr" style="display:none;background:#FDF0F0;color:#8B1A1A;font-size:.8rem;padding:.75rem;border-radius:3px;margin-bottom:1rem;border:1px solid #F0C0C0;text-align:center"></div>
@@ -183,9 +185,9 @@ th:hover{background:#EAD9C8!important}
 
     <!-- TABLE -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:4px;overflow:hidden">
-      <div style="overflow-x:auto">
+      <div style="overflow:auto;max-height:calc(100vh - 370px);min-height:300px">
         <table style="width:100%;border-collapse:collapse;font-size:.825rem">
-          <thead>
+          <thead style="position:sticky;top:0;z-index:10">
             <tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">
               <th class="si" onclick="sBy('lo')" id="th-lo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Loja</th>
               <th class="si" onclick="sBy('fo')" id="th-fo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Fornecedor</th>
@@ -392,10 +394,13 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 // CONSTANTS
 // ============================================================
+const APP_VER='4'; // bump to force localStorage refresh
 const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
 const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DEF_PWD='rasteira2024';
+// Force reload from data.json if version changed
+if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');localStorage.setItem('r_ver',APP_VER);}
 
 // ============================================================
 // STATE
@@ -420,9 +425,14 @@ function chgPwd(){const np=document.getElementById('cfPwd').value.trim();if(!np)
 async function init(){ldCfg();await ldData();bldSels();bldFilters();applyF();if(S.url)document.getElementById('btnSync').style.display='inline-block';applyLogo();}
 
 function applyLogo(){
-  if(S.logoUrl){
-    document.getElementById('logoArea').innerHTML='<img src="'+xe(S.logoUrl)+'" style="height:36px;object-fit:contain" alt="Rasteirissima" />';
-  }
+  // Try native logo.png first, then configured URL
+  const src=S.logoUrl||'logo.png';
+  const hdrImg='<img src="'+xe(src)+'" style="max-height:44px;max-width:200px;object-fit:contain" alt="Rasteirissima" onerror="this.parentNode.innerHTML=\'<span style=\\\'font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff\\\'>RASTEIRISSIMA</span>\'" />';
+  const loginImg='<img src="'+xe(src)+'" style="max-height:80px;max-width:240px;object-fit:contain" alt="Rasteirissima" onerror="this.parentNode.innerHTML=\'<span style=\\\'font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810\\\'>RASTEIRISSIMA</span>\'" />';
+  const hdr=document.getElementById('logoArea');
+  if(hdr)hdr.innerHTML=hdrImg;
+  const login=document.getElementById('loginLogo');
+  if(login)login.innerHTML=loginImg;
 }
 
 function ldCfg(){
@@ -607,9 +617,9 @@ function rtable(){
       '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.de)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:600;color:#2C1810;white-space:nowrap">'+fDt(r.dv)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:700;color:#2C1810;text-align:right;white-space:nowrap">'+fBRL(r.vn)+'</td>'+
-      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.mk?fBRL(r.mk):'-')+'</td>'+
-      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.pr?fBRL(r.pr):'-')+'</td>'+
-      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+(r.sv?fBRL(r.sv):'-')+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+fBRL(r.mk)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+fBRL(r.pr)+'</td>'+
+      '<td style="padding:.625rem 1rem;font-size:.75rem;color:#9B6B50;text-align:right">'+fBRL(r.sv)+'</td>'+
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap"><span style="font-size:.7rem;padding:.25rem .6rem;border-radius:2px" class="'+sc+'">'+sl+'</span></td>'+
       '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.dp)+'</td>'+
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap">'+
@@ -706,78 +716,129 @@ async function rdPDF(input){
   }catch(e){S.pdfTxt=null;toast('Não foi possível ler o PDF. Cole a linha digitável.','warn');}
 }
 
-function extractNF(txt){
-  if(!txt)return '';
-  const patterns=[
-    /N[ºo°\.]\s*[Dd]o\s*[Dd]ocumento\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
-    /[Nn][uú]mero\s*do\s*[Dd]ocumento\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
-    /[Nn][uú]m\.?\s*[Dd]oc\.?\s*[:\-]?\s*([A-Z0-9\-\.\/]+)/i,
-    /\bNF[- eE\-]*([0-9]{4,10})\b/i,
-    /[Nn]ota\s*[Ff]iscal\s*[nNºo°#]*\s*[:\-]?\s*([0-9]{4,10})/i,
-    /[Dd]ocumento\s*[:\-]?\s*([0-9]{5,10})/i,
-    /[Nn]os?\s*[:\-]?\s*([0-9]{4,10})/i,
-  ];
-  for(const p of patterns){const m=txt.match(p);if(m&&m[1]&&m[1].length>=3)return m[1].trim();}
-  return '';
-}
+// Normalize string: remove accents, uppercase (for fornecedor matching)
+function norm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();}
 
-function extractValue(txt){
-  if(!txt)return '';
-  const patterns=[
-    /[Vv]alor\s*[Cc]obra[dt]o\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
-    /[Vv]alor\s*do\s*[Dd]ocumento\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
-    /[Vv]alor\s*do\s*[Tt][ií]tulo\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
-    /[Vv]alor\s*[:\-]?\s*R?\$?\s*([\d\.]+,\d{2})/i,
+// Full PDF extraction: returns object with all detected fields
+function extractFromPDF(txt){
+  if(!txt)return {};
+  const r={};
+
+  // --- DUE DATE: "Vencimento" ---
+  const dvPat=[
+    /[Vv]encimento\s*[\r\n]+\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Vv]encimento\s*[:\|]\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+  ];
+  for(const p of dvPat){const m=txt.match(p);if(m){r.dv=br2iso(m[1].trim());break;}}
+
+  // --- EMISSION DATE: "Data do Documento" ---
+  const dePat=[
+    /[Dd]ata\s+do\s+[Dd]ocumento\s*[\r\n]+\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+do\s+[Dd]ocumento\s*[:\|]\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+[Dd]o\s+[Dd]ocumento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,
+    /[Dd]ata\s+de\s+[Ee]miss[aã]o\s*[:\|]?\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+  ];
+  for(const p of dePat){const m=txt.match(p);if(m){r.de=br2iso(m[1].trim());break;}}
+
+  // --- VALUE: "Valor do Documento" (priority), then R$ at top ---
+  const vnPat=[
+    /[Vv]alor\s+do\s+[Dd]ocumento\s*[\r\n]+\s*([\d\.]+,\d{2})/,
+    /[Vv]alor\s+do\s+[Dd]ocumento\s*[:\|]?\s*([\d\.]+,\d{2})/,
+    /[Vv]alor\s*[Cc]obra[dt]o\s*[\r\n\s]*([\d\.]+,\d{2})/i,
+    /[Vv]alor\s+do\s+[Tt][ií]tulo\s*[:\|]?\s*([\d\.]+,\d{2})/,
     /R\$\s*([\d\.]+,\d{2})/,
     /([\d]{1,3}(?:\.[\d]{3})+,\d{2})/,
   ];
-  for(const p of patterns){
+  for(const p of vnPat){
     const m=txt.match(p);
     if(m&&m[1]){
+      // Parse Brazilian number: "1.532,67" → 1532.67
       const v=parseFloat(m[1].replace(/\./g,'').replace(',','.'));
-      if(v>0)return v.toFixed(2);
+      if(v>0&&v<1000000){r.vn=v.toFixed(2);break;}
     }
   }
-  return '';
+
+  // --- NF NUMBER: "REF. NF 705" from informações (PRIORITY), then Nº do Documento ---
+  const nfPat=[
+    /REF\.?\s+NF\s+(\d+)/i,          // REF. NF 705 ← main pattern
+    /REF\.?\s*NF[:\-\s]+(\d+)/i,
+    /\bNF\s+n?[°º]?\s*(\d{3,10})\b/i,
+    /[Nn]ota\s+[Ff]iscal\s*[n°º#]*\s*[:\-]?\s*(\d{3,10})/i,
+    /N[°º]\s*do\s*[Dd]ocumento\s*[\r\n\s]+(\d+)/,  // fallback: Nº do Documento
+  ];
+  for(const p of nfPat){const m=txt.match(p);if(m&&m[1]){r.nn=m[1].trim();break;}}
+
+  // --- FORNECEDOR: match against known list (normalized, no accents) ---
+  const nt=norm(txt);
+  const fo=S.forns.find(f=>nt.includes(norm(f)));
+  if(fo)r.fo=fo;
+
+  return r;
 }
+
+// Keep legacy wrappers for barcode-only flow
+function extractNF(txt){return extractFromPDF(txt).nn||'';}
+function extractValue(txt){return extractFromPDF(txt).vn||'';}
 
 function parseBol(){
   const raw=document.getElementById('bLi').value.trim();
   const cl=raw.replace(/[\s.\-]/g,'');
-  let prs={tipo:'Manual'};
+  let prs={tipo:'Manual',banco:''};
 
+  // --- Extract from barcode (linha digitável) ---
   if(cl.length===47){
+    // Standard 47-digit bank boleto
+    // Amount is at positions 32-41 of field 5 (last 14 chars): factor(4)+amount(10)
     const f5=cl.substring(32,47);
     const fac=parseInt(f5.substring(0,4));
-    const base=new Date(1997,9,7);
-    const due=new Date(base.getTime()+fac*864e5);
     const amt=parseFloat(f5.substring(4,14))/100;
-    prs={tipo:'Bancário',banco:bancoNome(cl.substring(0,3)),dv:toISO(due),vn:amt>0?amt.toFixed(2):''};
+    // Due date from factor (only valid if factor > 1000, Boleto Pix may use 0000)
+    if(fac>1000){
+      const base=new Date(1997,9,7);
+      prs.dv=toISO(new Date(base.getTime()+fac*864e5));
+    }
+    if(amt>0)prs.vn=amt.toFixed(2);
+    prs.tipo='Bancário';
+    prs.banco=bancoNome(cl.substring(0,3));
   }else if(cl.length===48){
     const vid=cl.substring(2,3);
     let amt=0;
     if(['6','7','8','9'].includes(vid))amt=parseFloat(cl.substring(4,15))/100;
-    prs={tipo:'Concessionária',vn:amt>0?amt.toFixed(2):''};
+    if(amt>0)prs.vn=amt.toFixed(2);
+    prs.tipo='Concessionária';
   }else if(cl.length>0&&cl.length<44){
     toast('Linha digitável inválida ('+cl.length+' dígitos). Verifique.','warn');return;
   }
 
-  // Enrich from PDF text
+  // --- Enrich/override from PDF text (PDF data is more reliable than barcode for dates) ---
   if(S.pdfTxt){
-    const tx=S.pdfTxt;
-    if(!prs.vn){const v=extractValue(tx);if(v)prs.vn=v;}
-    prs.nn=extractNF(tx);
-    const fo=S.forns.find(f=>tx.toUpperCase().includes(f.toUpperCase()));
-    if(fo)prs.fo=fo;
+    const ext=extractFromPDF(S.pdfTxt);
+    // PDF dates ALWAYS override barcode dates (Boleto Pix doesn't encode date in barcode)
+    if(ext.dv)prs.dv=ext.dv;
+    if(ext.de)prs.de=ext.de;
+    // PDF value overrides if barcode had no value
+    if(ext.vn&&!prs.vn)prs.vn=ext.vn;
+    // NF, fornecedor always from PDF
+    if(ext.nn)prs.nn=ext.nn;
+    if(ext.fo)prs.fo=ext.fo;
   }
 
-  document.getElementById('bInf').textContent=
-    'Tipo: '+prs.tipo+(prs.banco?' | '+prs.banco:'')+
-    ' | Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado')+
-    ' | Vencimento: '+(fDt(prs.dv)||'não detectado')+
-    (prs.nn?' | NF: '+prs.nn:'');
+  // Build info summary
+  const parts=[
+    'Tipo: '+prs.tipo,
+    prs.banco?'Banco: '+prs.banco:'',
+    'Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado'),
+    'Vencimento: '+(fDt(prs.dv)||'não detectado'),
+    prs.de?'Emissão: '+fDt(prs.de):'',
+    prs.nn?'NF: '+prs.nn:'',
+    prs.fo?'Fornecedor: '+prs.fo:'',
+  ];
+  document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
 
+  // Fill form fields
   if(prs.dv)document.getElementById('bf_dv').value=prs.dv;
+  if(prs.de)document.getElementById('bf_de').value=prs.de;
   if(prs.vn)document.getElementById('bf_vn').value=prs.vn;
   if(prs.fo)document.getElementById('bf_fo').value=prs.fo;
   if(prs.nn)document.getElementById('bf_nn').value=prs.nn;
@@ -818,36 +879,52 @@ function doCSV(){
 function g(id){return document.getElementById(id).value;}
 function cm(id){document.getElementById(id).style.display='none';}
 function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function fBRL(v){if(!v&&v!==0)return '—';return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);}
+function fBRL(v){
+  const n=parseFloat(v)||0;
+  return 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
 function fNum(v){return new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);}
 
 // fDt: always returns DD/MM/YYYY or empty
-function fDt(iso){
-  if(!iso)return '';
-  iso=String(iso).trim();
-  // Already in DD/MM/YYYY
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(iso))return iso;
-  // ISO: YYYY-MM-DD
-  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){const p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
-  return iso;
-}
-
-// br2iso: DD/MM/YYYY → YYYY-MM-DD
-function br2iso(br){
-  if(!br)return '';
-  br=String(br).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(br))return br;
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(br)){const p=br.split('/');return p[2]+'-'+p[1]+'-'+p[0];}
+function fDt(v){
+  if(!v&&v!==0)return '';
+  const s=String(v).trim();
+  if(!s||s==='0'||s==='null'||s==='undefined')return '';
+  // Already DD/MM/YYYY or DD/MM/YY
+  if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)){
+    const p=s.split('/');
+    const y=p[2].length===2?'20'+p[2]:p[2];
+    return p[0].padStart(2,'0')+'/'+p[1].padStart(2,'0')+'/'+y;
+  }
+  // ISO YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
+    const p=s.substring(0,10).split('-');
+    return p[2]+'/'+p[1]+'/'+p[0];
+  }
+  // Excel serial date number (rare)
+  if(/^\d{5}$/.test(s)){
+    const d=new Date(Math.round((parseInt(s)-25569)*864e5));
+    if(!isNaN(d))return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+  }
   return '';
 }
 
-// i2br: YYYY-MM-DD → DD/MM/YYYY
-function i2br(iso){
-  if(!iso)return '';
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(iso))return iso;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){const p=iso.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+// br2iso: any date format → YYYY-MM-DD for internal storage & comparison
+function br2iso(v){
+  if(!v)return '';
+  const s=String(v).trim();
+  if(!s)return '';
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
+  if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)){
+    const p=s.split('/');
+    const y=p[2].length===2?'20'+p[2]:p[2];
+    return y+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+  }
   return '';
 }
+
+// i2br: YYYY-MM-DD → DD/MM/YYYY for Sheets
+function i2br(iso){return fDt(iso);}
 
 function toISO(d){if(!d||isNaN(d))return '';return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function tof(v){if(!v&&v!==0)return 0;const s=String(v).replace(/[R$\s]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.');return parseFloat(s)||0;}
@@ -863,6 +940,17 @@ function toast(msg,type='ok'){
 // ============================================================
 // BOOT
 // ============================================================
+// Apply logo on login page immediately (before auth)
+(function(){
+  try{
+    const c=JSON.parse(localStorage.getItem('r_cfg')||'{}');
+    if(c.logo){
+      const el=document.getElementById('loginLogo');
+      if(el)el.innerHTML='<img src="'+c.logo.replace(/"/g,'&quot;')+'" style="max-height:80px;max-width:240px;object-fit:contain" alt="Rasteirissima" />';
+    }
+  }catch(e){}
+})();
+
 if(localStorage.getItem('r_ok')==='1'){
   document.getElementById('pgLogin').style.display='none';
   document.getElementById('pgApp').style.display='flex';
