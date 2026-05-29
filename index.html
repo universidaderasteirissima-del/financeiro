@@ -256,6 +256,10 @@ th:hover{background:#EAD9C8!important}
           <span id="bQueueBadge" style="display:none;font-size:.72rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.2rem .7rem;border-radius:2px"></span>
         </div>
         <p style="font-size:.72rem;color:#7A4F3A" id="bInf"></p>
+        <details style="margin-top:.5rem">
+          <summary style="font-size:.68rem;color:#B8896A;cursor:pointer">🔍 Ver texto extraído do PDF (para diagnóstico)</summary>
+          <textarea id="bDebug" readonly rows="6" style="width:100%;margin-top:.4rem;font-size:.65rem;font-family:monospace;border:1px solid #DDD0BC;border-radius:3px;padding:.4rem;background:#FAF7F4;resize:vertical"></textarea>
+        </details>
       </div>
       <div style="display:grid;gap:.75rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
@@ -916,6 +920,7 @@ function parseBol(){
       const linhas=findLinhasDigitaveis(pageTxt);
       const linha=linhas.length?linhas[0]:(p===0?manualLinha.replace(/[\s.]/g,''):'');
       const prs=extractBoletoData(pageTxt,linha);
+      prs._raw=pageTxt.substring(0,2000); // debug
       // Add page if has boleto data OR a detected barcode
       if(prs.dv||prs.vn||(prs.nn&&prs.nn.length>0)||linhas.length>0){
         S.boletoQueue.push(prs);
@@ -927,6 +932,7 @@ function parseBol(){
   if(S.boletoQueue.length===0){
     const cl=manualLinha.replace(/[\s.]/g,'');
     const prs=extractBoletoData(S.pdfTxt||'',cl);
+    prs._raw=(S.pdfTxt||'').substring(0,2000);
     S.boletoQueue.push(prs);
   }
 
@@ -957,6 +963,9 @@ function showQueueItem(idx){
     prs.fo?'Fornecedor: '+prs.fo:'',
   ];
   document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
+  // Debug: show raw extracted text
+  const dbg=document.getElementById('bDebug');
+  if(dbg){const pageText=S.boletoQueue[idx]&&S.boletoQueue[idx]._raw?S.boletoQueue[idx]._raw:(S.pdfPages&&S.pdfPages[idx])||S.pdfTxt||'';dbg.value=pageText.substring(0,2000);}
 
   // Fill form
   document.getElementById('bf_dv').value=prs.dv||'';
@@ -1238,6 +1247,9 @@ function parseBol(){
     prs.fo?'Fornecedor: '+prs.fo:'',
   ];
   document.getElementById('bInf').textContent=parts.filter(Boolean).join(' | ');
+  // Debug: show raw extracted text
+  const dbg=document.getElementById('bDebug');
+  if(dbg){const pageText=S.boletoQueue[idx]&&S.boletoQueue[idx]._raw?S.boletoQueue[idx]._raw:(S.pdfPages&&S.pdfPages[idx])||S.pdfTxt||'';dbg.value=pageText.substring(0,2000);}
 
   // Fill form fields
   if(prs.dv)document.getElementById('bf_dv').value=prs.dv;
