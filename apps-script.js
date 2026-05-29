@@ -14,6 +14,7 @@
 // 10. Copie a URL gerada e cole nas Configurações do sistema
 // ============================================================
 
+const SPREADSHEET_ID = '19fYZQ84iym-62IVZdcjG2wr_Czj2jW_FsglSJg08kwg';
 const SHEET_NAME = 'Mercadorias a pagar lojas própr';
 
 // ============================================================
@@ -55,7 +56,7 @@ function respond(data) {
 }
 
 function getSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error('Aba "' + SHEET_NAME + '" não encontrada na planilha.');
   return sheet;
@@ -79,11 +80,15 @@ function getData() {
     const obj = { _rowIndex: i + 1 };
     headers.forEach((h, j) => {
       let val = row[j];
-      // Formata datas para dd/MM/yyyy
-      if (val instanceof Date) {
-        val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd/MM/yyyy');
-      }
-      obj[h] = val !== null && val !== undefined ? String(val) : '';
+      try {
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, 'America/Sao_Paulo', 'dd/MM/yyyy');
+        }
+      } catch(e) { val = ''; }
+      // Skip columns with date-formatted headers (extra columns from Excel like "28/05/2026")
+      const hStr = String(h || '').trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(hStr)) return;
+      obj[hStr] = (val !== null && val !== undefined) ? String(val) : '';
     });
     rows.push(obj);
   }
