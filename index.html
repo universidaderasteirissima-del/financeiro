@@ -501,7 +501,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');lo
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,lastId:null};
 
 // ============================================================
 // AUTH
@@ -563,11 +563,21 @@ async function syncSheets(){
     const res=await fetch(S.url+'?action=getData');
     const j=await res.json();
     if(j.data&&j.data.length){
+      const str=(v)=>{const s=String(v===null||v===undefined?'':v).trim();return s==='null'||s==='undefined'?'':s;};
+      const nota=(v)=>{
+        const s=str(v);
+        // Discard if it looks like a date ended up in nota column (conversion artifact)
+        if(s.length>12&&(s.includes('GMT')||s.includes('Bras')||s.includes('T00:')))return '';
+        return s;
+      };
       S.recs=j.data.map((r,i)=>({
-        _id:r._rowIndex||(i+1),lo:r['Loja']||'',fo:r['Fornecedor']||'',nn:r['número_da_nota']||'',
-        de:br2iso(r['data_de_emissão']||''),dv:br2iso(r['data_vencimento']||''),
-        vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),pr:tof(r['Produto']),sv:tof(r['Serviço']),
-        st:r['Status']||'em aberto',dp:br2iso(r['Data_Pagamento']||''),mv:+r['Mês_vencimento']||0
+        _id:r._rowIndex||(i+1),
+        lo:str(r['Loja']),fo:str(r['Fornecedor']),nn:nota(r['número_da_nota']||r['numero_da_nota']||r['N_mero_da_nota']||''),
+        de:br2iso(str(r['data_de_emissão']||r['data_de_emissao']||'')),
+        dv:br2iso(str(r['data_vencimento']||'')),
+        vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),pr:tof(r['Produto']),sv:tof(r['Serviço']||r['Servico']||''),
+        st:str(r['Status'])||'em aberto',
+        dp:br2iso(str(r['Data_Pagamento']||'')),mv:+str(r['Mês_vencimento']||r['Mes_vencimento']||'')||0
       }));
       svData();applyF();toast('Sincronizado! '+S.recs.length+' registros.');
     }
@@ -707,9 +717,11 @@ function rtable(){
     rpg();return;
   }
   document.getElementById('tBody').innerHTML=rows.map((r,i)=>{
-    const bg=i%2===0?'#fff':'#FAF7F4';
+    const isNew=r._id===S.lastId;
+    const bg=isNew?'#FFF8E8':i%2===0?'#fff':'#FAF7F4';
+    const borderLeft=isNew?'border-left:3px solid #9B6B50;':''
     const sc=stC[r.st]||'sa',sl=stL[r.st]||r.st;
-    return '<tr style="border-bottom:1px solid #F2EAE0;background:'+bg+'" onmouseover="this.style.background=\'#F5EFE6\'" onmouseout="this.style.background=\''+bg+'\'">'+
+    return '<tr title="'+(isNew?'Último lançamento':'')+'" style="border-bottom:1px solid #F2EAE0;background:'+bg+';'+borderLeft+'" onmouseover="this.style.background=\'#F5EFE6\'" onmouseout="this.style.background=\''+bg+'\'">'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:600;color:#2C1810;white-space:nowrap">'+xe(r.lo)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;color:#5C3D2E;white-space:nowrap">'+xe(r.fo)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.75rem;color:#7A4F3A;font-family:monospace">'+xe(r.nn)+'</td>'+
@@ -772,7 +784,9 @@ async function saveRec(){
   let rowIdx=null;
   if(S.editId){const i=S.recs.findIndex(x=>x._id===S.editId);if(i>=0){rowIdx=S.recs[i]._id;rec._id=S.editId;S.recs[i]={...S.recs[i],...rec};}}
   else{rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;S.recs.push(rec);}
-  svData();const ok=await push2Sheets(rec,rowIdx);cm('mRec');applyF();
+  svData();const ok=await push2Sheets(rec,rowIdx);
+  if(!S.editId)S.lastId=rec._id;
+  cm('mRec');applyF();
   toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
 async function delRec(id){
@@ -955,6 +969,7 @@ async function saveBol(){
   const rec={lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,st:g('bf_st'),dp:g('bf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
   S.recs.push(rec);svData();
   const ok=await push2Sheets(rec,null);
+  S.lastId=rec._id;
   cm('mBoleto');S.pdfTxt=null;applyF();
   toast('Boleto salvo!'+(ok?' ✓ Google Sheets':''));
 }
@@ -1007,16 +1022,29 @@ function fDt(v){
   return '';
 }
 
-// br2iso: any date format → YYYY-MM-DD for internal storage & comparison
+// br2iso: any date format → YYYY-MM-DD
 function br2iso(v){
   if(!v)return '';
   const s=String(v).trim();
-  if(!s)return '';
+  if(!s||s==='null'||s==='undefined'||s==='0')return '';
+  // Already ISO: 2026-03-04 or with time
   if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
+  // BR: 04/03/2026
   if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)){
     const p=s.split('/');
     const y=p[2].length===2?'20'+p[2]:p[2];
     return y+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+  }
+  // JS Date string or any other parseable format: "Wed Mar 04 2026 05:00:00 GMT-0300..."
+  // Use UTC components to avoid timezone shift
+  if(s.length>8){
+    const d=new Date(s);
+    if(!isNaN(d.getTime())){
+      // Use UTC date to match what was intended (avoids midnight rollover)
+      const utc=new Date(d.getTime()+d.getTimezoneOffset()*60000);
+      const y=utc.getFullYear(),m=utc.getMonth()+1,dd=utc.getDate();
+      if(y>1990&&y<2100)return y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    }
   }
   return '';
 }
