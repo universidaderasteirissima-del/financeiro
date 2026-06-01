@@ -806,7 +806,7 @@ function openAdd(){
   ['rf_mk','rf_pr','rf_sv'].forEach(id=>document.getElementById(id).value='0');
   document.getElementById('rf_lo').value='';document.getElementById('rf_fo').value='';
   document.getElementById('rf_vn').value='';document.getElementById('rf_st').value='em aberto';
-  document.getElementById('mRec').style.display='flex';
+  var _mr=document.getElementById('mRec');document.body.appendChild(_mr);_mr.style.display='flex';
 }
 function editRec(id){
   const r=S.recs.find(x=>x._id===id);if(!r)return;S.editId=id;
@@ -817,7 +817,7 @@ function editRec(id){
   document.getElementById('rf_vn').value=r.vn;document.getElementById('rf_mk').value=r.mk||0;
   document.getElementById('rf_pr').value=r.pr||0;document.getElementById('rf_sv').value=r.sv||0;
   document.getElementById('rf_st').value=r.st;document.getElementById('rf_dp').value=r.dp||'';
-  document.getElementById('mRec').style.display='flex';
+  var _mr=document.getElementById('mRec');document.body.appendChild(_mr);_mr.style.display='flex';
 }
 async function saveRec(){
   const lo=g('rf_lo'),fo=g('rf_fo'),dv=g('rf_dv'),vn=g('rf_vn');
@@ -864,7 +864,7 @@ function openBoleto(){
   document.getElementById('bLi').value='';
   document.getElementById('bPDFNm').textContent='Nenhum arquivo selecionado';
   S.pdfTxt=null;S.pdfPages=[];S.boletoQueue=[];S.boletoQueueIdx=0;
-  document.getElementById('mBoleto').style.display='flex';
+  var _mb=document.getElementById('mBoleto');document.body.appendChild(_mb);_mb.style.display='flex';
 }
 function bSt(n){
   document.getElementById('bS1').style.display=n===1?'block':'none';
@@ -1386,8 +1386,7 @@ function openFornMgmt(){
     var cfg=document.getElementById('mCfg');
     if(cfg)cfg.style.display='none';
   }catch(err){console.error('openFornMgmt error:',err);}
-  var m=document.getElementById('mForn');
-  if(m)m.style.display='flex';
+  var m=document.getElementById('mForn');document.body.appendChild(m);m.style.display='flex';
 }
 
 function switchFornTab(tab){
