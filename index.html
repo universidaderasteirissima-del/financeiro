@@ -1591,7 +1591,7 @@ async function renderPDF(pdfDoc){
   for(var i=1;i<=pdfDoc.numPages;i++){
     var pg=await pdfDoc.getPage(i);
     var nat=pg.getViewport({scale:1});
-    var sc=540/nat.width;
+    var sc=Math.min(1080/nat.width,3.0); // 2x res for crisp zoom
     var vp=pg.getViewport({scale:sc});
     var canvas=document.createElement('canvas');
     canvas.width=Math.round(vp.width);
