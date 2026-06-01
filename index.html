@@ -1117,8 +1117,33 @@ function extractBoletoData(txt,barcode){
     if(pm)prs.parcel=parseInt(pm[1]);
   }
 
-  // FORNECEDOR
-  const nt=norm(txt);const fo=S.forns.find(f=>nt.includes(norm(f)));if(fo)prs.fo=fo;
+  // FORNECEDOR — priority: 'Beneficiario Final' field, then 'Beneficiario' field, then broad match
+  // Use word-boundary for short names (<=3 chars) to avoid 'GA' matching 'PAGAMENTO'
+  var foTxt='';
+  var bfMatch=txt.match(/[Bb]enefici[aá]rio\s+[Ff]inal\s+([^\r\n]+)/i);
+  if(bfMatch)foTxt=bfMatch[1].trim();
+  else{var bMatch=txt.match(/[Bb]enefici[aá]rio\s+([^\r\n]+)/i);if(bMatch)foTxt=bMatch[1].trim();}
+  var searchTxts=foTxt?[norm(foTxt),norm(txt)]:[norm(txt)];
+  var fo=null;
+  for(var si=0;si<searchTxts.length&&!fo;si++){
+    var nt=searchTxts[si];
+    fo=S.forns.find(function(f){
+      var nf=norm(f);
+      if(nf.length<=3){var re=new RegExp('(^|\\s)'+nf+'(\\s|$)');return re.test(nt);}
+      return nt.includes(nf);
+    });
+  }
+  if(fo)prs.fo=fo;
+
+  // LOJA — extract from 'Pagador' field (Inter/Sicoob style)
+  if(!prs.lo){
+    var pagMatch=txt.match(/[Pp]agador\s+([\w\sÀ-ÿ]+?)(?=\s+(?:RUA|AV|CEP|CPF|CNPJ|R\s|\d{5})|[\r\n]|$)/i);
+    if(pagMatch){
+      var pagTxt=norm(pagMatch[1].trim());
+      var lo=S.lojas.find(function(l){var nl=norm(l);return pagTxt.includes(nl)||nl.includes(pagTxt);});
+      if(lo)prs.lo=lo;
+    }
+  }
   return prs;
 }
 function extractFromPDF(txt){return extractBoletoData(txt,'');}
