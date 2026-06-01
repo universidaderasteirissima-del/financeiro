@@ -429,7 +429,7 @@ th:hover{background:#EAD9C8!important}
 </div>
 
 <!-- ===== MODAL: FORNECEDORES/LOJAS MANAGEMENT ===== -->
-<div id="mForn" class="modal-overlay" style="display:none">
+<div id="mForn" class="modal-overlay" style="display:none;z-index:10000">
   <div class="modal-box fade" style="max-width:860px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
       <div>
@@ -1340,23 +1340,25 @@ function ldFornData(){
 function svFornData(){localStorage.setItem('r_forn_data',JSON.stringify(S.fornData));}
 
 function openFornMgmt(){
-  switchFornTab('forn');
-  renderFornTable();
-  renderLojaTable();
-  cm('mCfg');
-  document.getElementById('mForn').style.display='flex';
+  try{
+    if(!S.fornData||Object.keys(S.fornData).length===0)ldFornData();
+    switchFornTab('forn');
+    renderFornTable();
+    renderLojaTable();
+    var cfg=document.getElementById('mCfg');
+    if(cfg)cfg.style.display='none';
+  }catch(err){console.error('openFornMgmt error:',err);}
+  var m=document.getElementById('mForn');
+  if(m)m.style.display='flex';
 }
 
 function switchFornTab(tab){
-  document.getElementById('tabForn').style.display=tab==='forn'?'block':'none';
-  document.getElementById('tabLoja').style.display=tab==='loja'?'block':'none';
-  const fb=document.getElementById('tabFornBtn'),lb=document.getElementById('tabLojaBtn');
-  fb.style.color=tab==='forn'?'#2C1810':'#9B6B50';
-  fb.style.borderBottomColor=tab==='forn'?'#2C1810':'transparent';
-  fb.style.fontWeight=tab==='forn'?'700':'600';
-  lb.style.color=tab==='loja'?'#2C1810':'#9B6B50';
-  lb.style.borderBottomColor=tab==='loja'?'#2C1810':'transparent';
-  lb.style.fontWeight=tab==='loja'?'700':'600';
+  var tf=document.getElementById('tabForn'),tl=document.getElementById('tabLoja');
+  var fb=document.getElementById('tabFornBtn'),lb=document.getElementById('tabLojaBtn');
+  if(tf)tf.style.display=tab==='forn'?'block':'none';
+  if(tl)tl.style.display=tab==='loja'?'block':'none';
+  if(fb){fb.style.color=tab==='forn'?'#2C1810':'#9B6B50';fb.style.borderBottomColor=tab==='forn'?'#2C1810':'transparent';fb.style.fontWeight=tab==='forn'?'700':'600';}
+  if(lb){lb.style.color=tab==='loja'?'#2C1810':'#9B6B50';lb.style.borderBottomColor=tab==='loja'?'#2C1810':'transparent';lb.style.fontWeight=tab==='loja'?'700':'600';}
 }
 
 function renderFornTable(){
