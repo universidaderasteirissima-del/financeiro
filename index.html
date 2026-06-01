@@ -1084,13 +1084,14 @@ function extractBoletoData(txt,barcode){
   ];
   for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
 
-  // EMISSION DATE — BB: "Data Processamento" used as emission date
+  // EMISSION DATE — 'Data de Emissao' FIRST (Sicoob) to avoid capturing vencimento
+  // 'Data do Documento' is a generic header that may appear near wrong dates
   var deM=
-    txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/) ||
-    txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/[Dd]ata\s+de\s+[Ee]miss[^\d]{0,15}(\d{2}\/\d{2}\/\d{4})/i) ||
-    txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
-    txt.match(/\d{3}\s+DM\s+N\s+(\d{2}\/\d{2}\/\d{4})/);  // BB: "007 DM N 25/05/2026"
+    txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/\d{3}\s+DM\s+N\s+(\d{2}\/\d{2}\/\d{4})/);
   if(deM)prs.de=br2iso(deM[deM.length-1]);
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
