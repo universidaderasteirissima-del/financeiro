@@ -1077,10 +1077,11 @@ function extractBoletoData(txt,barcode){
 
   // DUE DATE
   const dvPat=[
-    /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date (e.g. "52.361.779/0001-74 25/06/2026")
-    /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/,  // "Data de Vencimento ... 25/06/2026"
+    /PAGAVEL\s+PREFERENCIALMENTE\s+NO\s+SICOOB[\s\S]{0,100}?(\d{2}\/\d{2}\/\d{4})/i, // Sicoob: date after PAGAVEL text
+    /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date
+    /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/,  // BB: Data de Vencimento
     /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,                          // tight adjacent
-    /[Vv]encimento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/,                   // broad (Sicoob, BB ficha)
+    /[Vv]encimento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/,                   // broad window 500
   ];
   for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
 
@@ -1093,6 +1094,14 @@ function extractBoletoData(txt,barcode){
     txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/\d{3}\s+DM\s+N\s+(\d{2}\/\d{2}\/\d{4})/);
   if(deM)prs.de=br2iso(deM[deM.length-1]);
+  // If emission date equals vencimento date, it's wrong — try alternate patterns for emission
+  if(prs.de&&prs.dv&&prs.de===prs.dv){
+    var altDeM=
+      txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
+      txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
+      txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/);
+    if(altDeM){var altDate=br2iso(altDeM[altDeM.length-1]);if(altDate!==prs.dv)prs.de=altDate;}
+  }
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
   const vnPat=[
