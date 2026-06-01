@@ -1596,9 +1596,6 @@ async function renderPDF(pdfDoc){
     canvas.style.marginBottom='6px';
     canvas.style.background='#fff';
     canvas.dataset.page=String(i);
-    canvas.style.cursor='crosshair';
-    canvas.addEventListener('mousemove',function(ev){moveMagnifier(canvas,ev);});
-    canvas.addEventListener('mouseleave',hideMagnifier);
     await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     viewer.appendChild(canvas);
   }
