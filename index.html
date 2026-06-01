@@ -28,7 +28,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F5EFE6;color:#2C1810
 .sh{background:#FDF5EE;color:#7A3300;border:1px solid #F0C898;font-weight:600}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem;backdrop-filter:blur(2px)}
+.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;backdrop-filter:blur(2px)}
 .modal-box{background:#fff;border-radius:4px;padding:28px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(44,24,16,.2);border:1px solid var(--border)}
 
 /* INPUTS */
@@ -429,7 +429,7 @@ th:hover{background:#EAD9C8!important}
 </div>
 
 <!-- ===== MODAL: FORNECEDORES/LOJAS MANAGEMENT ===== -->
-<div id="mForn" class="modal-overlay" style="display:none;z-index:10000">
+<div id="mForn" class="modal-overlay" style="display:none">
   <div class="modal-box fade" style="max-width:860px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
       <div>
@@ -524,7 +524,7 @@ th:hover{background:#EAD9C8!important}
 </div>
 
 <!-- TOAST -->
-<div id="tst" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:99;display:none;pointer-events:none">
+<div id="tst" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:20000;display:none;pointer-events:none">
   <div id="tstMsg" style="font-size:.8rem;padding:.7rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);max-width:280px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600"></div>
 </div>
 
