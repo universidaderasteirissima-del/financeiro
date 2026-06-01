@@ -866,6 +866,9 @@ function openBoleto(){
 function bSt(n){
   document.getElementById('bS1').style.display=n===1?'block':'none';
   document.getElementById('bS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mBoletoBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&S.pdfDoc)setTimeout(function(){renderPDF(S.pdfDoc).catch(function(){});},120);
 }
 
 async function rdPDF(input){
@@ -1574,28 +1577,29 @@ async function confirmBoleto(){
 }
 
 async function renderPDF(pdfDoc){
-  const viewer=document.getElementById('bPDFViewer');
-  const msg=document.getElementById('bViewerMsg');
-  if(msg)msg.style.display='none';
-  // Remove existing canvases
-  Array.from(viewer.children).forEach(c=>{if(c.tagName==='CANVAS'||c.id!=='bViewerMsg')c.remove();});
-
-  for(let i=1;i<=pdfDoc.numPages;i++){
-    const pg=await pdfDoc.getPage(i);
-    const vw=viewer.clientWidth-16||300;
-    const nat=pg.getViewport({scale:1});
-    const scale=Math.min(vw/nat.width,1.8);
-    const vp=pg.getViewport({scale});
-    const canvas=document.createElement('canvas');
-    canvas.width=vp.width;canvas.height=vp.height;
-    canvas.style.width='100%';canvas.style.borderRadius='2px';
-    canvas.style.flexShrink='0';canvas.style.display='block';
+  var viewer=document.getElementById('bPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('bViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=540/nat.width;
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);
+    canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';
+    canvas.style.display='block';
+    canvas.style.borderRadius='3px';
+    canvas.style.marginBottom='6px';
+    canvas.style.background='#fff';
     canvas.dataset.page=String(i);
     await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     viewer.appendChild(canvas);
   }
 }
-
 function highlightPage(pageNum){
   document.querySelectorAll('#bPDFViewer canvas').forEach(c=>{
     c.style.outline=c.dataset.page===String(pageNum)?'3px solid #9B6B50':'none';
