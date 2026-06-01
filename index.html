@@ -1611,23 +1611,18 @@ function highlightPage(pageNum){
   });
 }
 // ============================================================
-// PDF MAGNIFIER — img-based, centered on cursor, 3x zoom
+// PDF MAGNIFIER — canvas element with border-radius:50%
+// Uses drawImage directly (no div wrapper, no toDataURL)
 // ============================================================
-var bMag=null,bMagImg=null;
+var bMagCanvas=null;
 
 function ensureMagnifier(){
-  if(bMag)return;
-  bMag=document.createElement('div');
-  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;overflow:hidden;pointer-events:none;z-index:9999;display:none;box-shadow:0 6px 28px rgba(44,24,16,.5);background:#f5f5f5;';
-  bMagImg=document.createElement('img');
-  bMagImg.style.cssText='position:absolute;max-width:none;max-height:none;display:block;';
-  bMag.appendChild(bMagImg);
-  // crosshair
-  var xh=document.createElement('div');
-  xh.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;width:20px;height:20px;';
-  xh.innerHTML='<svg width="20" height="20" style="display:block"><line x1="10" y1="0" x2="10" y2="20" stroke="#9B6B50" stroke-width="1.5" opacity="0.6"/><line x1="0" y1="10" x2="20" y2="10" stroke="#9B6B50" stroke-width="1.5" opacity="0.6"/></svg>';
-  bMag.appendChild(xh);
-  document.body.appendChild(bMag);
+  if(bMagCanvas)return;
+  bMagCanvas=document.createElement('canvas');
+  bMagCanvas.width=260;bMagCanvas.height=260;
+  bMagCanvas.style.cssText='position:fixed;z-index:9999;display:none;border-radius:50%;border:3px solid #9B6B50;box-shadow:0 6px 28px rgba(44,24,16,.5);pointer-events:none;';
+  bMagCtx=bMagCanvas.getContext('2d');
+  document.body.appendChild(bMagCanvas);
 }
 
 function moveMagnifier(srcCanvas,e){
@@ -1636,42 +1631,42 @@ function moveMagnifier(srcCanvas,e){
   var rect=srcCanvas.getBoundingClientRect();
   if(!rect.width||!rect.height)return;
 
-  // Generate dataURL once per canvas (cached on the element)
-  if(!srcCanvas._du){
-    try{srcCanvas._du=srcCanvas.toDataURL('image/png');}
-    catch(err){
-      try{srcCanvas._du=srcCanvas.toDataURL('image/jpeg',0.9);}
-      catch(e2){return;}
-    }
-    bMagImg.onload=null; // clear handler
-    bMagImg.src=srcCanvas._du;
-  }
-
-  // Cursor position in display pixels relative to canvas
+  // Mouse in display-pixel coords relative to canvas top-left
   var px=e.clientX-rect.left;
   var py=e.clientY-rect.top;
 
-  // Size of img inside magnifier: display size x zoom
-  var iW=Math.round(rect.width*zoom);
-  var iH=Math.round(rect.height*zoom);
-  bMagImg.style.width=iW+'px';
-  bMagImg.style.height=iH+'px';
+  // Scale from CSS display size to internal canvas resolution
+  var sx=px*(srcCanvas.width/rect.width);
+  var sy=py*(srcCanvas.height/rect.height);
 
-  // Offset: shift img so cursor point is at center of magnifier circle
-  bMagImg.style.left=Math.round(ms/2-px*zoom)+'px';
-  bMagImg.style.top=Math.round(ms/2-py*zoom)+'px';
+  // Source region: (ms/zoom) display-pixels = 1 canvas-unit region to extract
+  var sw=(ms/zoom)*(srcCanvas.width/rect.width);
+  var sh=(ms/zoom)*(srcCanvas.height/rect.height);
 
-  // Position magnifier CENTERED on cursor
-  var ml=Math.round(e.clientX-ms/2);
-  var mt=Math.round(e.clientY-ms/2);
-  if(ml<4)ml=4;
-  if(ml+ms>window.innerWidth-4)ml=window.innerWidth-ms-4;
-  if(mt<4)mt=4;
-  if(mt+ms>window.innerHeight-4)mt=window.innerHeight-ms-4;
-  bMag.style.left=ml+'px';bMag.style.top=mt+'px';bMag.style.display='block';
+  bMagCtx.clearRect(0,0,ms,ms);
+  bMagCtx.fillStyle='#fff';
+  bMagCtx.fillRect(0,0,ms,ms);
+  try{
+    bMagCtx.drawImage(srcCanvas,
+      Math.max(0,sx-sw/2), Math.max(0,sy-sh/2), // src xy
+      sw, sh,                                      // src size
+      0, 0, ms, ms                                 // dst (fill magnifier)
+    );
+  }catch(er){}
+
+  // Center magnifier on cursor
+  var lft=Math.round(e.clientX-ms/2);
+  var top=Math.round(e.clientY-ms/2);
+  if(lft<4)lft=4;
+  if(lft+ms>window.innerWidth-4)lft=window.innerWidth-ms-4;
+  if(top<4)top=4;
+  if(top+ms>window.innerHeight-4)top=window.innerHeight-ms-4;
+  bMagCanvas.style.left=lft+'px';
+  bMagCanvas.style.top=top+'px';
+  bMagCanvas.style.display='block';
 }
 
-function hideMagnifier(){if(bMag)bMag.style.display='none';}
+function hideMagnifier(){if(bMagCanvas)bMagCanvas.style.display='none';}
 
 // ============================================================
 // BOOT
