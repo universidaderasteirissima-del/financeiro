@@ -1087,7 +1087,7 @@ function extractBoletoData(txt,barcode){
   // EMISSION DATE — 'Data de Emissao' FIRST (Sicoob) to avoid capturing vencimento
   // 'Data do Documento' is a generic header that may appear near wrong dates
   var deM=
-    txt.match(/[Dd]ata\s+de\s+[Ee]miss[^\d]{0,15}(\d{2}\/\d{2}\/\d{4})/i) ||
+    txt.match(/[Dd]ata\s+de\s+[Ee]miss[^\d]{0,60}(\d{2}\/\d{2}\/\d{4})/i) ||
     txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/) ||
@@ -1356,6 +1356,7 @@ function tof(v){if(!v&&v!==0)return 0;const s=String(v).replace(/[R$\s]/g,'').re
 
 function toast(msg,type='ok'){
   const el=document.getElementById('tst'),mc=document.getElementById('tstMsg');
+  document.body.appendChild(el); // ensure toast is last in DOM (renders on top)
   const c={ok:'background:#2C1810;color:#FAF7F4',err:'background:#8B1A1A;color:#fff',warn:'background:#6B5500;color:#fff',info:'background:#5C3D2E;color:#FAF7F4'};
   mc.style.cssText=(c[type]||c.ok)+';font-size:.8rem;padding:.65rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600';
   mc.textContent=msg;el.style.display='block';
