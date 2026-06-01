@@ -1072,14 +1072,21 @@ function extractBoletoData(txt,barcode){
   else if(cl.length===48){const vid=cl[2];if('6789'.includes(vid)){const amt=parseFloat(cl.substring(4,15))/100;if(amt>0)prs.vn=amt.toFixed(2);}}
   if(!txt)return prs;
 
-  // DUE DATE
-  const dvPat=[/[Dd]ata\s+de\s+[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,/[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/];
-  for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[1]);break;}}
+  // DUE DATE — Sicoob/Bradesco/BB: "Vencimento" and date may be separated by other text
+  const dvPat=[
+    /[Dd]ata\s+de\s+[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,   // BB style
+    /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,                    // tight: "Vencimento 21/07/2026"
+    /[Vv]encimento[\s\S]{0,120}?(\d{2}\/\d{2}\/\d{4})/,             // broad: Sicoob col layout
+  ];
+  for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
 
-  // EMISSION DATE — broad: table layouts make label/value non-adjacent
-  const deM=txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/)||
-             txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/)||
-             txt.match(/[Dd]ata\s+de\s+[Ee]miss[aã]o[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/);
+  // EMISSION DATE — broad patterns; BB uses "Data processamento" as emission date
+  const deM=
+    txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/)||
+    txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/)||
+    txt.match(/[Dd]ata\s+de\s+[Ee]miss[^\d]{0,10}(\d{2}\/\d{2}\/\d{4})/i)||  // "Data de Emissão" any accent variant
+    (bk==='001'?txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/):null)||  // BB: use data processamento
+    txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/);  // fallback all banks
   if(deM)prs.de=br2iso(deM[deM.length-1]);
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
