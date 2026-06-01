@@ -1072,20 +1072,22 @@ function extractBoletoData(txt,barcode){
   else if(cl.length===48){const vid=cl[2];if('6789'.includes(vid)){const amt=parseFloat(cl.substring(4,15))/100;if(amt>0)prs.vn=amt.toFixed(2);}}
   if(!txt)return prs;
 
-  // DUE DATE — Sicoob: "Vencimento" separated by text; BB: "Data de Vencimento" then CNPJ then date
+  // DUE DATE
   const dvPat=[
-    /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/,  // BB: allows CNPJ in between
-    /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,                           // tight
-    /[Vv]encimento[\s\S]{0,150}?(\d{2}\/\d{2}\/\d{4})/,                    // broad (Sicoob)
+    /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date (e.g. "52.361.779/0001-74 25/06/2026")
+    /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/,  // "Data de Vencimento ... 25/06/2026"
+    /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,                          // tight adjacent
+    /[Vv]encimento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/,                   // broad (Sicoob, BB ficha)
   ];
   for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
 
-  // EMISSION DATE — try many patterns; for BB use "Data Processamento" as emission date
+  // EMISSION DATE — BB: "Data Processamento" used as emission date
   var deM=
-    txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/) ||
-    txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/[Dd]ata\s+de\s+[Ee]miss[^\d]{0,15}(\d{2}\/\d{2}\/\d{4})/i) ||
-    txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/);
+    txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
+    txt.match(/\d{3}\s+DM\s+N\s+(\d{2}\/\d{2}\/\d{4})/);  // BB: "007 DM N 25/05/2026"
   if(deM)prs.de=br2iso(deM[deM.length-1]);
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
