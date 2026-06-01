@@ -1611,21 +1611,17 @@ function highlightPage(pageNum){
   });
 }
 // ============================================================
-// PDF MAGNIFIER LENS
+// PDF MAGNIFIER LENS — uses CSS background-image (reliable cross-browser)
 // ============================================================
-var bMag=null,bMagCtx=null;
+var bMag=null;
 
 function ensureMagnifier(){
   if(bMag)return;
   bMag=document.createElement('div');
-  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;overflow:hidden;pointer-events:none;z-index:9999;display:none;box-shadow:0 6px 28px rgba(44,24,16,.5);';
-  var mc=document.createElement('canvas');mc.width=260;mc.height=260;
-  bMagCtx=mc.getContext('2d');
-  bMag.appendChild(mc);
-  // Crosshair
+  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;pointer-events:none;z-index:9999;display:none;background-repeat:no-repeat;background-color:#fff;box-shadow:0 6px 28px rgba(44,24,16,.5);';
   var cross=document.createElement('div');
-  cross.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;pointer-events:none;';
-  cross.innerHTML='<svg width="16" height="16"><line x1="8" y1="0" x2="8" y2="16" stroke="#9B6B50" stroke-width="1" opacity="0.7"/><line x1="0" y1="8" x2="16" y2="8" stroke="#9B6B50" stroke-width="1" opacity="0.7"/></svg>';
+  cross.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0.35;';
+  cross.innerHTML='<svg width=20 height=20><line x1=10 y1=0 x2=10 y2=20 stroke=#5C3D2E stroke-width=1/><line x1=0 y1=10 x2=20 y2=10 stroke=#5C3D2E stroke-width=1/></svg>';
   bMag.appendChild(cross);
   document.body.appendChild(bMag);
 }
@@ -1633,14 +1629,24 @@ function ensureMagnifier(){
 function moveMagnifier(srcCanvas,e){
   ensureMagnifier();
   var ms=260,zoom=3;
+  // Cache dataURL once per canvas render (toDataURL is expensive)
+  if(!srcCanvas._du){
+    try{srcCanvas._du=srcCanvas.toDataURL();}catch(er){return;}
+  }
   var rect=srcCanvas.getBoundingClientRect();
-  var cx=(e.clientX-rect.left)*(srcCanvas.width/rect.width);
-  var cy=(e.clientY-rect.top)*(srcCanvas.height/rect.height);
-  var sw=ms/zoom,sh=ms/zoom;
-  bMagCtx.clearRect(0,0,ms,ms);
-  bMagCtx.drawImage(srcCanvas,cx-sw/2,cy-sh/2,sw,sh,0,0,ms,ms);
-  var lft=e.clientX+20,top=e.clientY-ms/2;
-  if(lft+ms>window.innerWidth)lft=e.clientX-ms-20;
+  if(!rect.width)return;
+  var x=(e.clientX-rect.left)/rect.width;
+  var y=(e.clientY-rect.top)/rect.height;
+  // Show canvas at zoom x its display size, centered on cursor
+  var bgW=Math.round(rect.width*zoom);
+  var bgH=Math.round(rect.height*zoom);
+  var bgX=Math.round(ms/2-x*bgW);
+  var bgY=Math.round(ms/2-y*bgH);
+  bMag.style.backgroundImage='url('+srcCanvas._du+')';
+  bMag.style.backgroundSize=bgW+'px '+bgH+'px';
+  bMag.style.backgroundPosition=bgX+'px '+bgY+'px';
+  var lft=e.clientX+22,top=e.clientY-ms/2;
+  if(lft+ms>window.innerWidth)lft=e.clientX-ms-22;
   if(top<8)top=8;
   if(top+ms>window.innerHeight-8)top=window.innerHeight-ms-8;
   bMag.style.left=lft+'px';bMag.style.top=top+'px';bMag.style.display='block';
