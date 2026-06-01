@@ -214,7 +214,7 @@ th:hover{background:#EAD9C8!important}
 
 <!-- ===== MODAL: BOLETO ===== -->
 <div id="mBoleto" class="modal-overlay" style="display:none">
-  <div class="modal-box fade" style="max-width:600px">
+  <div class="modal-box fade" id="mBoletoBox" style="max-width:640px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
       <div>
         <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Adicionar Boleto</h2>
@@ -250,65 +250,84 @@ th:hover{background:#EAD9C8!important}
     </div>
     <!-- Step 2 -->
     <div id="bS2" style="display:none">
-      <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.875rem;margin-bottom:1.25rem">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
-          <p style="font-size:.8rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete abaixo</p>
-          <span id="bQueueBadge" style="display:none;font-size:.72rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.2rem .7rem;border-radius:2px"></span>
-        </div>
-        <p style="font-size:.72rem;color:#7A4F3A" id="bInf"></p>
-        <details style="margin-top:.5rem">
-          <summary style="font-size:.68rem;color:#B8896A;cursor:pointer">🔍 Ver texto extraído do PDF (para diagnóstico)</summary>
-          <textarea id="bDebug" readonly rows="6" style="width:100%;margin-top:.4rem;font-size:.65rem;font-family:monospace;border:1px solid #DDD0BC;border-radius:3px;padding:.4rem;background:#FAF7F4;resize:vertical"></textarea>
-        </details>
-      </div>
-      <div style="display:grid;gap:.75rem">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
-          <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel"><option value="">Selecione</option></select></div>
-          <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel" onchange="calcFornSplit()"><option value="">Selecione</option></select></div>
-        </div>
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.75rem">
-          <div><label class="lbl">Nº da Nota / Documento</label><input type="text" id="bf_nn" class="inp" /></div>
-          <div>
-            <label class="lbl">Parcela <span style="font-weight:400;text-transform:none;letter-spacing:0">(se houver)</span></label>
-            <input type="number" min="1" id="bf_parc" class="inp" placeholder="ex: 2" />
+      <!-- Side-by-side: PDF viewer left + form right -->
+      <div id="bLayout" style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="bPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="bViewerMsg">Nenhum PDF carregado</p>
           </div>
-          <div><label class="lbl">Data de Emissão</label><input type="date" id="bf_de" class="inp" /></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
-          <div><label class="lbl">Data de Vencimento *</label><input type="date" id="bf_dv" required class="inp" /></div>
-          <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" oninput="calcFornSplit()" /></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
-          <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="bf_mk" value="0" class="inp" /></div>
-          <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="bf_pr" value="0" class="inp" /></div>
-          <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="bf_sv" value="0" class="inp" /></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
-          <div><label class="lbl">Status</label>
-            <select id="bf_st" class="sel">
-              <option value="em aberto">Em aberto</option>
-              <option value="vence hoje">Vence hoje</option>
-              <option value="vencida">Vencida</option>
-              <option value="pago">Pago</option>
-            </select>
+
+        <!-- RIGHT: Tabs + Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <!-- Boleto tabs -->
+          <div id="bTabs" style="display:none;margin-bottom:.5rem;flex-shrink:0"></div>
+
+          <!-- Info bar -->
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem">
+              <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+              <span id="bQueueBadge" style="display:none;font-size:.7rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.15rem .6rem;border-radius:2px"></span>
+            </div>
+            <p style="font-size:.7rem;color:#7A4F3A" id="bInf"></p>
           </div>
-          <div>
-            <label class="lbl">Data de Pagamento</label>
-            <div style="display:flex;gap:.4rem;align-items:center">
-              <input type="date" id="bf_dp" class="inp" onchange="autoStatusOnPay('bf_dp','bf_st')" />
-              <button type="button" onclick="setToday('bf_dp','bf_st')" title="Marcar como pago hoje" style="white-space:nowrap;padding:.45rem .7rem;background:#1E6B3A;color:#fff;border:none;border-radius:3px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">✓ Hoje</button>
+
+          <!-- Form (scrollable) -->
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Loja *</label><select id="bf_lo" required class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Fornecedor *</label><select id="bf_fo" required class="sel" style="font-size:.8rem" onchange="calcFornSplit()"><option value="">Selecione</option></select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Nº da Nota / Documento</label><input type="text" id="bf_nn" class="inp" style="font-size:.8rem" /></div>
+                <div>
+                  <label class="lbl">Parcela <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.65rem">(se houver)</span></label>
+                  <input type="number" min="1" id="bf_parc" class="inp" placeholder="ex: 2" style="font-size:.8rem" />
+                </div>
+                <div><label class="lbl">Data de Emissão</label><input type="date" id="bf_de" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Data de Vencimento *</label><input type="date" id="bf_dv" required class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="bf_vn" required class="inp" style="font-size:.8rem" oninput="calcFornSplit()" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="bf_mk" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="bf_pr" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="bf_sv" value="0" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div>
+                  <label class="lbl">Status</label>
+                  <select id="bf_st" class="sel" style="font-size:.8rem">
+                    <option value="em aberto">Em aberto</option>
+                    <option value="vence hoje">Vence hoje</option>
+                    <option value="vencida">Vencida</option>
+                    <option value="pago">Pago</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="lbl">Data de Pagamento</label>
+                  <div style="display:flex;gap:.3rem;align-items:center">
+                    <input type="date" id="bf_dp" class="inp" style="font-size:.8rem" onchange="autoStatusOnPay('bf_dp','bf_st')" />
+                    <button type="button" onclick="setToday('bf_dp','bf_st')" style="padding:.4rem .6rem;background:#1E6B3A;color:#fff;border:none;border-radius:3px;font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap">✓ Hoje</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="bSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="confirmBoleto()" class="btn-primary" style="flex:1;font-size:.8rem" id="bConfirmBtn">✓ Confirmar este boleto</button>
+          </div>
         </div>
       </div>
-      <div style="display:flex;gap:.75rem;margin-top:1.5rem">
-        <button onclick="bSt(1)" class="btn-secondary" style="padding:.5rem 1.1rem">← Voltar</button>
-        <button onclick="saveBol()" class="btn-primary" style="flex:1">✓ Confirmar e Salvar</button>
-      </div>
     </div>
-  </div>
-</div>
-
 <!-- ===== MODAL: ADD/EDIT ===== -->
 <div id="mRec" class="modal-overlay" style="display:none">
   <div class="modal-box fade">
@@ -524,7 +543,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');lo
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],boletoQueue:[],boletoQueueIdx:0,lastId:null};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null};
 
 // ============================================================
 // AUTH
@@ -864,6 +883,7 @@ async function rdPDF(input){
       S.pdfPages.push(ct.items.map(x=>x.str).join(' '));
     }
     S.pdfTxt=S.pdfPages.join('\n\n===PAGINA===\n\n');
+    S.pdfDoc=pdf;renderPDF(pdf).catch(function(){});
     // Auto-detect first linha digitável
     const allLinhas=findLinhasDigitaveis(S.pdfTxt);
     if(allLinhas.length)document.getElementById('bLi').value=allLinhas[0];
@@ -948,10 +968,14 @@ function showQueueItem(idx){
   const prs=S.boletoQueue[idx];
   const total=S.boletoQueue.length;
 
-  // Update queue badge
+  // Update tabs and badge
+  renderTabs();
   const badge=document.getElementById('bQueueBadge');
   if(total>1){badge.style.display='inline-block';badge.textContent='Boleto '+(idx+1)+' de '+total;}
   else badge.style.display='none';
+  // Highlight corresponding PDF page
+  if(S.pdfPages&&S.pdfPages.length>1)highlightPage(idx+1);
+  else highlightPage(1);
 
   // Build info string
   const parts=[
@@ -1462,6 +1486,123 @@ function calcFornSplit(){
   if(d.servico)document.getElementById('bf_sv').value=((vn*(d.servico||0))/100).toFixed(2);
 }
 
+// ============================================================
+// BOLETO: PDF VIEWER + MULTI-BOLETO TABS
+// ============================================================
+
+function bSt(n){
+  document.getElementById('bS1').style.display=n===1?'block':'none';
+  document.getElementById('bS2').style.display=n===2?'block':'none';
+  // Expand modal width for step 2 (side-by-side layout)
+  const box=document.getElementById('mBoletoBox');
+  if(box){
+    box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';
+    box.style.overflowY=n===2?'hidden':'auto';
+  }
+}
+
+function renderTabs(){
+  const container=document.getElementById('bTabs');
+  const total=S.boletoQueue.length;
+  if(total<=1){container.style.display='none';return;}
+  container.style.display='flex';
+  container.style.gap='.3rem';
+  container.style.flexWrap='wrap';
+  container.innerHTML=S.boletoQueue.map((q,i)=>{
+    const active=i===S.boletoQueueIdx;
+    const confirmed=q._confirmed;
+    const bg=confirmed?'#1E6B3A':active?'#2C1810':'#EAD9C8';
+    const col=confirmed||active?'#fff':'#5C3D2E';
+    const label='Boleto '+(i+1)+(confirmed?' ✓':'');
+    return '<button onclick="switchBoletoTab('+i+')" style="padding:.3rem .75rem;border:none;border-radius:2px;background:'+bg+';color:'+col+';font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;transition:background .15s">'
+      +xe(label)+'</button>';
+  }).join('');
+}
+
+function switchBoletoTab(idx){
+  saveFormToQueue(); // save current form state before switching
+  S.boletoQueueIdx=idx;
+  showQueueItem(idx);
+}
+
+function saveFormToQueue(){
+  const idx=S.boletoQueueIdx;
+  if(idx<0||idx>=S.boletoQueue.length)return;
+  const q=S.boletoQueue[idx];
+  const dv=g('bf_dv');
+  q.lo=g('bf_lo');q.fo=g('bf_fo');q.nn=g('bf_nn');
+  q.parcel=g('bf_parc')?parseInt(g('bf_parc')):null;
+  q.de=g('bf_de');q.dv=dv;
+  q.vn=+g('bf_vn')||0;q.mk=+g('bf_mk')||0;q.pr=+g('bf_pr')||0;q.sv=+g('bf_sv')||0;
+  q.st=g('bf_st');q.dp=g('bf_dp');
+  q.mv=dv?new Date(dv+'T12:00').getMonth()+1:0;
+}
+
+async function confirmBoleto(){
+  saveFormToQueue();
+  const idx=S.boletoQueueIdx;
+  const q=S.boletoQueue[idx];
+  if(!q.lo||!q.fo||!q.dv||!q.vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
+
+  const btn=document.getElementById('bConfirmBtn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+
+  const parcel=q.parcel;
+  const nn=q.nn&&parcel?q.nn+'-'+parcel:(q.nn||'');
+  const rec={lo:q.lo,fo:q.fo,nn,de:q.de,dv:q.dv,vn:q.vn,mk:q.mk,pr:q.pr,sv:q.sv,
+    st:q.st,dp:q.dp,mv:q.mv,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
+  S.recs.push(rec);svData();S.lastId=rec._id;
+  const ok=await push2Sheets(rec,null);
+
+  q._confirmed=true;
+  renderTabs();
+
+  // Find next unconfirmed
+  const next=S.boletoQueue.findIndex((b,i)=>i>idx&&!b._confirmed);
+  if(next>=0){
+    S.boletoQueueIdx=next;
+    showQueueItem(next);
+    toast('Boleto '+(idx+1)+' confirmado!'+(ok?' ✓':'')+' Confirme o próximo ('+( next+1)+'/'+S.boletoQueue.length+').');
+  }else{
+    const total=S.boletoQueue.filter(b=>b._confirmed).length;
+    cm('mBoleto');
+    S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
+    applyF();
+    toast(total+' boleto(s) confirmado(s)!'+(ok?' ✓ Google Sheets':''));
+  }
+  if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
+}
+
+async function renderPDF(pdfDoc){
+  const viewer=document.getElementById('bPDFViewer');
+  const msg=document.getElementById('bViewerMsg');
+  if(msg)msg.style.display='none';
+  // Remove existing canvases
+  Array.from(viewer.children).forEach(c=>{if(c.tagName==='CANVAS'||c.id!=='bViewerMsg')c.remove();});
+
+  for(let i=1;i<=pdfDoc.numPages;i++){
+    const pg=await pdfDoc.getPage(i);
+    const vw=viewer.clientWidth-16||300;
+    const nat=pg.getViewport({scale:1});
+    const scale=Math.min(vw/nat.width,1.8);
+    const vp=pg.getViewport({scale});
+    const canvas=document.createElement('canvas');
+    canvas.width=vp.width;canvas.height=vp.height;
+    canvas.style.width='100%';canvas.style.borderRadius='2px';
+    canvas.style.flexShrink='0';canvas.style.display='block';
+    canvas.dataset.page=String(i);
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+}
+
+function highlightPage(pageNum){
+  document.querySelectorAll('#bPDFViewer canvas').forEach(c=>{
+    c.style.outline=c.dataset.page===String(pageNum)?'3px solid #9B6B50':'none';
+    c.style.boxShadow=c.dataset.page===String(pageNum)?'0 0 0 1px #9B6B50':'none';
+    if(c.dataset.page===String(pageNum))c.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
 // ============================================================
 // BOOT
 // ============================================================
