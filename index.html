@@ -28,7 +28,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F5EFE6;color:#2C1810
 .sh{background:#FDF5EE;color:#7A3300;border:1px solid #F0C898;font-weight:600}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;backdrop-filter:blur(2px)}
+.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.52);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;isolation:isolate}
 .modal-box{background:#fff;border-radius:4px;padding:28px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(44,24,16,.2);border:1px solid var(--border)}
 
 /* INPUTS */
@@ -96,7 +96,7 @@ th:hover{background:#EAD9C8!important}
 <div id="pgApp" style="display:none;min-height:100vh;flex-direction:column">
 
   <!-- HEADER -->
-  <header style="background:#2C1810;color:#fff;position:sticky;top:0;z-index:30;border-bottom:2px solid #5C3D2E">
+  <header style="background:#2C1810;color:#fff;position:sticky;top:0;z-index:10;border-bottom:2px solid #5C3D2E">
     <div style="max-width:1600px;margin:0 auto;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:1rem">
         <div id="logoArea">
