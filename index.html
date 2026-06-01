@@ -1611,45 +1611,64 @@ function highlightPage(pageNum){
   });
 }
 // ============================================================
-// PDF MAGNIFIER LENS — uses CSS background-image (reliable cross-browser)
+// PDF MAGNIFIER — img-based, centered on cursor, 3x zoom
 // ============================================================
-var bMag=null;
+var bMag=null,bMagImg=null;
 
 function ensureMagnifier(){
   if(bMag)return;
   bMag=document.createElement('div');
-  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;pointer-events:none;z-index:9999;display:none;background-repeat:no-repeat;background-color:#fff;box-shadow:0 6px 28px rgba(44,24,16,.5);';
-  var cross=document.createElement('div');
-  cross.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:0.35;';
-  cross.innerHTML='<svg width=20 height=20><line x1=10 y1=0 x2=10 y2=20 stroke=#5C3D2E stroke-width=1/><line x1=0 y1=10 x2=20 y2=10 stroke=#5C3D2E stroke-width=1/></svg>';
-  bMag.appendChild(cross);
+  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;overflow:hidden;pointer-events:none;z-index:9999;display:none;box-shadow:0 6px 28px rgba(44,24,16,.5);background:#f5f5f5;';
+  bMagImg=document.createElement('img');
+  bMagImg.style.cssText='position:absolute;max-width:none;max-height:none;display:block;';
+  bMag.appendChild(bMagImg);
+  // crosshair
+  var xh=document.createElement('div');
+  xh.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;width:20px;height:20px;';
+  xh.innerHTML='<svg width="20" height="20" style="display:block"><line x1="10" y1="0" x2="10" y2="20" stroke="#9B6B50" stroke-width="1.5" opacity="0.6"/><line x1="0" y1="10" x2="20" y2="10" stroke="#9B6B50" stroke-width="1.5" opacity="0.6"/></svg>';
+  bMag.appendChild(xh);
   document.body.appendChild(bMag);
 }
 
 function moveMagnifier(srcCanvas,e){
   ensureMagnifier();
   var ms=260,zoom=3;
-  // Cache dataURL once per canvas render (toDataURL is expensive)
-  if(!srcCanvas._du){
-    try{srcCanvas._du=srcCanvas.toDataURL();}catch(er){return;}
-  }
   var rect=srcCanvas.getBoundingClientRect();
-  if(!rect.width)return;
-  var x=(e.clientX-rect.left)/rect.width;
-  var y=(e.clientY-rect.top)/rect.height;
-  // Show canvas at zoom x its display size, centered on cursor
-  var bgW=Math.round(rect.width*zoom);
-  var bgH=Math.round(rect.height*zoom);
-  var bgX=Math.round(ms/2-x*bgW);
-  var bgY=Math.round(ms/2-y*bgH);
-  bMag.style.backgroundImage='url('+srcCanvas._du+')';
-  bMag.style.backgroundSize=bgW+'px '+bgH+'px';
-  bMag.style.backgroundPosition=bgX+'px '+bgY+'px';
-  var lft=e.clientX+22,top=e.clientY-ms/2;
-  if(lft+ms>window.innerWidth)lft=e.clientX-ms-22;
-  if(top<8)top=8;
-  if(top+ms>window.innerHeight-8)top=window.innerHeight-ms-8;
-  bMag.style.left=lft+'px';bMag.style.top=top+'px';bMag.style.display='block';
+  if(!rect.width||!rect.height)return;
+
+  // Generate dataURL once per canvas (cached on the element)
+  if(!srcCanvas._du){
+    try{srcCanvas._du=srcCanvas.toDataURL('image/png');}
+    catch(err){
+      try{srcCanvas._du=srcCanvas.toDataURL('image/jpeg',0.9);}
+      catch(e2){return;}
+    }
+    bMagImg.onload=null; // clear handler
+    bMagImg.src=srcCanvas._du;
+  }
+
+  // Cursor position in display pixels relative to canvas
+  var px=e.clientX-rect.left;
+  var py=e.clientY-rect.top;
+
+  // Size of img inside magnifier: display size x zoom
+  var iW=Math.round(rect.width*zoom);
+  var iH=Math.round(rect.height*zoom);
+  bMagImg.style.width=iW+'px';
+  bMagImg.style.height=iH+'px';
+
+  // Offset: shift img so cursor point is at center of magnifier circle
+  bMagImg.style.left=Math.round(ms/2-px*zoom)+'px';
+  bMagImg.style.top=Math.round(ms/2-py*zoom)+'px';
+
+  // Position magnifier CENTERED on cursor
+  var ml=Math.round(e.clientX-ms/2);
+  var mt=Math.round(e.clientY-ms/2);
+  if(ml<4)ml=4;
+  if(ml+ms>window.innerWidth-4)ml=window.innerWidth-ms-4;
+  if(mt<4)mt=4;
+  if(mt+ms>window.innerHeight-4)mt=window.innerHeight-ms-4;
+  bMag.style.left=ml+'px';bMag.style.top=mt+'px';bMag.style.display='block';
 }
 
 function hideMagnifier(){if(bMag)bMag.style.display='none';}
