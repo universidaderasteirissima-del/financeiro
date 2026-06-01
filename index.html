@@ -1094,14 +1094,8 @@ function extractBoletoData(txt,barcode){
     txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/) ||
     txt.match(/\d{3}\s+DM\s+N\s+(\d{2}\/\d{2}\/\d{4})/);
   if(deM)prs.de=br2iso(deM[deM.length-1]);
-  // If emission date equals vencimento date, it's wrong — try alternate patterns for emission
-  if(prs.de&&prs.dv&&prs.de===prs.dv){
-    var altDeM=
-      txt.match(/[Dd]ata\s+[Dd]o\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
-      txt.match(/[Dd]ata\s+[Dd]ocumento[\s\S]{0,300}?(\d{2}\/\d{2}\/\d{4})/) ||
-      txt.match(/[Dd]ata\s+[Pp]rocessamento[\s\S]{0,200}?(\d{2}\/\d{2}\/\d{4})/);
-    if(altDeM){var altDate=br2iso(altDeM[altDeM.length-1]);if(altDate!==prs.dv)prs.de=altDate;}
-  }
+  // Sanity check: emission date must be BEFORE vencimento. If inverted, swap them.
+  if(prs.de&&prs.dv&&prs.de>prs.dv){var tmp=prs.de;prs.de=prs.dv;prs.dv=tmp;}
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
   const vnPat=[
