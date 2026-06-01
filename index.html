@@ -1654,15 +1654,9 @@ function moveMagnifier(srcCanvas,e){
     );
   }catch(er){}
 
-  // Center magnifier on cursor
-  var lft=Math.round(e.clientX-ms/2);
-  var top=Math.round(e.clientY-ms/2);
-  if(lft<4)lft=4;
-  if(lft+ms>window.innerWidth-4)lft=window.innerWidth-ms-4;
-  if(top<4)top=4;
-  if(top+ms>window.innerHeight-4)top=window.innerHeight-ms-4;
-  bMagCanvas.style.left=lft+'px';
-  bMagCanvas.style.top=top+'px';
+  // Center magnifier exactly on cursor — no clamping so Y always follows
+  bMagCanvas.style.left=Math.round(e.clientX-ms/2)+'px';
+  bMagCanvas.style.top=Math.round(e.clientY-ms/2)+'px';
   bMagCanvas.style.display='block';
 }
 
