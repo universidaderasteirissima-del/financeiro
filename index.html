@@ -1142,23 +1142,22 @@ function extractBoletoData(txt,barcode){
   }
   if(fo)prs.fo=fo;
 
-  // LOJA — 1) by CEP (most reliable), 2) by Pagador text, 3) by full-text loja name
+  // LOJA — direct indexOf search for each known CEP (no regex, most reliable)
   if(!prs.lo){
-    // Extract all CEP-like patterns (5 digits + optional space/hyphen + 3 digits)
-    // Extract CEPs: match NNNNN-NNN or NNNNNNNN NOT inside longer number sequences
-    var cepMatches=txt.match(/\b\d{5}-\d{3}\b|\b\d{8}\b/g)||[];
-    for(var ci=0;ci<cepMatches.length;ci++){
-      var cepNorm=cepMatches[ci].replace(/[^0-9]/g,'');
-      if(cepNorm.length===8&&LOJA_CEP[cepNorm]){prs.lo=LOJA_CEP[cepNorm];break;}
+    var cepKeys=Object.keys(LOJA_CEP);
+    for(var ki=0;ki<cepKeys.length;ki++){
+      var c8=cepKeys[ki];
+      var c9=c8.substring(0,5)+'-'+c8.substring(5);
+      if(txt.indexOf(c8)!==-1||txt.indexOf(c9)!==-1){prs.lo=LOJA_CEP[c8];break;}
     }
   }
+  // Fallback: 'Pagador' field name matching (Inter: 'Pagador ARAGUAINA RUA...')
   if(!prs.lo){
-    // From 'Pagador' field text (Inter/Sicoob: 'Pagador ARAGUAINA RUA...')
-    var pagMatch=txt.match(/[Pp]agador\s+([\w\sÀ-ÿ]+?)(?=\s+(?:RUA|AV|CEP|CPF|CNPJ|R\s|\d{5})|[\r\n]|$)/i);
-    if(pagMatch){
-      var pagTxt=norm(pagMatch[1].trim());
-      var lo=S.lojas.find(function(l){var nl=norm(l);return pagTxt.includes(nl)||nl.includes(pagTxt);});
-      if(lo)prs.lo=lo;
+    var pm2=txt.match(/[Pp]agador[\s\r\n]+([A-Z][A-Z\s]+?)(?=[\s\r\n]+(?:RUA|AV|CEP|CPF|CNPJ|\d{5}))/i);
+    if(pm2){
+      var pagN=norm(pm2[1].trim());
+      var lo2=S.lojas.find(function(l){var nl2=norm(l);return pagN.includes(nl2)||nl2.includes(pagN);});
+      if(lo2)prs.lo=lo2;
     }
   }
   return prs;
