@@ -1596,6 +1596,9 @@ async function renderPDF(pdfDoc){
     canvas.style.marginBottom='6px';
     canvas.style.background='#fff';
     canvas.dataset.page=String(i);
+    canvas.style.cursor='crosshair';
+    canvas.addEventListener('mousemove',function(ev){moveMagnifier(canvas,ev);});
+    canvas.addEventListener('mouseleave',hideMagnifier);
     await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     viewer.appendChild(canvas);
   }
@@ -1607,6 +1610,44 @@ function highlightPage(pageNum){
     if(c.dataset.page===String(pageNum))c.scrollIntoView({behavior:'smooth',block:'nearest'});
   });
 }
+// ============================================================
+// PDF MAGNIFIER LENS
+// ============================================================
+var bMag=null,bMagCtx=null;
+
+function ensureMagnifier(){
+  if(bMag)return;
+  bMag=document.createElement('div');
+  bMag.style.cssText='position:fixed;width:260px;height:260px;border-radius:50%;border:3px solid #9B6B50;overflow:hidden;pointer-events:none;z-index:9999;display:none;box-shadow:0 6px 28px rgba(44,24,16,.5);';
+  var mc=document.createElement('canvas');mc.width=260;mc.height=260;
+  bMagCtx=mc.getContext('2d');
+  bMag.appendChild(mc);
+  // Crosshair
+  var cross=document.createElement('div');
+  cross.style.cssText='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;pointer-events:none;';
+  cross.innerHTML='<svg width="16" height="16"><line x1="8" y1="0" x2="8" y2="16" stroke="#9B6B50" stroke-width="1" opacity="0.7"/><line x1="0" y1="8" x2="16" y2="8" stroke="#9B6B50" stroke-width="1" opacity="0.7"/></svg>';
+  bMag.appendChild(cross);
+  document.body.appendChild(bMag);
+}
+
+function moveMagnifier(srcCanvas,e){
+  ensureMagnifier();
+  var ms=260,zoom=3;
+  var rect=srcCanvas.getBoundingClientRect();
+  var cx=(e.clientX-rect.left)*(srcCanvas.width/rect.width);
+  var cy=(e.clientY-rect.top)*(srcCanvas.height/rect.height);
+  var sw=ms/zoom,sh=ms/zoom;
+  bMagCtx.clearRect(0,0,ms,ms);
+  bMagCtx.drawImage(srcCanvas,cx-sw/2,cy-sh/2,sw,sh,0,0,ms,ms);
+  var lft=e.clientX+20,top=e.clientY-ms/2;
+  if(lft+ms>window.innerWidth)lft=e.clientX-ms-20;
+  if(top<8)top=8;
+  if(top+ms>window.innerHeight-8)top=window.innerHeight-ms-8;
+  bMag.style.left=lft+'px';bMag.style.top=top+'px';bMag.style.display='block';
+}
+
+function hideMagnifier(){if(bMag)bMag.style.display='none';}
+
 // ============================================================
 // BOOT
 // ============================================================
