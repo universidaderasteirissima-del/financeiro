@@ -28,7 +28,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F5EFE6;color:#2C1810
 .sh{background:#FDF5EE;color:#7A3300;border:1px solid #F0C898;font-weight:600}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.52);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;isolation:isolate}
+.modal-overlay{position:fixed;inset:0;background:rgba(44,24,16,.52);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem}
 .modal-box{background:#fff;border-radius:4px;padding:28px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(44,24,16,.2);border:1px solid var(--border)}
 
 /* INPUTS */
@@ -637,11 +637,12 @@ async function push2Sheets(rec,rowIdx){
 // SETTINGS
 // ============================================================
 function openCfg(){
+  hideMagnifier();
   document.getElementById('cfUrl').value=S.url;
   document.getElementById('cfLogo').value=S.logoUrl;
   document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
   document.getElementById('cfFoList').textContent=S.forns.join(' · ');
-  document.getElementById('mCfg').style.display='flex';
+  var m=document.getElementById('mCfg');document.body.appendChild(m);m.style.display='flex';
 }
 function saveCfg(){
   S.url=document.getElementById('cfUrl').value.trim();
@@ -1140,11 +1141,11 @@ function extractBoletoData(txt,barcode){
   // LOJA — 1) by CEP (most reliable), 2) by Pagador text, 3) by full-text loja name
   if(!prs.lo){
     // Extract all CEP-like patterns (5 digits + optional space/hyphen + 3 digits)
-    var cepRe=/(?<![\/\d])(\d{5})[ -]?(\d{3})(?![\/\d])/g;
-    var cm2;
-    while((cm2=cepRe.exec(txt))!==null){
-      var cepNorm=cm2[1]+cm2[2]; // 8 digits normalized
-      if(LOJA_CEP[cepNorm]){prs.lo=LOJA_CEP[cepNorm];break;}
+    // Extract CEPs: match NNNNN-NNN or NNNNNNNN NOT inside longer number sequences
+    var cepMatches=txt.match(/\b\d{5}-\d{3}\b|\b\d{8}\b/g)||[];
+    for(var ci=0;ci<cepMatches.length;ci++){
+      var cepNorm=cepMatches[ci].replace(/[^0-9]/g,'');
+      if(cepNorm.length===8&&LOJA_CEP[cepNorm]){prs.lo=LOJA_CEP[cepNorm];break;}
     }
   }
   if(!prs.lo){
@@ -1676,7 +1677,7 @@ function ensureMagnifier(){
   if(bMagCanvas)return;
   bMagCanvas=document.createElement('canvas');
   bMagCanvas.width=260;bMagCanvas.height=260;
-  bMagCanvas.style.cssText='position:fixed;z-index:9999;display:none;border-radius:50%;border:3px solid #9B6B50;box-shadow:0 6px 28px rgba(44,24,16,.5);pointer-events:none;';
+  bMagCanvas.style.cssText='position:fixed;z-index:20001;display:none;border-radius:50%;border:3px solid #9B6B50;box-shadow:0 6px 28px rgba(44,24,16,.5);pointer-events:none;';
   bMagCtx=bMagCanvas.getContext('2d');
   document.body.appendChild(bMagCanvas);
 }
