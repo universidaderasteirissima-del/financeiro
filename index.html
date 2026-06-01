@@ -534,6 +534,8 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 const APP_VER='7'; // bump to force localStorage refresh
 const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
+// CEP -> Loja (8 digits, no hyphen). Source: user-provided lojas.csv
+const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil'};
 const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DEF_PWD='rasteira2024';
@@ -1135,8 +1137,18 @@ function extractBoletoData(txt,barcode){
   }
   if(fo)prs.fo=fo;
 
-  // LOJA — extract from 'Pagador' field (Inter/Sicoob style)
+  // LOJA — 1) by CEP (most reliable), 2) by Pagador text, 3) by full-text loja name
   if(!prs.lo){
+    // Extract all CEP-like patterns (5 digits + optional space/hyphen + 3 digits)
+    var cepRe=/(?<![\/\d])(\d{5})[ -]?(\d{3})(?![\/\d])/g;
+    var cm2;
+    while((cm2=cepRe.exec(txt))!==null){
+      var cepNorm=cm2[1]+cm2[2]; // 8 digits normalized
+      if(LOJA_CEP[cepNorm]){prs.lo=LOJA_CEP[cepNorm];break;}
+    }
+  }
+  if(!prs.lo){
+    // From 'Pagador' field text (Inter/Sicoob: 'Pagador ARAGUAINA RUA...')
     var pagMatch=txt.match(/[Pp]agador\s+([\w\sÀ-ÿ]+?)(?=\s+(?:RUA|AV|CEP|CPF|CNPJ|R\s|\d{5})|[\r\n]|$)/i);
     if(pagMatch){
       var pagTxt=norm(pagMatch[1].trim());
