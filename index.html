@@ -1602,6 +1602,18 @@ async function renderPDF(pdfDoc){
     await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     viewer.appendChild(canvas);
   }
+  // Add single listener to viewer div — covers all Y positions and gaps between pages
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
 }
 function highlightPage(pageNum){
   document.querySelectorAll('#bPDFViewer canvas').forEach(c=>{
@@ -1628,38 +1640,22 @@ function ensureMagnifier(){
 function moveMagnifier(srcCanvas,e){
   ensureMagnifier();
   var ms=260,zoom=3;
+  // Position circle centered on cursor
+  bMagCanvas.style.left=(e.clientX-ms/2)+'px';
+  bMagCanvas.style.top=(e.clientY-ms/2)+'px';
+  bMagCanvas.style.display='block';
   var rect=srcCanvas.getBoundingClientRect();
-  if(!rect.width||!rect.height)return;
-
-  // Mouse in display-pixel coords relative to canvas top-left
+  if(!rect.width||!rect.height||!srcCanvas.width)return;
   var px=e.clientX-rect.left;
   var py=e.clientY-rect.top;
-
-  // Scale from CSS display size to internal canvas resolution
-  var sx=px*(srcCanvas.width/rect.width);
-  var sy=py*(srcCanvas.height/rect.height);
-
-  // Source region: (ms/zoom) display-pixels = 1 canvas-unit region to extract
-  var sw=(ms/zoom)*(srcCanvas.width/rect.width);
-  var sh=(ms/zoom)*(srcCanvas.height/rect.height);
-
-  bMagCtx.clearRect(0,0,ms,ms);
-  bMagCtx.fillStyle='#fff';
-  bMagCtx.fillRect(0,0,ms,ms);
-  try{
-    bMagCtx.drawImage(srcCanvas,
-      Math.max(0,sx-sw/2), Math.max(0,sy-sh/2), // src xy
-      sw, sh,                                      // src size
-      0, 0, ms, ms                                 // dst (fill magnifier)
-    );
-  }catch(er){}
-
-  // Center magnifier exactly on cursor — no clamping so Y always follows
-  bMagCanvas.style.left=Math.round(e.clientX-ms/2)+'px';
-  bMagCanvas.style.top=Math.round(e.clientY-ms/2)+'px';
-  bMagCanvas.style.display='block';
+  var scX=srcCanvas.width/rect.width;
+  var scY=srcCanvas.height/rect.height;
+  var sx=px*scX; var sy=py*scY;
+  var sw=(ms/zoom)*scX; var sh=(ms/zoom)*scY;
+  // Fill white then draw zoomed content
+  bMagCtx.fillStyle='#fff';bMagCtx.fillRect(0,0,ms,ms);
+  bMagCtx.drawImage(srcCanvas,sx-sw/2,sy-sh/2,sw,sh,0,0,ms,ms);
 }
-
 function hideMagnifier(){if(bMagCanvas)bMagCanvas.style.display='none';}
 
 // ============================================================
