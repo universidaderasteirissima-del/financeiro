@@ -1862,14 +1862,17 @@ async function uploadBoletoToGitHub(rec){
   if(!repo){console.log('GitHub PDF: repositório não configurado');return '';}
   if(!file){console.log('GitHub PDF: nenhum arquivo na fila');return '';}
   try{
-    toast('Enviando PDF para GitHub...','info');
-    // Build organized path: boletos/YYYY/MM/YYYY-MM-DD_FORNECEDOR_R$VALUE.pdf
+    toast('Enviando PDF...','info');
     var dv=rec.dv||new Date().toISOString().substring(0,10);
     var yr=dv.substring(0,4),mo=dv.substring(5,7);
+    // Filename: only safe chars (no $, no comma)
     var fo=(rec.fo||'boleto').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,15);
-    var val=String(Math.round((rec.vn||0)*100)/100).replace('.',',');
-    var fname=dv+'_'+fo+'_R$'+val+'.pdf';
-    var path='boletos/'+yr+'/'+mo+'/'+fname;
+    var val=Math.round((rec.vn||0)).toString();
+    var fname=dv+'_'+fo+'_'+val+'.pdf';
+    // URL-encode path segments to avoid issues with special chars
+    var apiBase='https://api.github.com/repos/'+repo+'/contents/boletos/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
+    var rawUrl='https://raw.githubusercontent.com/'+repo+'/main/boletos/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
+    console.log('[GH] repo:',repo,'url:',apiBase,'file:',file.name,'size:',file.size);
     // Convert PDF to base64 in chunks
     var buf=await file.arrayBuffer();
     var bytes=new Uint8Array(buf);
@@ -1879,22 +1882,22 @@ async function uploadBoletoToGitHub(rec){
       binary+=String.fromCharCode.apply(null,bytes.slice(i,Math.min(i+chunk,bytes.length)));
     }
     var b64=btoa(binary);
+    console.log('[GH] b64 length:',b64.length);
     var hdrs={'Authorization':'token '+token,'Content-Type':'application/json'};
-    // Check if file already exists (get SHA for update)
+    // Check if file exists (get SHA for update)
     var sha=null;
-    try{var ck=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path,{headers:hdrs});
-      if(ck.ok)sha=(await ck.json()).sha;}catch(e){}
-    var body={message:'Boleto '+dv+': '+rec.fo+' R$'+val,content:b64};
+    try{
+      var ck=await fetch(apiBase,{headers:hdrs});
+      console.log('[GH] check status:',ck.status);
+      if(ck.ok){var ckj=await ck.json();sha=ckj.sha||null;}
+    }catch(e){console.log('[GH] check failed (probably new file):',e.message);}
+    var body={message:'Boleto '+dv+': '+(rec.fo||''),content:b64};
     if(sha)body.sha=sha;
-    var resp=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path,
-      {method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+    console.log('[GH] uploading to',apiBase);
+    var resp=await fetch(apiBase,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
     if(resp.ok){
       var data=await resp.json();
-      var url='';
-      if(data.content&&data.content.html_url){
-        // Use raw URL for direct PDF access
-        url='https://raw.githubusercontent.com/'+repo+'/main/'+path;
-      }
+      var url=rawUrl;
       if(!S.fileUrls)S.fileUrls=[];
       S.fileUrls[S.fileQueueIdx]=url;
       toast('PDF salvo no GitHub! '+path,'ok');
