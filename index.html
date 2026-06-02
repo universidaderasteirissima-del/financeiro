@@ -242,7 +242,7 @@ th:hover{background:#EAD9C8!important}
         <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF do boleto</p>
         <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="bPDFNm">Nenhum arquivo selecionado</p>
       </div>
-      <input type="file" id="bPDF" accept=".pdf" style="display:none" onchange="rdPDF(this)" />
+      <input type="file" id="bPDF" accept=".pdf" multiple style="display:none" onchange="handleFileInput(this)" />
       <div style="display:flex;gap:.75rem;margin-top:1.5rem">
         <button onclick="cm('mBoleto')" class="btn-secondary" style="flex:1">Cancelar</button>
         <button onclick="parseBol()" class="btn-primary" style="flex:2">Analisar Boleto →</button>
@@ -270,7 +270,7 @@ th:hover{background:#EAD9C8!important}
           <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem">
               <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
-              <span id="bQueueBadge" style="display:none;font-size:.7rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.15rem .6rem;border-radius:2px"></span>
+              <span id="bFileBadge" style="display:none;font-size:.7rem;font-weight:600;background:#7A4F3A;color:#FAF7F4;padding:.15rem .6rem;border-radius:2px;margin-right:.3rem"></span><span id="bQueueBadge" style="display:none;font-size:.7rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.15rem .6rem;border-radius:2px"></span>
             </div>
             <p style="font-size:.7rem;color:#7A4F3A" id="bInf"></p>
           </div>
@@ -545,7 +545,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');lo
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0};
 
 // ============================================================
 // AUTH
@@ -1704,6 +1704,69 @@ function moveMagnifier(srcCanvas,e){
   bMagCtx.drawImage(srcCanvas,sx-sw/2,sy-sh/2,sw,sh,0,0,ms,ms);
 }
 function hideMagnifier(){if(bMagCanvas)bMagCanvas.style.display='none';}
+
+// ============================================================
+// MULTI-FILE QUEUE
+// ============================================================
+function handleFileInput(input){
+  if(!input.files||!input.files.length)return;
+  S.fileQueue=Array.from(input.files);
+  S.fileQueueIdx=0;
+  var nm=S.fileQueue.length===1?S.fileQueue[0].name:S.fileQueue.length+' arquivos selecionados';
+  document.getElementById('bPDFNm').textContent=nm;
+  updFileBadge();
+  rdPDFFile(S.fileQueue[0]);
+}
+
+function updFileBadge(){
+  var b=document.getElementById('bFileBadge');
+  if(!b)return;
+  if(S.fileQueue.length>1){b.style.display='inline-block';b.textContent='Arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length;}
+  else b.style.display='none';
+}
+
+async function rdPDFFile(file){
+  if(!file)return;
+  document.getElementById('bPDFNm').textContent=file.name;
+  S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    var buf=await file.arrayBuffer();
+    var pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    S.pdfDoc=pdf;S.pdfPages=[];
+    for(var i=1;i<=pdf.numPages;i++){
+      var pg=await pdf.getPage(i);
+      var ct=await pg.getTextContent();
+      S.pdfPages.push(ct.items.map(function(x){return x.str;}).join(' '));
+    }
+    S.pdfTxt=S.pdfPages.join('\n\n===PAGINA===\n\n');
+    var linhas=findLinhasDigitaveis(S.pdfTxt);
+    if(linhas.length)document.getElementById('bLi').value=linhas[0];
+    var n=pdf.numPages,lb=linhas.length;
+    if(lb>0){toast('PDF lido! '+n+' pag., '+lb+' boleto(s).','info');}
+    else{toast('PDF lido ('+n+' pag., '+S.pdfTxt.replace(/[^\d]/g,'').length+' digitos). Cole a linha digitavel se nao preencher.','warn');}
+  }catch(e){S.pdfTxt=null;S.pdfPages=[];toast('Erro ao ler '+file.name,'err');}
+}
+
+async function advanceToNextFile(){
+  S.fileQueueIdx++;
+  updFileBadge();
+  if(S.fileQueueIdx<S.fileQueue.length){
+    var nextFile=S.fileQueue[S.fileQueueIdx];
+    toast('Carregando arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length+': '+nextFile.name,'info');
+    S.boletoQueue=[];S.boletoQueueIdx=0;
+    document.getElementById('bLi').value='';
+    bSt(1);
+    await rdPDFFile(nextFile);
+    setTimeout(function(){parseBol();},200);
+  }else{
+    var total=S.fileQueue.length;
+    S.fileQueue=[];S.fileQueueIdx=0;
+    cm('mBoleto');S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
+    applyF();
+    toast('Todos os '+total+' arquivo(s) processados!');
+  }
+}
 
 // ============================================================
 // BOOT
