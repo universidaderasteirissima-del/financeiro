@@ -986,6 +986,7 @@ function showQueueItem(idx){
   // Build info string
   const parts=[
     prs.banco?'Banco: '+prs.banco:'',
+    prs.lo?'Loja: '+prs.lo:'',
     'Valor: '+(prs.vn?'R$ '+fNum(parseFloat(prs.vn)):'não detectado'),
     'Vencimento: '+(fDt(prs.dv)||'não detectado'),
     prs.de?'Emissão: '+fDt(prs.de):'',
@@ -1009,7 +1010,7 @@ function showQueueItem(idx){
   document.getElementById('bf_sv').value='0';
   document.getElementById('bf_st').value='em aberto';
   document.getElementById('bf_dp').value='';
-  document.getElementById('bf_lo').value='';
+  document.getElementById('bf_lo').value=prs.lo||'';
 
   calcFornSplit();
   bSt(2);
