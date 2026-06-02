@@ -1014,6 +1014,13 @@ function showQueueItem(idx){
 
   calcFornSplit();
   bSt(2);
+  // Ensure PDF renders even if bSt timing misses (multi-file or slow machines)
+  setTimeout(function(){
+    var vw=document.getElementById('bPDFViewer');
+    if(S.pdfDoc&&vw&&!vw.querySelector('canvas')){
+      renderPDF(S.pdfDoc).catch(function(){});
+    }
+  },450);
 }
 
 // findDocNumber: extracts NF and parcel from boleto text
