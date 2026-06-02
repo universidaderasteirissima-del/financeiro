@@ -1192,9 +1192,9 @@ async function saveBol(){
     showQueueItem(nextIdx);
     toast('Boleto '+(S.boletoQueueIdx)+'/'+S.boletoQueue.length+' salvo!'+(ok?' ✓':'')+'  Confirme o próximo.');
   }else{
-    cm('mBoleto');S.pdfTxt=null;S.pdfPages=[];S.boletoQueue=[];
+    // All boletos in this file confirmed — advance to next file or close
     applyF();
-    toast((S.boletoQueue.length>1?S.boletoQueue.length+' boletos salvos!':'Boleto salvo!')+(ok?' ✓ Google Sheets':''));
+    advanceToNextFile();
   }
 }
 
