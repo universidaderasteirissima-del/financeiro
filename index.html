@@ -1760,12 +1760,18 @@ async function advanceToNextFile(){
   updFileBadge();
   if(S.fileQueueIdx<S.fileQueue.length){
     var nextFile=S.fileQueue[S.fileQueueIdx];
-    toast('Carregando arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length+': '+nextFile.name,'info');
+    // Reset state for next file
     S.boletoQueue=[];S.boletoQueueIdx=0;
     document.getElementById('bLi').value='';
-    bSt(1);
+    // Show viewer area with loading message
+    var vw=document.getElementById('bPDFViewer');
+    if(vw){Array.from(vw.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+      vw.innerHTML='<p style="color:#999;font-size:.75rem;padding:2rem 0">Carregando '+nextFile.name+'...</p>';}
+    toast('Arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length+': '+nextFile.name,'info');
+    // Load and parse the next file
     await rdPDFFile(nextFile);
-    setTimeout(function(){parseBol();},200);
+    // Call parseBol directly (S.pdfTxt is now set)
+    parseBol();
   }else{
     var total=S.fileQueue.length;
     S.fileQueue=[];S.fileQueueIdx=0;
