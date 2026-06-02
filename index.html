@@ -414,7 +414,15 @@ th:hover{background:#EAD9C8!important}
         <div id="cfFoList" style="font-size:.72rem;color:#7A4F3A;line-height:1.8"></div>
       </div>
       <div style="background:#FDF8F5;border:1px solid #E8D0B8;border-radius:3px;padding:1rem">
-        <p style="font-size:.8rem;font-weight:700;color:#7A3300;margin-bottom:.5rem">Alterar Senha</p>
+        <div style="background:#EEF7F0;border:1px solid #B8DFC8;border-radius:3px;padding:.85rem;margin-bottom:1rem">
+<p style="font-size:.8rem;font-weight:700;color:#1E6B3A;margin-bottom:.4rem">📄 GitHub — Armazenamento de PDFs</p>
+<p style="font-size:.7rem;color:#5C3D2E;margin-bottom:.5rem">Salva automaticamente os PDFs dos boletos em um repositório GitHub.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+<div><label class="lbl">Token GitHub</label><input type="password" id="cfGhPdfToken" placeholder="ghp_..." class="inp" style="font-size:.78rem" /></div>
+<div><label class="lbl">Repositório (ex: usuario/boletos)</label><input type="text" id="cfGhPdfRepo" placeholder="usuario/boletos" class="inp" style="font-size:.78rem" /></div>
+</div>
+</div>
+<p style="font-size:.8rem;font-weight:700;color:#7A3300;margin-bottom:.5rem">Alterar Senha</p>
         <div style="display:flex;gap:.5rem">
           <input type="password" id="cfPwd" placeholder="Nova senha" class="inp" style="font-size:.8rem" />
           <button onclick="chgPwd()" class="btn-secondary" style="white-space:nowrap">Alterar</button>
@@ -588,7 +596,7 @@ async function ldData(){
     const res=await fetch('data.json');
     if(!res.ok)throw new Error();
     const arr=await res.json();
-    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0}));
+    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0,url:r.url||''}));
     svData();
   }catch(e){S.recs=[];console.warn('data.json not loaded',e);}
 }
@@ -618,7 +626,7 @@ async function syncSheets(){
         dv:br2iso(str(r['data_vencimento']||'')),
         vn:tof(r['Valor_da_nota_fiscal']),mk:tof(r['MKT']),pr:tof(r['Produto']),sv:tof(r['Serviço']||r['Servico']||''),
         st:str(r['Status'])||'em aberto',
-        dp:br2iso(str(r['Data_Pagamento']||'')),mv:+str(r['Mês_vencimento']||r['Mes_vencimento']||'')||0
+        dp:br2iso(str(r['Data_Pagamento']||'')),mv:+str(r['Mês_vencimento']||r['Mes_vencimento']||'')||0,url:str(r['URL_Boleto']||'')
       }));
       svData();applyF();toast('Sincronizado! '+S.recs.length+' registros.');
     }
@@ -627,7 +635,7 @@ async function syncSheets(){
 async function push2Sheets(rec,rowIdx){
   if(!S.url)return false;
   try{
-    const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv];
+    const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv,rec.url||''];
     await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row})});
     return true;
   }catch(e){return false;}
@@ -640,6 +648,8 @@ function openCfg(){
   hideMagnifier();
   document.getElementById('cfUrl').value=S.url;
   document.getElementById('cfLogo').value=S.logoUrl;
+  document.getElementById('cfGhPdfToken').value=localStorage.getItem('r_gh_pdf_token')||'';
+  document.getElementById('cfGhPdfRepo').value=localStorage.getItem('r_gh_pdf_repo')||'';
   document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
   document.getElementById('cfFoList').textContent=S.forns.join(' · ');
   var m=document.getElementById('mCfg');document.body.appendChild(m);m.style.display='flex';
@@ -647,6 +657,10 @@ function openCfg(){
 function saveCfg(){
   S.url=document.getElementById('cfUrl').value.trim();
   S.logoUrl=document.getElementById('cfLogo').value.trim();
+  var ghTok=document.getElementById('cfGhPdfToken').value.trim();
+  var ghRepo=document.getElementById('cfGhPdfRepo').value.trim();
+  if(ghTok)localStorage.setItem('r_gh_pdf_token',ghTok);
+  if(ghRepo)localStorage.setItem('r_gh_pdf_repo',ghRepo);
   svCfgStore();cm('mCfg');
   applyLogo();
   if(S.url){document.getElementById('btnSync').style.display='inline-block';syncSheets();}
@@ -776,7 +790,8 @@ function rtable(){
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap"><span style="font-size:.7rem;padding:.25rem .6rem;border-radius:2px" class="'+sc+'">'+sl+'</span></td>'+
       '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.dp)+'</td>'+
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap">'+
-        '<button onclick="editRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
+        (r.url?'<a href="'+r.url+'" target="_blank" style="font-size:.72rem;color:#1E6B3A;font-weight:700;padding:.2rem .5rem;border:1px solid #B8DFC8;border-radius:2px;text-decoration:none" title="Ver PDF">📄 Boleto</a> ':'')+
+'<button onclick="editRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+"
         '<button onclick="delRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td></tr>';
   }).join('');
@@ -1624,8 +1639,10 @@ async function confirmBoleto(){
   else if(formNn&&formParcel){nn=formNn+'-'+formParcel;}
   else{nn=formNn||q.nn||'';}
   console.log('[NN] idx='+idx+' nn='+nn+' q.nn='+q.nn+' q.parcel='+q.parcel+' formParcel='+formParcel);
+  // Upload PDF to GitHub (only once per file, reused for multi-boleto PDFs)
+  const pdfUrl=await uploadBoletoToGitHub({...q,nn});
   const rec={lo:q.lo,fo:q.fo,nn,de:q.de,dv:q.dv,vn:q.vn,mk:q.mk,pr:q.pr,sv:q.sv,
-    st:q.st,dp:q.dp,mv:q.mv,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
+    st:q.st,dp:q.dp,mv:q.mv,url:pdfUrl,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
   S.recs.push(rec);svData();S.lastId=rec._id;
   const ok=await push2Sheets(rec,null);
 
@@ -1808,6 +1825,59 @@ async function advanceToNextFile(){
     applyF();
     toast('Todos os '+total+' arquivo(s) prontos! '+S.totalConfirmed+' boleto(s) confirmado(s).');
   }
+}
+
+// ============================================================
+// GITHUB PDF UPLOAD
+// ============================================================
+async function uploadBoletoToGitHub(rec){
+  // Reuse URL if this file was already uploaded
+  if(S.fileUrls&&S.fileUrls[S.fileQueueIdx])return S.fileUrls[S.fileQueueIdx];
+  var token=localStorage.getItem('r_gh_pdf_token');
+  var repo=localStorage.getItem('r_gh_pdf_repo');
+  var file=S.fileQueue&&S.fileQueue.length>0?S.fileQueue[S.fileQueueIdx]:null;
+  if(!token||!repo||!file)return '';
+  try{
+    toast('Enviando PDF para GitHub...','info');
+    // Build organized path: boletos/YYYY/MM/YYYY-MM-DD_FORNECEDOR_R$VALUE.pdf
+    var dv=rec.dv||new Date().toISOString().substring(0,10);
+    var yr=dv.substring(0,4),mo=dv.substring(5,7);
+    var fo=(rec.fo||'boleto').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,15);
+    var val=String(Math.round((rec.vn||0)*100)/100).replace('.',',');
+    var fname=dv+'_'+fo+'_R$'+val+'.pdf';
+    var path='boletos/'+yr+'/'+mo+'/'+fname;
+    // Convert PDF to base64 in chunks
+    var buf=await file.arrayBuffer();
+    var bytes=new Uint8Array(buf);
+    var binary='';
+    var chunk=8192;
+    for(var i=0;i<bytes.length;i+=chunk){
+      binary+=String.fromCharCode.apply(null,bytes.slice(i,Math.min(i+chunk,bytes.length)));
+    }
+    var b64=btoa(binary);
+    var hdrs={'Authorization':'token '+token,'Content-Type':'application/json','User-Agent':'rasteirissima'};
+    // Check if file already exists (get SHA for update)
+    var sha=null;
+    try{var ck=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path,{headers:hdrs});
+      if(ck.ok)sha=(await ck.json()).sha;}catch(e){}
+    var body={message:'Boleto '+dv+': '+rec.fo+' R$'+val,content:b64};
+    if(sha)body.sha=sha;
+    var resp=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path,
+      {method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+    if(resp.ok){
+      var data=await resp.json();
+      var url=data.content&&data.content.download_url?data.content.download_url:
+        'https://raw.githubusercontent.com/'+repo+'/main/'+path;
+      if(!S.fileUrls)S.fileUrls=[];
+      S.fileUrls[S.fileQueueIdx]=url;
+      toast('PDF salvo no GitHub!','ok');
+      return url;
+    }else{
+      var err=await resp.json().catch(function(){return{};});
+      toast('Erro GitHub: '+(err.message||resp.status),'err');
+    }
+  }catch(e){console.error('GitHub upload:',e);toast('Erro ao enviar PDF','err');}
+  return '';
 }
 
 // ============================================================
