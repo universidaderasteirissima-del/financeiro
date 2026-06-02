@@ -1615,14 +1615,17 @@ async function confirmBoleto(){
   const ok=await push2Sheets(rec,null);
 
   q._confirmed=true;
+  S.totalConfirmed++;
   renderTabs();
 
-  // Find next unconfirmed
-  const next=S.boletoQueue.findIndex((b,i)=>i>idx&&!b._confirmed);
+  // Find ANY unconfirmed boleto (not just after current — allows confirming out of order)
+  const next=S.boletoQueue.findIndex(b=>!b._confirmed);
   if(next>=0){
     S.boletoQueueIdx=next;
     showQueueItem(next);
-    S.totalConfirmed++;var fctx3=S.fileQueue.length>1?' | Arq.'+(S.fileQueueIdx+1)+'/'+S.fileQueue.length:'';toast('Boleto '+(idx+1)+'/'+S.boletoQueue.length+' salvo'+fctx3+(ok?' ✓':''));
+    var confirmed=S.boletoQueue.filter(b=>b._confirmed).length;
+    var fctx3=S.fileQueue.length>1?' | Arq.'+(S.fileQueueIdx+1)+'/'+S.fileQueue.length:'';
+    toast('Boleto '+confirmed+'/'+S.boletoQueue.length+' salvo'+fctx3+(ok?' ✓':''));
   }else{
     // All boletos in this file confirmed
     applyF();
@@ -1633,11 +1636,12 @@ async function confirmBoleto(){
       return;
     }else{
       // All files done — close modal
-      const total=S.boletoQueue.filter(b=>b._confirmed).length;
+      const totalArq=S.fileQueue.length;
       S.fileQueue=[];S.fileQueueIdx=0;
       cm('mBoleto');
       S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
-      var fArq=S.fileQueue.length>1?' | '+S.fileQueue.length+' arquivo(s) processados':'';toast(total+' boleto(s) confirmado(s)'+fArq+(ok?' ✓ Google Sheets':''));
+      var fArq=totalArq>1?' | '+totalArq+' arquivo(s) processados':'';
+      toast(S.totalConfirmed+' boleto(s) confirmado(s)'+fArq+(ok?' ✓ Google Sheets':''));
     }
   }
   if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
