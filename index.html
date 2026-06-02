@@ -1360,7 +1360,15 @@ function br2iso(v){
 function i2br(iso){return fDt(iso);}
 
 function toISO(d){if(!d||isNaN(d))return '';return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function tof(v){if(!v&&v!==0)return 0;const s=String(v).replace(/[R$\s]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.');return parseFloat(s)||0;}
+function tof(v){
+  if(!v&&v!==0)return 0;
+  const s=String(v).replace(/[R$\s]/g,'').trim();
+  if(!s)return 0;
+  // No comma = JavaScript number format ("71.5", "7066.79") — parse directly
+  if(s.indexOf(',')===-1)return parseFloat(s)||0;
+  // Brazilian format ("71,50" or "7.066,79") — remove thousand dots, swap decimal comma
+  return parseFloat(s.replace(/\./g,'').replace(',','.'))||0;
+}
 
 function toast(msg,type='ok'){
   const el=document.getElementById('tst'),mc=document.getElementById('tstMsg');
