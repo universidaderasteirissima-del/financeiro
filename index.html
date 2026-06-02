@@ -1142,24 +1142,26 @@ function extractBoletoData(txt,barcode){
   }
   if(fo)prs.fo=fo;
 
-  // LOJA IDENTIFICATION — multi-method approach
+  // LOJA IDENTIFICATION — hardcoded city names, inline normalization, no external deps
   if(!prs.lo){
-    // Method 1: CEP lookup (tries hyphen, no-hyphen, en-dash, space formats)
+    // Inline normalization (explicit unicode range for combining chars)
+    var txn=txt.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    // CEP lookup — try all variants (hyphen, no-hyphen, en-dash, space)
     var cks=Object.keys(LOJA_CEP);
     for(var ki=0;ki<cks.length&&!prs.lo;ki++){
-      var ck=cks[ki];
-      var variants=[ck, ck[0]+ck[1]+ck[2]+ck[3]+ck[4]+'-'+ck[5]+ck[6]+ck[7], ck.substring(0,5)+'–'+ck.substring(5), ck.substring(0,5)+' '+ck.substring(5)];
-      for(var vi=0;vi<variants.length;vi++){if(txt.indexOf(variants[vi])>=0){prs.lo=LOJA_CEP[ck];break;}}
+      var ck=cks[ki]; var cd=ck.slice(0,5)+'-'+ck.slice(5);
+      if(txn.indexOf(ck)>=0||txn.indexOf(cd)>=0||txt.indexOf(ck)>=0||txt.indexOf(cd)>=0)
+        prs.lo=LOJA_CEP[ck];
     }
   }
   if(!prs.lo){
-    // Method 2: loja city/name appears in text (e.g. 'FORTALEZA', 'ARAGUAINA', 'MARABA')
-    var ntf=norm(txt);
-    var lsort=[].concat(S.lojas).sort(function(a,b){return norm(b).length-norm(a).length;});
-    for(var li=0;li<lsort.length;li++){
-      var nlo=norm(lsort[li]);
-      if(nlo.length>=5&&ntf.indexOf(nlo)>=0){prs.lo=lsort[li];break;}
-    }
+    // City name search — hardcoded, sorted longest first to avoid partial matches
+    var CIDADES={'SHOPPING DA ILHA':'Shopping da Ilha','NEW MARABA':'New Marabá','SOUSA LIMA':'Sousa Lima','RIO ANIL':'Rio anil','SAO PAULO':'Sao Paulo','ARAGUAINA':'Araguaína','FORTALEZA':'Fortaleza','IMPERIAL':'Imperial','MARABA':'Marabá','PALMAS':'Palmas','BALSAS':'Balsas','BELEM':'Belém'};
+    var txn2=txt.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    var cnames=Object.keys(CIDADES);
+    for(var ci=0;ci<cnames.length&&!prs.lo;ci++){if(txn2.indexOf(cnames[ci])>=0)prs.lo=CIDADES[cnames[ci]];}
+    console.log('[LOJA] txn2 sample:',txn2.substring(0,300));
+    console.log('[LOJA] result:',prs.lo);
   }
   return prs;
 }
