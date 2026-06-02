@@ -1178,7 +1178,7 @@ async function saveBol(){
 
   const parcel=g('bf_parc');
   const baseNn=g('bf_nn');
-  const nn=baseNn&&parcel?(baseNn.endsWith('-'+parcel)?baseNn:baseNn+'-'+parcel):baseNn;
+  const nnBase2=baseNn?baseNn.replace(/-\d+$/,''):baseNn||'';const nn=nnBase2&&parcel?nnBase2+'-'+parcel:baseNn;
 
   const rec={
     lo,fo,nn,de:g('bf_de'),dv,
@@ -1616,7 +1616,7 @@ async function confirmBoleto(){
   if(btn){btn.disabled=true;btn.textContent='Salvando...';}
 
   const parcel=q.parcel;
-  const nn=q.nn&&parcel?(q.nn.endsWith('-'+parcel)?q.nn:q.nn+'-'+parcel):(q.nn||'');
+  const nnBase=q.nn?q.nn.replace(/-\d+$/,''):q.nn||'';const nn=nnBase&&parcel?nnBase+'-'+parcel:(q.nn||'');
   const rec={lo:q.lo,fo:q.fo,nn,de:q.de,dv:q.dv,vn:q.vn,mk:q.mk,pr:q.pr,sv:q.sv,
     st:q.st,dp:q.dp,mv:q.mv,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
   S.recs.push(rec);svData();S.lastId=rec._id;
