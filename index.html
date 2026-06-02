@@ -1659,8 +1659,10 @@ async function confirmBoleto(){
   else if(formNn&&formParcel){nn=formNn+'-'+formParcel;}
   else{nn=formNn||q.nn||'';}
   console.log('[NN] idx='+idx+' nn='+nn+' q.nn='+q.nn+' q.parcel='+q.parcel+' formParcel='+formParcel);
-  // Upload PDF to GitHub (only once per file, reused for multi-boleto PDFs)
-  const pdfUrl=await uploadBoletoToGitHub({...q,nn});
+  // Upload PDF to GitHub — NON-BLOCKING: boleto saves even if upload fails
+  let pdfUrl='';
+  try{pdfUrl=await uploadBoletoToGitHub({...q,nn});}
+  catch(e){console.warn('PDF upload skipped:',e);}
   const rec={lo:q.lo,fo:q.fo,nn,de:q.de,dv:q.dv,vn:q.vn,mk:q.mk,pr:q.pr,sv:q.sv,
     st:q.st,dp:q.dp,mv:q.mv,url:pdfUrl,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
   S.recs.push(rec);svData();S.lastId=rec._id;
@@ -1856,7 +1858,9 @@ async function uploadBoletoToGitHub(rec){
   var token=localStorage.getItem('r_gh_pdf_token');
   var repo=localStorage.getItem('r_gh_pdf_repo');
   var file=S.fileQueue&&S.fileQueue.length>0?S.fileQueue[S.fileQueueIdx]:null;
-  if(!token||!repo||!file)return '';
+  if(!token){console.log('GitHub PDF: token não configurado');return '';}
+  if(!repo){console.log('GitHub PDF: repositório não configurado');return '';}
+  if(!file){console.log('GitHub PDF: nenhum arquivo na fila');return '';}
   try{
     toast('Enviando PDF para GitHub...','info');
     // Build organized path: boletos/YYYY/MM/YYYY-MM-DD_FORNECEDOR_R$VALUE.pdf
@@ -1886,17 +1890,26 @@ async function uploadBoletoToGitHub(rec){
       {method:'PUT',headers:hdrs,body:JSON.stringify(body)});
     if(resp.ok){
       var data=await resp.json();
-      var url=data.content&&data.content.download_url?data.content.download_url:
-        'https://raw.githubusercontent.com/'+repo+'/main/'+path;
+      var url='';
+      if(data.content&&data.content.html_url){
+        // Use raw URL for direct PDF access
+        url='https://raw.githubusercontent.com/'+repo+'/main/'+path;
+      }
       if(!S.fileUrls)S.fileUrls=[];
       S.fileUrls[S.fileQueueIdx]=url;
-      toast('PDF salvo no GitHub!','ok');
+      toast('PDF salvo no GitHub! '+path,'ok');
       return url;
     }else{
-      var err=await resp.json().catch(function(){return{};});
-      toast('Erro GitHub: '+(err.message||resp.status),'err');
+      var errBody=await resp.text().catch(function(){return 'sem detalhes';});
+      var errMsg='';
+      try{errMsg=JSON.parse(errBody).message;}catch(e2){errMsg=errBody.substring(0,100);}
+      console.error('GitHub PDF error',resp.status,errMsg);
+      toast('Erro ao salvar PDF ('+resp.status+'): '+errMsg,'err');
     }
-  }catch(e){console.error('GitHub upload:',e);toast('Erro ao enviar PDF','err');}
+  }catch(e){
+    console.error('GitHub upload exception:',e);
+    toast('Erro de conexão ao enviar PDF: '+e.message,'err');
+  }
   return '';
 }
 
