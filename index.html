@@ -1879,7 +1879,7 @@ async function uploadBoletoToGitHub(rec){
       binary+=String.fromCharCode.apply(null,bytes.slice(i,Math.min(i+chunk,bytes.length)));
     }
     var b64=btoa(binary);
-    var hdrs={'Authorization':'token '+token,'Content-Type':'application/json','User-Agent':'rasteirissima'};
+    var hdrs={'Authorization':'token '+token,'Content-Type':'application/json'};
     // Check if file already exists (get SHA for update)
     var sha=null;
     try{var ck=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path,{headers:hdrs});
