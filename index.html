@@ -1142,22 +1142,23 @@ function extractBoletoData(txt,barcode){
   }
   if(fo)prs.fo=fo;
 
-  // LOJA — direct indexOf search for each known CEP (no regex, most reliable)
+  // LOJA IDENTIFICATION — multi-method approach
   if(!prs.lo){
-    var cepKeys=Object.keys(LOJA_CEP);
-    for(var ki=0;ki<cepKeys.length;ki++){
-      var c8=cepKeys[ki];
-      var c9=c8.substring(0,5)+'-'+c8.substring(5);
-      if(txt.indexOf(c8)!==-1||txt.indexOf(c9)!==-1){prs.lo=LOJA_CEP[c8];break;}
+    // Method 1: CEP lookup (tries hyphen, no-hyphen, en-dash, space formats)
+    var cks=Object.keys(LOJA_CEP);
+    for(var ki=0;ki<cks.length&&!prs.lo;ki++){
+      var ck=cks[ki];
+      var variants=[ck, ck[0]+ck[1]+ck[2]+ck[3]+ck[4]+'-'+ck[5]+ck[6]+ck[7], ck.substring(0,5)+'–'+ck.substring(5), ck.substring(0,5)+' '+ck.substring(5)];
+      for(var vi=0;vi<variants.length;vi++){if(txt.indexOf(variants[vi])>=0){prs.lo=LOJA_CEP[ck];break;}}
     }
   }
-  // Fallback: 'Pagador' field name matching (Inter: 'Pagador ARAGUAINA RUA...')
   if(!prs.lo){
-    var pm2=txt.match(/[Pp]agador[\s\r\n]+([A-Z][A-Z\s]+?)(?=[\s\r\n]+(?:RUA|AV|CEP|CPF|CNPJ|\d{5}))/i);
-    if(pm2){
-      var pagN=norm(pm2[1].trim());
-      var lo2=S.lojas.find(function(l){var nl2=norm(l);return pagN.includes(nl2)||nl2.includes(pagN);});
-      if(lo2)prs.lo=lo2;
+    // Method 2: loja city/name appears in text (e.g. 'FORTALEZA', 'ARAGUAINA', 'MARABA')
+    var ntf=norm(txt);
+    var lsort=[].concat(S.lojas).sort(function(a,b){return norm(b).length-norm(a).length;});
+    for(var li=0;li<lsort.length;li++){
+      var nlo=norm(lsort[li]);
+      if(nlo.length>=5&&ntf.indexOf(nlo)>=0){prs.lo=lsort[li];break;}
     }
   }
   return prs;
