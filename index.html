@@ -1142,27 +1142,22 @@ function extractBoletoData(txt,barcode){
   }
   if(fo)prs.fo=fo;
 
-  // LOJA IDENTIFICATION — hardcoded city names, inline normalization, no external deps
+  // LOJA IDENTIFICATION — hardcoded city names + CEP
+  console.log('[LOJA] txt len:',txt.length,'| sample:',txt.substring(0,150));
   if(!prs.lo){
-    // Inline normalization (explicit unicode range for combining chars)
-    var txn=txt.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
-    // CEP lookup — try all variants (hyphen, no-hyphen, en-dash, space)
     var cks=Object.keys(LOJA_CEP);
     for(var ki=0;ki<cks.length&&!prs.lo;ki++){
-      var ck=cks[ki]; var cd=ck.slice(0,5)+'-'+ck.slice(5);
-      if(txn.indexOf(ck)>=0||txn.indexOf(cd)>=0||txt.indexOf(ck)>=0||txt.indexOf(cd)>=0)
-        prs.lo=LOJA_CEP[ck];
+      var ck=cks[ki];var cd=ck.slice(0,5)+'-'+ck.slice(5);
+      if(txt.indexOf(ck)>=0||txt.indexOf(cd)>=0){prs.lo=LOJA_CEP[ck];}
     }
   }
   if(!prs.lo){
-    // City name search — hardcoded, sorted longest first to avoid partial matches
-    var CIDADES={'SHOPPING DA ILHA':'Shopping da Ilha','NEW MARABA':'New Marabá','SOUSA LIMA':'Sousa Lima','RIO ANIL':'Rio anil','SAO PAULO':'Sao Paulo','ARAGUAINA':'Araguaína','FORTALEZA':'Fortaleza','IMPERIAL':'Imperial','MARABA':'Marabá','PALMAS':'Palmas','BALSAS':'Balsas','BELEM':'Belém'};
-    var txn2=txt.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
-    var cnames=Object.keys(CIDADES);
-    for(var ci=0;ci<cnames.length&&!prs.lo;ci++){if(txn2.indexOf(cnames[ci])>=0)prs.lo=CIDADES[cnames[ci]];}
-    console.log('[LOJA] txn2 sample:',txn2.substring(0,300));
-    console.log('[LOJA] result:',prs.lo);
+    var txn3=txt.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    var CIDADES2={'SHOPPING DA ILHA':'Shopping da Ilha','SOUSA LIMA':'Sousa Lima','NEW MARABA':'New Marabá','RIO ANIL':'Rio anil','ARAGUAINA':'Araguaína','FORTALEZA':'Fortaleza','IMPERIAL':'Imperial','MARABA':'Marabá','PALMAS':'Palmas','BALSAS':'Balsas','BELEM':'Belém'};
+    var ckk=Object.keys(CIDADES2);
+    for(var ci=0;ci<ckk.length&&!prs.lo;ci++){if(txn3.indexOf(ckk[ci])>=0)prs.lo=CIDADES2[ckk[ci]];}
   }
+  console.log('[LOJA] result:',prs.lo||'NAO DETECTADA');
   return prs;
 }
 function extractFromPDF(txt){return extractBoletoData(txt,'');}
