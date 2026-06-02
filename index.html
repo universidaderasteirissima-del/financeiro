@@ -1201,7 +1201,7 @@ async function saveBol(){
   }else{
     // All boletos in this file confirmed — advance to next file or close
     applyF();
-    advanceToNextFile();
+    await advanceToNextFile();
   }
 }
 
@@ -1624,11 +1624,21 @@ async function confirmBoleto(){
     showQueueItem(next);
     toast('Boleto '+(idx+1)+' confirmado!'+(ok?' ✓':'')+' Confirme o próximo ('+( next+1)+'/'+S.boletoQueue.length+').');
   }else{
-    const total=S.boletoQueue.filter(b=>b._confirmed).length;
-    cm('mBoleto');
-    S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
+    // All boletos in this file confirmed
     applyF();
-    toast(total+' boleto(s) confirmado(s)!'+(ok?' ✓ Google Sheets':''));
+    if(S.fileQueue.length>1&&S.fileQueueIdx<S.fileQueue.length-1){
+      // More files remaining — advance to next file
+      if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
+      await advanceToNextFile();
+      return;
+    }else{
+      // All files done — close modal
+      const total=S.boletoQueue.filter(b=>b._confirmed).length;
+      S.fileQueue=[];S.fileQueueIdx=0;
+      cm('mBoleto');
+      S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
+      toast(total+' boleto(s) confirmado(s)!'+(ok?' ✓ Google Sheets':''));
+    }
   }
   if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
 }
