@@ -545,7 +545,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');lo
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0};
+const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // ============================================================
 // AUTH
@@ -1622,7 +1622,7 @@ async function confirmBoleto(){
   if(next>=0){
     S.boletoQueueIdx=next;
     showQueueItem(next);
-    toast('Boleto '+(idx+1)+' confirmado!'+(ok?' ✓':'')+' Confirme o próximo ('+( next+1)+'/'+S.boletoQueue.length+').');
+    S.totalConfirmed++;var fctx3=S.fileQueue.length>1?' | Arq.'+(S.fileQueueIdx+1)+'/'+S.fileQueue.length:'';toast('Boleto '+(idx+1)+'/'+S.boletoQueue.length+' salvo'+fctx3+(ok?' ✓':''));
   }else{
     // All boletos in this file confirmed
     applyF();
@@ -1637,7 +1637,7 @@ async function confirmBoleto(){
       S.fileQueue=[];S.fileQueueIdx=0;
       cm('mBoleto');
       S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
-      toast(total+' boleto(s) confirmado(s)!'+(ok?' ✓ Google Sheets':''));
+      var fArq=S.fileQueue.length>1?' | '+S.fileQueue.length+' arquivo(s) processados':'';toast(total+' boleto(s) confirmado(s)'+fArq+(ok?' ✓ Google Sheets':''));
     }
   }
   if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
@@ -1729,7 +1729,7 @@ function handleFileInput(input){
   if(!input.files||!input.files.length)return;
   S.fileQueue=Array.from(input.files);
   S.fileQueueIdx=0;
-  var nm=S.fileQueue.length===1?S.fileQueue[0].name:S.fileQueue.length+' arquivos selecionados';
+  S.totalConfirmed=0;var nm=S.fileQueue.length===1?S.fileQueue[0].name:S.fileQueue.length+' arquivo(s)';if(S.fileQueue.length>1)toast(S.fileQueue.length+' arquivo(s) selecionado(s). Carregando o primeiro...','info');
   document.getElementById('bPDFNm').textContent=nm;
   updFileBadge();
   rdPDFFile(S.fileQueue[0]);
@@ -1760,8 +1760,8 @@ async function rdPDFFile(file){
     var linhas=findLinhasDigitaveis(S.pdfTxt);
     if(linhas.length)document.getElementById('bLi').value=linhas[0];
     var n=pdf.numPages,lb=linhas.length;
-    if(lb>0){toast('PDF lido! '+n+' pag., '+lb+' boleto(s).','info');}
-    else{toast('PDF lido ('+n+' pag., '+S.pdfTxt.replace(/[^\d]/g,'').length+' digitos). Cole a linha digitavel se nao preencher.','warn');}
+    var fctx=S.fileQueue.length>1?' (arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length+')':'';if(lb>0){toast('Lido'+fctx+': '+n+' pag. | '+lb+' boleto(s) detectado(s)','info');}
+else{toast('Lido'+fctx+': '+n+' pag. | Nenhum boleto detectado. Cole a linha digitavel.','warn');}
   }catch(e){S.pdfTxt=null;S.pdfPages=[];toast('Erro ao ler '+file.name,'err');}
 }
 
@@ -1777,7 +1777,7 @@ async function advanceToNextFile(){
     var vw=document.getElementById('bPDFViewer');
     if(vw){Array.from(vw.querySelectorAll('canvas')).forEach(function(c){c.remove();});
       vw.innerHTML='<p style="color:#999;font-size:.75rem;padding:2rem 0">Carregando '+nextFile.name+'...</p>';}
-    toast('Arquivo '+(S.fileQueueIdx+1)+' de '+S.fileQueue.length+': '+nextFile.name,'info');
+    toast('Arquivo '+(S.fileQueueIdx+1)+'/'+S.fileQueue.length+': '+nextFile.name,'info');
     // Load and parse the next file
     await rdPDFFile(nextFile);
     // Call parseBol directly (S.pdfTxt is now set)
@@ -1787,7 +1787,7 @@ async function advanceToNextFile(){
     S.fileQueue=[];S.fileQueueIdx=0;
     cm('mBoleto');S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];
     applyF();
-    toast('Todos os '+total+' arquivo(s) processados!');
+    toast('Todos os '+total+' arquivo(s) prontos! '+S.totalConfirmed+' boleto(s) confirmado(s).');
   }
 }
 
