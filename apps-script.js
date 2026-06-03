@@ -132,3 +132,92 @@ function deleteRow(rowIndex) {
   sheet.deleteRow(rowIndex);
   return { success: true, message: 'Linha ' + rowIndex + ' excluída.' };
 }
+
+// ============================================================
+// BACKUP DIÁRIO AUTOMÁTICO
+// Cria uma cópia da aba principal todo dia e exclui o backup
+// anterior. NUNCA toca na aba principal.
+// ============================================================
+
+const BACKUP_PREFIX = 'Backup_'; // Prefixo exclusivo para abas de backup
+
+function criarBackupDiario() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  // *** PROTEÇÃO 1: verificar que a aba principal existe antes de qualquer ação ***
+  const mainSheet = ss.getSheetByName(SHEET_NAME);
+  if (!mainSheet) {
+    throw new Error('ERRO CRÍTICO: aba principal "' + SHEET_NAME + '" não encontrada! Backup cancelado por segurança.');
+  }
+
+  // Nome do backup de hoje
+  const hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  const backupNome = BACKUP_PREFIX + hoje;
+
+  // *** PROTEÇÃO 2: nunca permitir que o prefixo de backup seja igual ao nome da aba principal ***
+  if (SHEET_NAME.startsWith(BACKUP_PREFIX)) {
+    throw new Error('ERRO: nome da aba principal começa com "' + BACKUP_PREFIX + '". Altere a constante BACKUP_PREFIX.');
+  }
+
+  // Verificar se o backup de hoje já existe
+  if (ss.getSheetByName(backupNome)) {
+    Logger.log('Backup já existe para hoje: ' + backupNome);
+    return 'Backup já existe: ' + backupNome;
+  }
+
+  // Criar backup copiando a aba principal
+  const backupSheet = mainSheet.copyTo(ss);
+  backupSheet.setName(backupNome);
+
+  // Mover o backup para o final da planilha (longe da aba principal)
+  ss.setActiveSheet(backupSheet);
+  ss.moveActiveSheet(ss.getNumSheets());
+
+  // *** PROTEÇÃO 3: excluir APENAS abas com prefixo Backup_, nunca a principal ***
+  const todasAbas = ss.getSheets();
+  let excluidas = [];
+  for (const aba of todasAbas) {
+    const nome = aba.getName();
+
+    // Condições de segurança — pula se qualquer uma falhar:
+    if (!nome.startsWith(BACKUP_PREFIX)) continue;  // não é backup
+    if (nome === backupNome) continue;               // é o backup de hoje
+    if (nome === SHEET_NAME) continue;               // *** NUNCA excluir a principal ***
+    if (aba.getSheetId() === mainSheet.getSheetId()) continue; // dupla verificação por ID
+
+    ss.deleteSheet(aba);
+    excluidas.push(nome);
+    Logger.log('Backup antigo excluído: ' + nome);
+  }
+
+  const msg = 'Backup criado: ' + backupNome + (excluidas.length > 0 ? ' | Excluídos: ' + excluidas.join(', ') : '');
+  Logger.log(msg);
+  return msg;
+}
+
+// ============================================================
+// Configurar o trigger diário (execute UMA VEZ manualmente)
+// ============================================================
+function configurarBackupDiario() {
+  // Remover triggers anteriores desta função para evitar duplicatas
+  const triggers = ScriptApp.getProjectTriggers();
+  for (const t of triggers) {
+    if (t.getHandlerFunction() === 'criarBackupDiario') {
+      ScriptApp.deleteTrigger(t);
+      Logger.log('Trigger anterior removido.');
+    }
+  }
+
+  // Criar trigger: todo dia às 2h da manhã (horário de Brasília)
+  ScriptApp.newTrigger('criarBackupDiario')
+    .timeBased()
+    .everyDays(1)
+    .atHour(2)
+    .nearMinute(0)
+    .inTimezone('America/Sao_Paulo')
+    .create();
+
+  const msg = 'Trigger configurado! Backup automático todo dia às 02:00 (Brasília).';
+  Logger.log(msg);
+  return msg;
+}
