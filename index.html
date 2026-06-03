@@ -1919,10 +1919,12 @@ async function uploadBoletoToGitHub(rec){
     var resp=await fetch(apiBase,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
     if(resp.ok){
       var data=await resp.json();
-      var url=rawUrl;
+      // For private repos: use html_url (GitHub web viewer, requires login)
+      // For public repos: download_url works directly
+      var url=(data.content&&data.content.html_url)?data.content.html_url:rawUrl;
       if(!S.fileUrls)S.fileUrls=[];
       S.fileUrls[S.fileQueueIdx]=url;
-      toast('PDF salvo! boletos/'+yr+'/'+mo+'/'+fname,'ok');
+      toast('PDF salvo! '+fname,'ok');
       return url;
     }else{
       var errBody=await resp.text().catch(function(){return 'sem detalhes';});
