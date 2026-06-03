@@ -14,8 +14,8 @@
 // 10. Copie a URL gerada e cole nas Configurações do sistema
 // ============================================================
 
-const SPREADSHEET_ID = '19fYZQ84iym-62IVZdcjG2wr_Czj2jW_FsglSJg08kwg';
-const SHEET_NAME = 'Mercadorias a pagar lojas própr';
+const SPREADSHEET_ID = '1a_SPv0YGuvAZd8aLYsIqeTIl22n7lZqQ1GE50Mgq1HY';
+const SHEET_NAME = 'Mercadorias a pagar lojas próprias ';
 
 // ============================================================
 // GET: retorna todos os dados
@@ -96,23 +96,30 @@ function getData() {
   return { success: true, data: rows };
 }
 
+// Cor bege claro para lançamentos feitos pelo sistema
+const COR_SISTEMA = '#FFF5E0';
+
 // ============================================================
-// addRow: adiciona uma nova linha no final
+// addRow: adiciona uma nova linha no final com cor bege
 // ============================================================
 function addRow(rowData) {
   const sheet = getSheet();
   const lastRow = sheet.getLastRow();
-  sheet.getRange(lastRow + 1, 1, 1, rowData.length).setValues([rowData]);
+  const range = sheet.getRange(lastRow + 1, 1, 1, rowData.length);
+  range.setValues([rowData]);
+  range.setBackground(COR_SISTEMA);
   return { success: true, rowIndex: lastRow + 1, message: 'Linha adicionada com sucesso.' };
 }
 
 // ============================================================
-// updateRow: atualiza uma linha existente pelo índice
+// updateRow: atualiza uma linha existente e mantém a cor bege
 // ============================================================
 function updateRow(rowIndex, rowData) {
   const sheet = getSheet();
   if (!rowIndex || rowIndex < 2) throw new Error('rowIndex inválido: ' + rowIndex);
-  sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  const range = sheet.getRange(rowIndex, 1, 1, rowData.length);
+  range.setValues([rowData]);
+  range.setBackground(COR_SISTEMA);
   return { success: true, message: 'Linha ' + rowIndex + ' atualizada.' };
 }
 
