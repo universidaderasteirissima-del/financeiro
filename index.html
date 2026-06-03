@@ -885,7 +885,9 @@ async function saveRec(){
 }
 async function delRec(id){
   if(!confirm('Excluir este registro?'))return;
+  const rec=S.recs.find(x=>x._id===id);
   S.recs=S.recs.filter(x=>x._id!==id);svData();applyF();toast('Excluído!');
+  if(rec&&rec.url)deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
 }
 
 // ============================================================
@@ -1920,7 +1922,7 @@ async function uploadBoletoToGitHub(rec){
       var url=rawUrl;
       if(!S.fileUrls)S.fileUrls=[];
       S.fileUrls[S.fileQueueIdx]=url;
-      toast('PDF salvo no GitHub! '+path,'ok');
+      toast('PDF salvo! boletos/'+yr+'/'+mo+'/'+fname,'ok');
       return url;
     }else{
       var errBody=await resp.text().catch(function(){return 'sem detalhes';});
@@ -1934,6 +1936,31 @@ async function uploadBoletoToGitHub(rec){
     toast('Erro de conexão ao enviar PDF: '+e.message,'err');
   }
   return '';
+}
+
+// Delete PDF from GitHub when record is deleted
+async function deletePDFFromGitHub(rawUrl){
+  var token=localStorage.getItem('r_gh_pdf_token');
+  var repo=(localStorage.getItem('r_gh_pdf_repo')||'').replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
+  if(!token||!repo||!rawUrl)return;
+  // Extract path from raw URL: https://raw.githubusercontent.com/owner/repo/main/path
+  var m=rawUrl.match(/raw\.githubusercontent\.com\/[^\/]+\/[^\/]+\/[^\/]+\/(.+)$/);
+  if(!m)return;
+  var filePath=m[1];
+  var apiUrl='https://api.github.com/repos/'+repo+'/contents/'+filePath;
+  var hdrs={'Authorization':'token '+token,'Content-Type':'application/json'};
+  try{
+    // Get current SHA
+    var ck=await fetch(apiUrl,{headers:hdrs});
+    if(!ck.ok)return;
+    var ckj=await ck.json();
+    var sha=ckj.sha;
+    if(!sha)return;
+    // Delete the file
+    await fetch(apiUrl,{method:'DELETE',headers:hdrs,
+      body:JSON.stringify({message:'Excluir boleto: '+filePath,sha:sha})});
+    toast('PDF excluído do GitHub','ok');
+  }catch(e){console.warn('deletePDF:',e);}
 }
 
 // ============================================================
