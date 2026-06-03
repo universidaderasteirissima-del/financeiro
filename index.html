@@ -905,10 +905,17 @@ function autoStatusOnPay(dpId,stId){
 // BOLETO — MULTI-BOLETO QUEUE SYSTEM
 // ============================================================
 function openBoleto(){
+  hideMagnifier();
   bSt(1);
+  // Reset file input so onchange fires even if same file is selected again
+  var fi=document.getElementById('bPDF');if(fi)fi.value='';
   document.getElementById('bLi').value='';
   document.getElementById('bPDFNm').textContent='Nenhum arquivo selecionado';
-  S.pdfTxt=null;S.pdfPages=[];S.boletoQueue=[];S.boletoQueueIdx=0;
+  S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;
+  S.boletoQueue=[];S.boletoQueueIdx=0;
+  S.fileQueue=[];S.fileQueueIdx=0;S.fileUrls=[];S.totalConfirmed=0;
+  var vw=document.getElementById('bPDFViewer');
+  if(vw)vw.innerHTML='<p style="color:#999;font-size:.75rem;padding:2rem 0" id="bViewerMsg">Nenhum PDF carregado</p>';
   var _mb=document.getElementById('mBoleto');document.body.appendChild(_mb);_mb.style.display='flex';
 }
 function bSt(n){
