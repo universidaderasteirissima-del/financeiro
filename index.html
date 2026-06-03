@@ -544,7 +544,8 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 // CONSTANTS
 // ============================================================
-const APP_VER='7'; // bump to force localStorage refresh
+const APP_VER='9'; // bump to force localStorage refresh
+const DEF_URL='https://script.google.com/macros/s/AKfycbyIBXg5bDs0-BBnGsAOXSc1KiRrPvEQCmCtSPjIzStQFhhKZxkkaJDdWHLVs-ddW0pg7w/exec';
 const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
 // CEP -> Loja (8 digits, no hyphen). Source: user-provided lojas.csv
 const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65904296':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil'};
@@ -552,7 +553,11 @@ const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DEF_PWD='rasteira2024';
 // Force reload from data.json if version changed
-if(localStorage.getItem('r_ver')!==APP_VER){localStorage.removeItem('r_data');localStorage.setItem('r_ver',APP_VER);}
+if(localStorage.getItem('r_ver')!==APP_VER){
+  localStorage.removeItem('r_data');
+  try{const _c=localStorage.getItem('r_cfg');if(_c){const _o=JSON.parse(_c);_o.url=DEF_URL;localStorage.setItem('r_cfg',JSON.stringify(_o));}}catch(e){}
+  localStorage.setItem('r_ver',APP_VER);
+}
 
 // ============================================================
 // STATE
@@ -605,7 +610,8 @@ function applyLogo(){
 
 function ldCfg(){
   const r=localStorage.getItem('r_cfg');
-  if(r){const c=JSON.parse(r);S.url=c.url||'';S.logoUrl=c.logo||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
+  if(r){const c=JSON.parse(r);S.url=c.url||DEF_URL;S.logoUrl=c.logo||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
+  else{S.url=DEF_URL;}
 }
 function svCfgStore(){localStorage.setItem('r_cfg',JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns}));}
 
@@ -631,11 +637,11 @@ async function syncSheets(){
     toast('Sincronizando...','info');
     const res=await fetch(S.url+'?action=getData');
     const j=await res.json();
+    if(j.error){toast('Erro do servidor: '+j.error,'err');return;}
     if(j.data&&j.data.length){
       const str=(v)=>{const s=String(v===null||v===undefined?'':v).trim();return s==='null'||s==='undefined'?'':s;};
       const nota=(v)=>{
         const s=str(v);
-        // Discard if it looks like a date ended up in nota column (conversion artifact)
         if(s.length>12&&(s.includes('GMT')||s.includes('Bras')||s.includes('T00:')))return '';
         return s;
       };
@@ -649,8 +655,12 @@ async function syncSheets(){
         dp:br2iso(str(r['Data_Pagamento']||'')),mv:+str(r['Mês_vencimento']||r['Mes_vencimento']||'')||0,url:str(r['URL_Boleto']||'')
       }));
       svData();applyF();toast('Sincronizado! '+S.recs.length+' registros.');
+    }else if(j.data){
+      toast('Planilha conectada, mas sem registros.','warn');
+    }else{
+      toast('Resposta inesperada do servidor.','err');
     }
-  }catch(e){toast('Erro: '+e.message,'err');}
+  }catch(e){toast('Erro de conexão: '+e.message,'err');}
 }
 async function push2Sheets(rec,rowIdx){
   if(!S.url)return false;
@@ -1856,10 +1866,13 @@ async function uploadBoletoToGitHub(rec){
   // Reuse URL if this file was already uploaded
   if(S.fileUrls&&S.fileUrls[S.fileQueueIdx])return S.fileUrls[S.fileQueueIdx];
   var token=localStorage.getItem('r_gh_pdf_token');
-  var repo=localStorage.getItem('r_gh_pdf_repo');
+  // Normalize repo: accept full URL or just "owner/repo"
+  var repoRaw=localStorage.getItem('r_gh_pdf_repo')||'';
+  var repo=repoRaw.replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
   var file=S.fileQueue&&S.fileQueue.length>0?S.fileQueue[S.fileQueueIdx]:null;
-  if(!token){console.log('GitHub PDF: token não configurado');return '';}
-  if(!repo){console.log('GitHub PDF: repositório não configurado');return '';}
+  if(!token){toast('Configure o Token GitHub em ⚙ Config','warn');return '';}
+  if(!repo){toast('Configure o Repositório GitHub em ⚙ Config','warn');return '';}
+  if(!repo.includes('/')){toast('Repositório inválido. Use o formato: usuario/repositorio','warn');return '';}
   if(!file){console.log('GitHub PDF: nenhum arquivo na fila');return '';}
   try{
     toast('Enviando PDF...','info');
