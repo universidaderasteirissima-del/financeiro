@@ -202,12 +202,25 @@ th:hover{background:#EAD9C8!important}
       </div>
     </div>
 
+    <!-- SELECTION SUMMARY BAR -->
+    <div id="selBar" style="display:none;background:#FFF8E8;border:1.5px solid #E8D880;border-radius:4px;padding:.875rem 1.25rem;margin-bottom:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+        <span id="selCount" style="font-size:.825rem;font-weight:700;color:#6B5500"></span>
+        <span id="selSums" style="font-size:.8rem;color:#6B5500"></span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <button onclick="bulkMarkPaid()" class="btn-accent" style="font-size:.78rem;padding:.45rem .9rem">✓ Dar baixa (marcar como pago)</button>
+        <button onclick="clearSel()" style="font-size:.75rem;padding:.4rem .7rem;color:#6B5500;background:transparent;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-decoration:underline">✕ Limpar seleção</button>
+      </div>
+    </div>
+
     <!-- TABLE -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:4px;overflow:hidden">
       <div style="overflow:auto;max-height:calc(100vh - 370px);min-height:300px">
         <table style="width:100%;border-collapse:collapse;font-size:.825rem">
           <thead style="position:sticky;top:0;z-index:10">
             <tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">
+              <th style="padding:.75rem .6rem;text-align:center;width:2.25rem"><input type="checkbox" id="selAllChk" onchange="toggleSelAll(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50" title="Selecionar todos nesta página"/></th>
               <th class="si" onclick="sBy('lo')" id="th-lo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Loja</th>
               <th class="si" onclick="sBy('fo')" id="th-fo" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Fornecedor</th>
               <th class="si" onclick="sBy('nn')" id="th-nn" style="padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Nº Nota</th>
@@ -651,7 +664,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],selIds:new Set(),lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // ============================================================
 // AUTH
@@ -864,13 +877,13 @@ function clearF(){
   S.stFilter=[];
   document.querySelectorAll('#fStDrop input[type=checkbox]').forEach(c=>c.checked=false);
   updateStLbl();
-  const drop=g('fStDrop');if(drop)drop.style.display='none';
+  const drop=document.getElementById('fStDrop');if(drop)drop.style.display='none';
   applyF();
 }
 
 function toggleStDrop(ev){
   if(ev)ev.stopPropagation();
-  const drop=g('fStDrop');
+  const drop=document.getElementById('fStDrop');
   if(!drop)return;
   drop.style.display=drop.style.display==='none'?'block':'none';
 }
@@ -887,7 +900,7 @@ function toggleStFilter(chk){
 }
 
 function updateStLbl(){
-  const lbl=g('fStLbl');
+  const lbl=document.getElementById('fStLbl');
   if(!lbl)return;
   if(!S.stFilter.length){lbl.textContent='Todos';return;}
   const map={'em aberto':'Em aberto','vence hoje':'Vence hoje','vencida':'Vencida','pago':'Pago'};
@@ -895,7 +908,7 @@ function updateStLbl(){
 }
 
 document.addEventListener('click',function(ev){
-  const drop=g('fStDrop'),btn=g('fStBtn');
+  const drop=document.getElementById('fStDrop'),btn=document.getElementById('fStBtn');
   if(!drop||drop.style.display==='none')return;
   if(drop.contains(ev.target)||(btn&&btn.contains(ev.target)))return;
   drop.style.display='none';
@@ -929,8 +942,9 @@ function rtable(){
   const stC={'pago':'sp','vencida':'sv','em aberto':'sa','vence hoje':'sh'};
   const stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
   if(!rows.length){
-    document.getElementById('tBody').innerHTML='<tr><td colspan="12" style="padding:3rem;text-align:center;color:#C8A882;font-size:.875rem">Nenhum registro encontrado</td></tr>';
-    rpg();return;
+    document.getElementById('tBody').innerHTML='<tr><td colspan="13" style="padding:3rem;text-align:center;color:#C8A882;font-size:.875rem">Nenhum registro encontrado</td></tr>';
+    const allChk=document.getElementById('selAllChk');if(allChk)allChk.checked=false;
+    rpg();updateSelBar();return;
   }
   document.getElementById('tBody').innerHTML=rows.map((r,i)=>{
     const isNew=r._id===S.lastId;
@@ -938,6 +952,7 @@ function rtable(){
     const borderLeft=isNew?'border-left:3px solid #9B6B50;':''
     const sc=stC[r.st]||'sa',sl=stL[r.st]||r.st;
     return '<tr title="'+(isNew?'Último lançamento':'')+'" style="border-bottom:1px solid #F2EAE0;background:'+bg+';'+borderLeft+'" onmouseover="this.style.background=\'#F5EFE6\'" onmouseout="this.style.background=\''+bg+'\'">'+
+      '<td style="padding:.625rem .6rem;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" '+(S.selIds.has(r._id)?'checked':'')+' onchange="toggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;font-weight:600;color:#2C1810;white-space:nowrap">'+xe(r.lo)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.8rem;color:#5C3D2E;white-space:nowrap">'+xe(r.fo)+'</td>'+
       '<td style="padding:.625rem 1rem;font-size:.75rem;color:#7A4F3A;font-family:monospace">'+xe(r.nn)+'</td>'+
@@ -955,7 +970,9 @@ function rtable(){
         '<button onclick="delRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td></tr>';
   }).join('');
-  rpg();
+  const allChk=document.getElementById('selAllChk');
+  if(allChk)allChk.checked=rows.length>0&&rows.every(r=>S.selIds.has(r._id));
+  rpg();updateSelBar();
 }
 
 function rpg(){
@@ -970,6 +987,62 @@ function rpg(){
 }
 
 function goPg(p){S.pg=Math.max(1,Math.min(p,Math.ceil(S.filt.length/S.pp)));rtable();window.scrollTo({top:0,behavior:'smooth'});}
+
+// ============================================================
+// SELEÇÃO MÚLTIPLA — soma MKT/Produto/Serviço e baixa em lote
+// ============================================================
+function toggleSelRow(id,checked){
+  if(checked)S.selIds.add(id);else S.selIds.delete(id);
+  const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
+  const allChk=document.getElementById('selAllChk');
+  if(allChk)allChk.checked=rows.length>0&&rows.every(r=>S.selIds.has(r._id));
+  updateSelBar();
+}
+
+function toggleSelAll(checked){
+  const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
+  rows.forEach(r=>{if(checked)S.selIds.add(r._id);else S.selIds.delete(r._id);});
+  rtable();
+}
+
+function clearSel(){
+  S.selIds.clear();
+  rtable();
+}
+
+function updateSelBar(){
+  const bar=document.getElementById('selBar');
+  if(!bar)return;
+  const sel=S.recs.filter(r=>S.selIds.has(r._id));
+  if(!sel.length){bar.style.display='none';return;}
+  const mk=sel.reduce((s,r)=>s+(r.mk||0),0);
+  const pr=sel.reduce((s,r)=>s+(r.pr||0),0);
+  const sv=sel.reduce((s,r)=>s+(r.sv||0),0);
+  bar.style.display='flex';
+  document.getElementById('selCount').textContent=sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'');
+  document.getElementById('selSums').innerHTML='MKT: <strong>'+fBRL(mk)+'</strong> · Produto: <strong>'+fBRL(pr)+'</strong> · Serviço: <strong>'+fBRL(sv)+'</strong> · Soma total: <strong>'+fBRL(mk+pr+sv)+'</strong>';
+}
+
+async function bulkMarkPaid(){
+  const sel=S.recs.filter(r=>S.selIds.has(r._id));
+  if(!sel.length)return;
+  const pend=sel.filter(r=>r.st!=='pago');
+  if(!pend.length){toast('Os lançamentos selecionados já estão pagos.','warn');return;}
+  if(!confirm('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)? A data de pagamento será definida como hoje.'))return;
+  const today=toISO(new Date());
+  let okCount=0;
+  for(const rec of pend){
+    const i=S.recs.findIndex(x=>x._id===rec._id);
+    if(i<0)continue;
+    S.recs[i]={...S.recs[i],st:'pago',dp:today};
+    const ok=await push2Sheets(S.recs[i],S.recs[i]._id);
+    if(ok)okCount++;
+  }
+  svData();
+  S.selIds.clear();
+  applyF();
+  toast(okCount+' de '+pend.length+' lançamento(s) marcado(s) como pago ✓'+(okCount<pend.length?' (alguns sem sincronizar)':''));
+}
 
 // ============================================================
 // CRUD
@@ -1017,7 +1090,7 @@ async function delRec(id){
   if(!confirm('Excluir este registro? Ele será movido para a aba "Excluídos" no Google Sheets.'))return;
   const rec=S.recs.find(x=>x._id===id);
   if(!rec)return;
-  S.recs=S.recs.filter(x=>x._id!==id);svData();applyF();
+  S.recs=S.recs.filter(x=>x._id!==id);S.selIds.delete(id);svData();applyF();
   if(S.url&&rec._id&&rec._id<1000000){
     try{
       const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
