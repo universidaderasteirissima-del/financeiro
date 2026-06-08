@@ -37,9 +37,10 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
-    if (action === 'add')    return respond(addRow(body.row));
-    if (action === 'update') return respond(updateRow(body.rowIndex, body.row));
-    if (action === 'delete') return respond(deleteRow(body.rowIndex));
+    if (action === 'add')     return respond(addRow(body.row, body.pcts));
+    if (action === 'update')  return respond(updateRow(body.rowIndex, body.row, body.pcts));
+    if (action === 'delete')  return respond(deleteRow(body.rowIndex));
+    if (action === 'archive') return respond(archiveRow(body.rowIndex));
     return respond({ error: 'Ação desconhecida: ' + action });
   } catch (err) {
     return respond({ error: err.message });
@@ -102,25 +103,71 @@ const COR_SISTEMA = '#FFF5E0';
 // ============================================================
 // addRow: adiciona uma nova linha no final com cor bege
 // ============================================================
-function addRow(rowData) {
+function addRow(rowData, pcts) {
   const sheet = getSheet();
   const lastRow = sheet.getLastRow();
-  const range = sheet.getRange(lastRow + 1, 1, 1, rowData.length);
+  const rowIndex = lastRow + 1;
+  const range = sheet.getRange(rowIndex, 1, 1, rowData.length);
   range.setValues([rowData]);
   range.setBackground(COR_SISTEMA);
-  return { success: true, rowIndex: lastRow + 1, message: 'Linha adicionada com sucesso.' };
+  if (pcts) applyPercentFormulas(sheet, rowIndex, pcts);
+  return { success: true, rowIndex: rowIndex, message: 'Linha adicionada com sucesso.' };
 }
 
 // ============================================================
 // updateRow: atualiza uma linha existente e mantém a cor bege
 // ============================================================
-function updateRow(rowIndex, rowData) {
+function updateRow(rowIndex, rowData, pcts) {
   const sheet = getSheet();
   if (!rowIndex || rowIndex < 2) throw new Error('rowIndex inválido: ' + rowIndex);
   const range = sheet.getRange(rowIndex, 1, 1, rowData.length);
   range.setValues([rowData]);
   range.setBackground(COR_SISTEMA);
+  if (pcts) applyPercentFormulas(sheet, rowIndex, pcts);
   return { success: true, message: 'Linha ' + rowIndex + ' atualizada.' };
+}
+
+// ============================================================
+// applyPercentFormulas: escreve fórmulas (ex: =F123*3/100) nas
+// células de MKT/Produto/Serviço, referenciando a célula do
+// "Valor da nota fiscal" da própria linha. Assim a planilha
+// mostra o valor em R$ E a fórmula/porcentagem usada no cálculo.
+// ============================================================
+function colToLetter(col) {
+  let letter = '';
+  while (col > 0) {
+    const rem = (col - 1) % 26;
+    letter = String.fromCharCode(65 + rem) + letter;
+    col = Math.floor((col - 1) / 26);
+  }
+  return letter;
+}
+
+function applyPercentFormulas(sheet, rowIndex, pcts) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const findCol = (patterns) => {
+    for (const p of patterns) {
+      for (let i = 0; i < headers.length; i++) {
+        const h = String(headers[i] || '').trim().toLowerCase();
+        if (h.indexOf(p) !== -1) return i + 1;
+      }
+    }
+    return 0;
+  };
+  const valCol = findCol(['valor_da_nota', 'valor da nota', 'valor nf', 'valor']);
+  if (!valCol) return;
+  const valRef = colToLetter(valCol) + rowIndex;
+
+  const targets = [
+    { col: findCol(['mkt']), pct: pcts.mkt },
+    { col: findCol(['produto']), pct: pcts.produto },
+    { col: findCol(['serviço', 'servico']), pct: pcts.servico }
+  ];
+  targets.forEach(function(t) {
+    if (t.col && t.pct) {
+      sheet.getRange(rowIndex, t.col).setFormula('=' + valRef + '*' + t.pct + '/100');
+    }
+  });
 }
 
 // ============================================================
@@ -131,6 +178,43 @@ function deleteRow(rowIndex) {
   if (!rowIndex || rowIndex < 2) throw new Error('rowIndex inválido: ' + rowIndex);
   sheet.deleteRow(rowIndex);
   return { success: true, message: 'Linha ' + rowIndex + ' excluída.' };
+}
+
+// ============================================================
+// EXCLUÍDOS — arquiva linha antes de deletar
+// ============================================================
+const DELETED_SHEET_NAME = 'Excluídos';
+
+function getOrCreateDeletedSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName(DELETED_SHEET_NAME);
+  if (!sheet) {
+    const mainSheet = getSheet();
+    const headers = mainSheet.getRange(1, 1, 1, mainSheet.getLastColumn()).getValues()[0];
+    sheet = ss.insertSheet(DELETED_SHEET_NAME);
+    const fullHeaders = headers.concat(['Data de Exclusão']);
+    sheet.getRange(1, 1, 1, fullHeaders.length).setValues([fullHeaders]);
+    sheet.getRange(1, 1, 1, fullHeaders.length).setFontWeight('bold').setBackground('#F8D7DA');
+    sheet.setTabColor('#cc0000');
+  }
+  return sheet;
+}
+
+function archiveRow(rowIndex) {
+  const sheet = getSheet();
+  if (!rowIndex || rowIndex < 2) throw new Error('rowIndex inválido: ' + rowIndex);
+
+  const lastCol = sheet.getLastColumn();
+  const rowData = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+
+  const deletedSheet = getOrCreateDeletedSheet();
+  const timestamp = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'dd/MM/yyyy HH:mm');
+  const archiveData = rowData.concat([timestamp]);
+
+  deletedSheet.getRange(deletedSheet.getLastRow() + 1, 1, 1, archiveData.length).setValues([archiveData]);
+  sheet.deleteRow(rowIndex);
+
+  return { success: true, message: 'Arquivado em "Excluídos".' };
 }
 
 // ============================================================

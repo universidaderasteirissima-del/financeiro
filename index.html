@@ -127,6 +127,9 @@ th:hover{background:#EAD9C8!important}
       <button onclick="openBoleto()" class="btn-primary" style="display:flex;align-items:center;gap:.5rem">
         <span style="font-size:.9rem">+</span> Adicionar Boleto
       </button>
+      <button onclick="openNF()" class="btn-primary" style="display:flex;align-items:center;gap:.5rem;background:#7A4F3A">
+        <span style="font-size:.9rem">+</span> Nota Fiscal
+      </button>
       <button onclick="openAdd()" class="btn-accent" style="display:flex;align-items:center;gap:.5rem">
         <span>+</span> Nova Conta
       </button>
@@ -343,7 +346,7 @@ th:hover{background:#EAD9C8!important}
       <input type="hidden" id="rf_id" />
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div><label class="lbl">Loja *</label><select id="rf_lo" required class="sel"><option value="">Selecione</option></select></div>
-        <div><label class="lbl">Fornecedor *</label><select id="rf_fo" required class="sel"><option value="">Selecione</option></select></div>
+        <div><label class="lbl">Fornecedor *</label><select id="rf_fo" required class="sel" onchange="calcRecSplit()"><option value="">Selecione</option></select></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div><label class="lbl">Nº da Nota</label><input type="text" id="rf_nn" class="inp" /></div>
@@ -351,7 +354,7 @@ th:hover{background:#EAD9C8!important}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div><label class="lbl">Data de Vencimento *</label><input type="date" id="rf_dv" required class="inp" /></div>
-        <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="rf_vn" required class="inp" /></div>
+        <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="rf_vn" required class="inp" oninput="calcRecSplit()" /></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
         <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="rf_mk" value="0" class="inp" /></div>
@@ -535,6 +538,81 @@ th:hover{background:#EAD9C8!important}
   </div>
 </div>
 
+<!-- ===== MODAL: NOTA FISCAL ===== -->
+<div id="mNF" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" id="mNFBox" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Adicionar Nota Fiscal</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de DANFE (PDF)</p>
+      </div>
+      <button onclick="cm('mNF')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Step 1 -->
+    <div id="nfS1">
+      <div onclick="document.getElementById('nfPDF').click()" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.3rem">📄</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF da Nota Fiscal</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="nfPDFNm">Nenhum arquivo selecionado</p>
+      </div>
+      <input type="file" id="nfPDF" accept=".pdf" style="display:none" onchange="document.getElementById('nfPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button onclick="cm('mNF')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="parseNF()" class="btn-primary" style="flex:2">Analisar NF →</button>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div id="nfS2" style="display:none">
+      <div id="nfLayout" style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="nfPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="nfViewerMsg">Nenhum PDF carregado</p>
+          </div>
+        </div>
+        <!-- RIGHT: Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <p style="font-size:.7rem;color:#7A4F3A" id="nfInf"></p>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Loja *</label><select id="nfLO" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Fornecedor *</label><select id="nfFO" class="sel" style="font-size:.8rem" onchange="calcFornSplitNF()"><option value="">Selecione</option></select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Nº da NF *</label><input type="text" id="nfNN" class="inp" style="font-size:.8rem" placeholder="2590" /></div>
+                <div><label class="lbl">Data de Emissão</label><input type="date" id="nfDE" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Valor Total (R$) *</label><input type="number" step="0.01" id="nfVN" class="inp" style="font-size:.8rem" oninput="calcFornSplitNF();nfCalcValues()" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="nfMK" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="nfPR" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="nfSV" value="0" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <div style="border:1.5px solid var(--border);border-radius:3px;padding:.65rem">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+                  <label class="lbl" style="margin:0">Vencimentos *</label>
+                  <button onclick="nfAddVenc()" class="btn-accent" style="padding:.25rem .6rem;font-size:.72rem">+ Vencimento</button>
+                </div>
+                <div id="nfVencs"></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="nfSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="confirmNF()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamentos</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="tst" style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:20000;display:none;pointer-events:none">
   <div id="tstMsg" style="font-size:.8rem;padding:.7rem 1.1rem;border-radius:3px;box-shadow:0 8px 24px rgba(44,24,16,.25);max-width:280px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600"></div>
@@ -666,7 +744,9 @@ async function push2Sheets(rec,rowIdx){
   if(!S.url)return false;
   try{
     const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv,rec.url||''];
-    await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row})});
+    const fd=S.fornData[rec.fo]||{};
+    const pcts={mkt:fd.mkt||null,produto:fd.produto||null,servico:fd.servico||null};
+    await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row,pcts})});
     return true;
   }catch(e){return false;}
 }
@@ -710,8 +790,8 @@ function bldFilters(){
   fo.innerHTML='<option value="">Todos</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===curf?' selected':'')+'>'+xe(v)+'</option>').join('');
 }
 function bldSels(){
-  ['rf_lo','bf_lo'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
-  ['rf_fo','bf_fo'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
+  ['rf_lo','bf_lo','nfLO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
+  ['rf_fo','bf_fo','nfFO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
 }
 
 function setPeriod(preset){
@@ -884,9 +964,18 @@ async function saveRec(){
   toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
 async function delRec(id){
-  if(!confirm('Excluir este registro?'))return;
+  if(!confirm('Excluir este registro? Ele será movido para a aba "Excluídos" no Google Sheets.'))return;
   const rec=S.recs.find(x=>x._id===id);
-  S.recs=S.recs.filter(x=>x._id!==id);svData();applyF();toast('Excluído!');
+  if(!rec)return;
+  S.recs=S.recs.filter(x=>x._id!==id);svData();applyF();
+  if(S.url&&rec._id&&rec._id<1000000){
+    try{
+      const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
+      const j=await res.json();
+      if(j.error)toast('Excluído localmente. Erro ao arquivar: '+j.error,'warn');
+      else toast('Excluído e arquivado ✓');
+    }catch(e){toast('Excluído localmente (sem conexão)','warn');}
+  }else{toast('Excluído!');}
   if(rec&&rec.url)deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
 }
 
@@ -1598,15 +1687,32 @@ function fPct(v){return v?'<strong>'+parseFloat(v).toFixed(2).replace('.',',')+'
 // ============================================================
 // AUTO-CALCULATE SPLIT IN BOLETO FORM
 // ============================================================
+function fornPctVals(fo,vn){
+  const d=S.fornData[fo];
+  if(!d||!vn)return null;
+  return{
+    mk:d.mkt?(vn*d.mkt/100):null,
+    pr:d.produto?(vn*d.produto/100):null,
+    sv:d.servico?(vn*d.servico/100):null
+  };
+}
 function calcFornSplit(){
   const fo=document.getElementById('bf_fo').value;
   const vn=parseFloat(document.getElementById('bf_vn').value)||0;
-  if(!fo||!vn)return;
-  const d=S.fornData[fo];
-  if(!d)return;
-  if(d.mkt)document.getElementById('bf_mk').value=((vn*(d.mkt||0))/100).toFixed(2);
-  if(d.produto)document.getElementById('bf_pr').value=((vn*(d.produto||0))/100).toFixed(2);
-  if(d.servico)document.getElementById('bf_sv').value=((vn*(d.servico||0))/100).toFixed(2);
+  const s=fo?fornPctVals(fo,vn):null;
+  if(!s)return;
+  if(s.mk!=null)document.getElementById('bf_mk').value=s.mk.toFixed(2);
+  if(s.pr!=null)document.getElementById('bf_pr').value=s.pr.toFixed(2);
+  if(s.sv!=null)document.getElementById('bf_sv').value=s.sv.toFixed(2);
+}
+function calcRecSplit(){
+  const fo=document.getElementById('rf_fo').value;
+  const vn=parseFloat(document.getElementById('rf_vn').value)||0;
+  const s=fo?fornPctVals(fo,vn):null;
+  if(!s)return;
+  if(s.mk!=null)document.getElementById('rf_mk').value=s.mk.toFixed(2);
+  if(s.pr!=null)document.getElementById('rf_pr').value=s.pr.toFixed(2);
+  if(s.sv!=null)document.getElementById('rf_sv').value=s.sv.toFixed(2);
 }
 
 // ============================================================
@@ -1963,6 +2069,240 @@ async function deletePDFFromGitHub(rawUrl){
       body:JSON.stringify({message:'Excluir boleto: '+filePath,sha:sha})});
     toast('PDF excluído do GitHub','ok');
   }catch(e){console.warn('deletePDF:',e);}
+}
+
+// ============================================================
+// NOTA FISCAL
+// ============================================================
+let nfPdfTxt='',nfPdfDoc=null;
+
+function openNF(){
+  nfPdfTxt='';nfPdfDoc=null;
+  document.getElementById('nfPDF').value='';
+  document.getElementById('nfPDFNm').textContent='Nenhum arquivo selecionado';
+  document.getElementById('nfVencs').innerHTML='';
+  document.getElementById('nfMK').value='0';
+  document.getElementById('nfPR').value='0';
+  document.getElementById('nfSV').value='0';
+  nfAddVenc();
+  nfSt(1);
+  var m=document.getElementById('mNF');document.body.appendChild(m);m.style.display='flex';
+}
+
+function nfSt(n){
+  document.getElementById('nfS1').style.display=n===1?'block':'none';
+  document.getElementById('nfS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mNFBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&nfPdfDoc)setTimeout(function(){renderNFPDF(nfPdfDoc).catch(function(){});},120);
+}
+
+async function renderNFPDF(pdfDoc){
+  var viewer=document.getElementById('nfPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('nfViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=Math.min(1080/nat.width,3.0);
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';canvas.style.display='block';
+    canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+}
+
+function extractNFData(txt){
+  const prs={};
+  const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ');
+
+  // NF Number — "Nº 2590" ou "Nº: 2590"
+  let m=txt.match(/N[º°o][\s.:]*(\d{2,6})(?!\d)/i)||txt.match(/NF[- e]*N[º°o]\s*(\d+)/i);
+  if(m)prs.nn=m[1];
+
+  // Emission date
+  m=txt.match(/[Ee]miss[aã]o\s+(\d{2}\/\d{2}\/\d{4})/)||txt.match(/EMISS[ÃA]O[\s\S]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
+  if(m)prs.de=br2iso(m[1]);
+
+  // Total value
+  m=txt.match(/VALOR TOTAL DA NOTA\s+([\d.,]+)/i)||txt.match(/Valor total[:\s]+([\d.,]+)/i)||txt.match(/VALOR TOTAL[:\s]+([\d.,]+)/i);
+  if(m)prs.vn=tof(m[1]);
+
+  // Fornecedor — compara com lista cadastrada
+  for(const fo of S.forns){
+    const foN=norm(fo).trim();
+    if(foN.length>2&&norm(txt).includes(foN)){prs.fo=fo;break;}
+  }
+
+  // Loja — por CEP (todos os CEPs no texto, procura match na tabela)
+  const allCeps=txt.match(/\d{5}[-.]?\d{3}/g)||[];
+  for(const c of allCeps){
+    const digits=c.replace(/\D/g,'');
+    if(LOJA_CEP[digits]){prs.lo=LOJA_CEP[digits];break;}
+  }
+  if(!prs.lo){
+    for(const loja of S.lojas){
+      if(norm(loja).trim().length>3&&norm(txt).includes(norm(loja).trim())){prs.lo=loja;break;}
+    }
+  }
+
+  // Vencimentos — seção Informações Adicionais
+  const addIdx=txt.search(/INFORMA[ÇC][ÕO]ES ADICIONAIS/i);
+  if(addIdx>=0){
+    const section=txt.substring(addIdx,addIdx+600);
+    const dates=section.match(/\d{2}\/\d{2}\/\d{4}/g);
+    if(dates&&dates.length)prs.vencimentos=dates.map(d=>br2iso(d));
+  }
+
+  return prs;
+}
+
+function calcFornSplitNF(){
+  const fo=document.getElementById('nfFO').value;
+  const vn=parseFloat(document.getElementById('nfVN').value)||0;
+  const s=fo?fornPctVals(fo,vn):null;
+  if(s){
+    if(s.mk!=null)document.getElementById('nfMK').value=s.mk.toFixed(2);
+    if(s.pr!=null)document.getElementById('nfPR').value=s.pr.toFixed(2);
+    if(s.sv!=null)document.getElementById('nfSV').value=s.sv.toFixed(2);
+  }
+  nfCalcValues();
+}
+
+async function parseNF(){
+  const file=document.getElementById('nfPDF').files[0];
+  if(file){
+    try{
+      toast('Lendo PDF...','info');
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      nfPdfDoc=doc;
+      let txt='';
+      for(let i=1;i<=doc.numPages;i++){
+        const pg=await doc.getPage(i);
+        const tc=await pg.getTextContent();
+        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+      }
+      nfPdfTxt=txt;
+    }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
+  }
+
+  const prs=extractNFData(nfPdfTxt||'');
+
+  // Preenche campos
+  document.getElementById('nfNN').value=prs.nn||'';
+  document.getElementById('nfDE').value=prs.de||'';
+  document.getElementById('nfVN').value=prs.vn||'';
+  document.getElementById('nfMK').value='0';
+  document.getElementById('nfPR').value='0';
+  document.getElementById('nfSV').value='0';
+  if(prs.fo){const el=document.getElementById('nfFO');if(el)el.value=prs.fo;}
+  if(prs.lo){const el=document.getElementById('nfLO');if(el)el.value=prs.lo;}
+
+  // Auto-calcula split do fornecedor
+  if(prs.fo&&prs.vn)calcFornSplitNF();
+
+  // Vencimentos
+  document.getElementById('nfVencs').innerHTML='';
+  if(prs.vencimentos&&prs.vencimentos.length>0){
+    prs.vencimentos.forEach(()=>nfAddVenc());
+    document.querySelectorAll('.nf-venc-date').forEach((el,i)=>{if(prs.vencimentos[i])el.value=prs.vencimentos[i];});
+  }else{
+    nfAddVenc();
+  }
+  nfCalcValues();
+
+  // Info bar
+  const parts=[];
+  if(prs.fo)parts.push(prs.fo);
+  if(prs.lo)parts.push(prs.lo);
+  if(prs.vn)parts.push('R$ '+prs.vn.toFixed(2).replace('.',','));
+  if(prs.de)parts.push('Emissão: '+fDt(prs.de));
+  document.getElementById('nfInf').textContent=parts.join(' | ');
+
+  nfSt(2);
+}
+
+function nfAddVenc(){
+  const container=document.getElementById('nfVencs');
+  const div=document.createElement('div');
+  div.style.cssText='display:flex;gap:.5rem;align-items:center;margin-bottom:.45rem';
+  div.innerHTML='<span style="font-size:.7rem;font-weight:700;color:#9B6B50;min-width:18px;flex-shrink:0" class="nf-venc-num"></span>'
+    +'<input type="date" class="inp nf-venc-date" style="flex:1;font-size:.8rem" oninput="nfCalcValues()" />'
+    +'<input type="text" class="inp nf-venc-val" placeholder="R$" style="width:100px;font-size:.8rem" />'
+    +'<button onclick="this.parentNode.remove();nfCalcValues();nfNumVencs()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:2px;background:#FAF7F4;cursor:pointer;color:#7A4F3A;font-weight:700;font-size:.9rem;flex-shrink:0">×</button>';
+  container.appendChild(div);
+  nfCalcValues();nfNumVencs();
+}
+
+function nfNumVencs(){
+  document.querySelectorAll('#nfVencs .nf-venc-num').forEach((el,i)=>{el.textContent=(i+1)+'.';});
+}
+
+function nfCalcValues(){
+  const total=parseFloat(document.getElementById('nfVN').value)||0;
+  const rows=document.querySelectorAll('#nfVencs > div');
+  const n=rows.length;
+  if(!n||!total)return;
+  const base=Math.floor(total/n*100)/100;
+  rows.forEach((r,i)=>{
+    const v=i===n-1?Math.round((total-base*(n-1))*100)/100:base;
+    r.querySelector('.nf-venc-val').value=v.toFixed(2).replace('.',',');
+  });
+  nfNumVencs();
+}
+
+async function confirmNF(){
+  const nn=document.getElementById('nfNN').value.trim();
+  const fo=document.getElementById('nfFO').value;
+  const lo=document.getElementById('nfLO').value;
+  const de=document.getElementById('nfDE').value;
+  const totalVN=parseFloat(document.getElementById('nfVN').value)||0;
+  const totalMK=parseFloat(document.getElementById('nfMK').value)||0;
+  const totalPR=parseFloat(document.getElementById('nfPR').value)||0;
+  const totalSV=parseFloat(document.getElementById('nfSV').value)||0;
+
+  if(!lo){toast('Selecione a Loja','warn');return;}
+  if(!fo){toast('Selecione o Fornecedor','warn');return;}
+  if(!nn){toast('Informe o número da NF','warn');return;}
+
+  const rows=document.querySelectorAll('#nfVencs > div');
+  if(!rows.length){toast('Adicione ao menos um vencimento','warn');return;}
+
+  const vencs=[];let valid=true;
+  rows.forEach(r=>{
+    const dv=r.querySelector('.nf-venc-date').value;
+    const val=parseFloat((r.querySelector('.nf-venc-val').value||'0').replace(',','.'));
+    if(!dv){toast('Preencha todas as datas de vencimento','warn');valid=false;return;}
+    vencs.push({dv,vn:val});
+  });
+  if(!valid)return;
+
+  const n=vencs.length;
+  for(let i=0;i<n;i++){
+    const suffix=n>1?'-'+(i+1):'';
+    const ratio=totalVN>0?vencs[i].vn/totalVN:1/n;
+    const rec={
+      _id:Date.now()+i,lo,fo,
+      nn:nn+suffix,de,dv:vencs[i].dv,
+      vn:vencs[i].vn,
+      mk:Math.round(totalMK*ratio*100)/100,
+      pr:Math.round(totalPR*ratio*100)/100,
+      sv:Math.round(totalSV*ratio*100)/100,
+      st:'em aberto',dp:'',mv:0,url:''
+    };
+    S.recs.push(rec);
+    S.lastId=rec._id;
+    push2Sheets(rec,null);
+  }
+  svData();applyF();
+  cm('mNF');
+  toast(n+' lançamento'+(n>1?'s':'')+' adicionado'+(n>1?'s':'')+' ✓');
 }
 
 // ============================================================

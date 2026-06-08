@@ -1,0 +1,4 @@
+*.xlsx
+*.json
+data_compact.js
+.claude/
