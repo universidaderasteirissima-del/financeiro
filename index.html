@@ -1076,6 +1076,22 @@ function findLinhasDigitaveis(txt){
   return [...new Set(results)];
 }
 
+// expandParcelas: quando a FATURA/DUPLICATA tem mais de 1 vencimento,
+// transforma o resultado em N entradas na fila (uma por parcela), cada
+// uma com seu vencimento/valor e o número da nota com sufixo -1, -2, -3...
+function expandParcelas(prs,raw){
+  const baseNN=prs.nfeBase||prs.nn||'';
+  return prs.parcelas.map(function(p,i){
+    const clone=Object.assign({},prs);
+    delete clone.parcelas;delete clone.nfeBase;
+    clone.dv=p.dv;clone.vn=p.vn;
+    clone.nn=baseNN?(baseNN+'-'+(i+1)):(p.nn||clone.nn);
+    clone.parcel=i+1;
+    clone._raw=raw;
+    return clone;
+  });
+}
+
 function parseBol(){
   const manualLinha=document.getElementById('bLi').value.trim();
 
@@ -1089,9 +1105,17 @@ function parseBol(){
       const linhas=findLinhasDigitaveis(pageTxt);
       const linha=linhas.length?linhas[0]:(p===0?manualLinha.replace(/[\s.]/g,''):'');
       const prs=extractBoletoData(pageTxt,linha);
-      prs._raw=pageTxt.substring(0,2000); // debug
-      // Add page if has boleto data OR a detected barcode
-      if(prs.dv||prs.vn||(prs.nn&&prs.nn.length>0)||linhas.length>0){
+      prs._page=p+1;
+      const raw=pageTxt.substring(0,2000); // debug
+      if(prs.parcelas&&prs.parcelas.length>1){
+        S.boletoQueue.push.apply(S.boletoQueue,expandParcelas(prs,raw));
+        continue;
+      }
+      prs._raw=raw;
+      // Add page only if it has a due date, document number or barcode —
+      // a lone "vn" isn't enough evidence (avoids false positives from stray
+      // "R$ x,xx" mentions in product/body text on pages without a vencimento)
+      if(prs.dv||(prs.nn&&prs.nn.length>0)||linhas.length>0){
         S.boletoQueue.push(prs);
       }
     }
@@ -1101,8 +1125,13 @@ function parseBol(){
   if(S.boletoQueue.length===0){
     const cl=manualLinha.replace(/[\s.]/g,'');
     const prs=extractBoletoData(S.pdfTxt||'',cl);
-    prs._raw=(S.pdfTxt||'').substring(0,2000);
-    S.boletoQueue.push(prs);
+    const raw=(S.pdfTxt||'').substring(0,2000);
+    if(prs.parcelas&&prs.parcelas.length>1){
+      S.boletoQueue.push.apply(S.boletoQueue,expandParcelas(prs,raw));
+    }else{
+      prs._raw=raw;
+      S.boletoQueue.push(prs);
+    }
   }
 
   if(S.boletoQueue.length===0){toast('Não foi possível extrair dados. Preencha manualmente.','warn');bSt(2);return;}
@@ -1122,8 +1151,9 @@ function showQueueItem(idx){
   const badge=document.getElementById('bQueueBadge');
   if(total>1){badge.style.display='inline-block';badge.textContent='Boleto '+(idx+1)+' de '+total;}
   else badge.style.display='none';
-  // Highlight corresponding PDF page
-  if(S.pdfPages&&S.pdfPages.length>1)highlightPage(idx+1);
+  // Highlight corresponding PDF page (use the page the data was extracted from,
+  // since multiple parcelas/vencimentos can come from the same page)
+  if(S.pdfPages&&S.pdfPages.length>1)highlightPage(prs._page||(idx+1));
   else highlightPage(1);
 
   // Build info string
@@ -1203,6 +1233,35 @@ function findDocNumber(txt,bk){
   return null;
 }
 
+// FATURA/DUPLICATA — DANFE/NF-e style table listing one or more
+// vencimentos (ex: "NÚMERO 001 VENCTO 02/07/2026 VALOR 894,40").
+// This is checked as the DEFAULT location for vencimentos in boletos,
+// since some suppliers send the NF/DANFE itself as the payment document.
+function extractFaturaParcelas(txt){
+  var nt=norm(txt);
+  var out=[];
+  var re=/NUMERO[\s\S]{0,6}?(\d{2,4})[\s\S]{0,10}?VENCTO[\s\S]{0,6}?(\d{2}\/\d{2}\/\d{4})[\s\S]{0,10}?VALOR[\s\S]{0,6}?(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  var m;
+  while((m=re.exec(nt))!==null){
+    out.push({nn:m[1],dv:br2iso(m[2]),vn:parseFloat(m[3].replace(/\./g,'').replace(',','.')).toFixed(2)});
+  }
+  return out;
+}
+
+// extractNFeNumber: pega o número da NF-e (ex: "NF-e Nº: 000009232" -> "9232")
+function extractNFeNumber(txt){
+  var idx=txt.indexOf('NF-e');
+  if(idx<0)idx=txt.indexOf('NFe');
+  if(idx<0)return null;
+  var win=txt.substring(idx,idx+60);
+  var m=win.match(/(\d{6,9})/);
+  if(m){
+    var n=parseInt(m[1],10);
+    if(n>0)return String(n);
+  }
+  return null;
+}
+
 // ============================================================
 // BOLETO DATA EXTRACTOR — multi-bank robust version
 // ============================================================
@@ -1226,7 +1285,22 @@ function extractBoletoData(txt,barcode){
   else if(cl.length===48){const vid=cl[2];if('6789'.includes(vid)){const amt=parseFloat(cl.substring(4,15))/100;if(amt>0)prs.vn=amt.toFixed(2);}}
   if(!txt)return prs;
 
-  // DUE DATE
+  // FATURA/DUPLICATA — local padrão (default) para verificar vencimentos.
+  // Documentos no formato DANFE/NF-e trazem uma tabela "FATURA/DUPLICATA"
+  // com NÚMERO/VENCTO/VALOR — pode ter 1 ou várias parcelas (vencimentos).
+  var parcelas=extractFaturaParcelas(txt);
+  if(parcelas.length===1){
+    prs.dv=parcelas[0].dv;
+    prs.vn=prs.vn||parcelas[0].vn;
+  }else if(parcelas.length>1){
+    prs.parcelas=parcelas;
+    prs.dv=parcelas[0].dv;
+    prs.vn=prs.vn||parcelas[0].vn;
+    var nfeBase=extractNFeNumber(txt);
+    if(nfeBase)prs.nfeBase=nfeBase;
+  }
+
+  // DUE DATE — padrões genéricos (usados se FATURA/DUPLICATA não for encontrada)
   const dvPat=[
     /PAGAVEL\s+PREFERENCIALMENTE\s+NO\s+SICOOB[\s\S]{0,100}?(\d{2}\/\d{2}\/\d{4})/i, // Sicoob: date after PAGAVEL text
     /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date
@@ -1234,7 +1308,9 @@ function extractBoletoData(txt,barcode){
     /[Vv]encimento\s+(\d{1,2}\/\d{1,2}\/\d{4})/,                          // tight adjacent
     /[Vv]encimento[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/,                   // broad window 500
   ];
-  for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
+  if(!prs.dv){
+    for(const p of dvPat){const m=txt.match(p);if(m){prs.dv=br2iso(m[m.length-1]);break;}}
+  }
 
   // EMISSION DATE — 'Data de Emissao' FIRST (Sicoob) to avoid capturing vencimento
   // 'Data do Documento' is a generic header that may appear near wrong dates
@@ -1249,18 +1325,22 @@ function extractBoletoData(txt,barcode){
   if(prs.de&&prs.dv&&prs.de>prs.dv){var tmp=prs.de;prs.de=prs.dv;prs.dv=tmp;}
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
-  const vnPat=[
-    /[Vv]alor\s+do\s+[Dd]ocumento\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
-    /[Vv]alor\s+do\s+[Dd]ocumento[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*,\d{2})/,
-    /\([=\s]*\)\s*[Vv]alor\s+[Cc]obra[dt]o[\s\S]{0,200}?(\d{1,3}(?:\.\d{3})*,\d{2})/i,
-    /R\$\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
-    /(\d{1,3}(?:\.\d{3})+,\d{2})/,
-  ];
-  for(const p of vnPat){
-    const m=txt.match(p);if(!m)continue;
-    const raw=m[m.length-1];
-    const v=parseFloat(raw.replace(/\./g,'').replace(',','.'));
-    if(v>0&&v<999999){prs.vn=v.toFixed(2);break;}
+  // Pulado se a FATURA/DUPLICATA já definiu o valor (evita pegar valores
+  // soltos no corpo do documento, ex: "Valor da Parcela Importada R$ 6,87")
+  if(!parcelas.length){
+    const vnPat=[
+      /[Vv]alor\s+do\s+[Dd]ocumento\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
+      /[Vv]alor\s+do\s+[Dd]ocumento[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*,\d{2})/,
+      /\([=\s]*\)\s*[Vv]alor\s+[Cc]obra[dt]o[\s\S]{0,200}?(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+      /R\$\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
+      /(\d{1,3}(?:\.\d{3})+,\d{2})/,
+    ];
+    for(const p of vnPat){
+      const m=txt.match(p);if(!m)continue;
+      const raw=m[m.length-1];
+      const v=parseFloat(raw.replace(/\./g,'').replace(',','.'));
+      if(v>0&&v<999999){prs.vn=v.toFixed(2);break;}
+    }
   }
 
   // NF / DOCUMENT NUMBER + PARCEL
