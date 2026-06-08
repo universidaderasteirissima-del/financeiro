@@ -150,15 +150,26 @@ th:hover{background:#EAD9C8!important}
           <label class="lbl">Fornecedor</label>
           <select id="fFo" onchange="applyF()" class="sel"></select>
         </div>
-        <div>
+        <div style="position:relative">
           <label class="lbl">Status</label>
-          <select id="fSt" onchange="applyF()" class="sel">
-            <option value="">Todos</option>
-            <option value="em aberto">Em aberto</option>
-            <option value="vence hoje">Vence hoje</option>
-            <option value="vencida">Vencida</option>
-            <option value="pago">Pago</option>
-          </select>
+          <div id="fStBtn" onclick="toggleStDrop(event)" class="sel" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+            <span id="fStLbl">Todos</span>
+            <span style="font-size:.65rem;color:#C8A882">▾</span>
+          </div>
+          <div id="fStDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1.5px solid var(--border);border-radius:3px;box-shadow:0 6px 16px rgba(44,24,16,.12);margin-top:.25rem;padding:.4rem">
+            <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background='#FAF7F4'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" value="em aberto" onchange="toggleStFilter(this)" /> Em aberto
+            </label>
+            <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background='#FAF7F4'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" value="vence hoje" onchange="toggleStFilter(this)" /> Vence hoje
+            </label>
+            <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background='#FAF7F4'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" value="vencida" onchange="toggleStFilter(this)" /> Vencida
+            </label>
+            <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background='#FAF7F4'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" value="pago" onchange="toggleStFilter(this)" /> Pago
+            </label>
+          </div>
         </div>
         <div>
           <label class="lbl">Buscar</label>
@@ -624,9 +635,9 @@ th:hover{background:#EAD9C8!important}
 // ============================================================
 const APP_VER='9'; // bump to force localStorage refresh
 const DEF_URL='https://script.google.com/macros/s/AKfycbyIBXg5bDs0-BBnGsAOXSc1KiRrPvEQCmCtSPjIzStQFhhKZxkkaJDdWHLVs-ddW0pg7w/exec';
-const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
+const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Redenção','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
 // CEP -> Loja (8 digits, no hyphen). Source: user-provided lojas.csv
-const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65904296':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil'};
+const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65904296':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil','68553052':'Redenção'};
 const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DEF_PWD='rasteira2024';
@@ -640,7 +651,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // ============================================================
 // AUTH
@@ -807,7 +818,9 @@ function setPeriod(preset){
     de=toISO(new Date(now.getTime()-30*864e5));
     ate=toISO(now);
   }else if(preset==='vencidas'){
-    document.getElementById('fSt').value='vencida';
+    S.stFilter=['vencida'];
+    document.querySelectorAll('#fStDrop input[type=checkbox]').forEach(c=>{c.checked=(c.value==='vencida');});
+    updateStLbl();
     applyF();return;
   }
   document.getElementById('fDe').value=de;
@@ -816,12 +829,12 @@ function setPeriod(preset){
 }
 
 function applyF(){
-  const flo=g('fLo'),ffo=g('fFo'),fst=g('fSt'),fsq=g('fSq').toLowerCase();
+  const flo=g('fLo'),ffo=g('fFo'),fsq=g('fSq').toLowerCase();
   const fde=g('fDe'),fate=g('fAte');
   S.filt=S.recs.filter(r=>{
     if(flo&&r.lo!==flo)return false;
     if(ffo&&r.fo!==ffo)return false;
-    if(fst&&r.st!==fst)return false;
+    if(S.stFilter.length&&!S.stFilter.includes(r.st))return false;
     if(fsq&&!(r.fo+' '+r.nn+' '+r.lo+' '+r.st).toLowerCase().includes(fsq))return false;
     // Date range filter on dv (due date)
     if(fde&&r.dv&&r.dv<fde)return false;
@@ -846,10 +859,47 @@ function sBy(col){
 }
 
 function clearF(){
-  ['fLo','fFo','fSt','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
+  ['fLo','fFo','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fSq').value='';
+  S.stFilter=[];
+  document.querySelectorAll('#fStDrop input[type=checkbox]').forEach(c=>c.checked=false);
+  updateStLbl();
+  const drop=g('fStDrop');if(drop)drop.style.display='none';
   applyF();
 }
+
+function toggleStDrop(ev){
+  if(ev)ev.stopPropagation();
+  const drop=g('fStDrop');
+  if(!drop)return;
+  drop.style.display=drop.style.display==='none'?'block':'none';
+}
+
+function toggleStFilter(chk){
+  const v=chk.value;
+  if(chk.checked){
+    if(!S.stFilter.includes(v))S.stFilter.push(v);
+  }else{
+    S.stFilter=S.stFilter.filter(x=>x!==v);
+  }
+  updateStLbl();
+  applyF();
+}
+
+function updateStLbl(){
+  const lbl=g('fStLbl');
+  if(!lbl)return;
+  if(!S.stFilter.length){lbl.textContent='Todos';return;}
+  const map={'em aberto':'Em aberto','vence hoje':'Vence hoje','vencida':'Vencida','pago':'Pago'};
+  lbl.textContent=S.stFilter.map(s=>map[s]||s).join(', ');
+}
+
+document.addEventListener('click',function(ev){
+  const drop=g('fStDrop'),btn=g('fStBtn');
+  if(!drop||drop.style.display==='none')return;
+  if(drop.contains(ev.target)||(btn&&btn.contains(ev.target)))return;
+  drop.style.display='none';
+});
 
 // ============================================================
 // RENDER
@@ -2219,11 +2269,23 @@ function extractNFData(txt){
     if(foN.length>2&&norm(txt).includes(foN)){prs.fo=fo;break;}
   }
 
-  // Loja — por CEP (todos os CEPs no texto, procura match na tabela)
-  const allCeps=txt.match(/\d{5}[-.]?\d{3}/g)||[];
-  for(const c of allCeps){
-    const digits=c.replace(/\D/g,'');
-    if(LOJA_CEP[digits]){prs.lo=LOJA_CEP[digits];break;}
+  // Loja — primeiro procura o CEP na seção do Destinatário (endereço > bairro > CEP)
+  const destIdx=txt.search(/DESTINAT[ÁA]RIO/i);
+  if(destIdx>=0){
+    const section=txt.substring(destIdx,destIdx+1500);
+    const cepM=section.match(/BAIRRO[\s\S]{0,80}?CEP[\s:]*?(\d{5}[-.]?\d{3})/i)||section.match(/CEP[\s:]*?(\d{5}[-.]?\d{3})/i);
+    if(cepM){
+      const digits=cepM[1].replace(/\D/g,'');
+      if(LOJA_CEP[digits])prs.lo=LOJA_CEP[digits];
+    }
+  }
+  // Fallback — todos os CEPs no texto, procura match na tabela
+  if(!prs.lo){
+    const allCeps=txt.match(/\d{5}[-.]?\d{3}/g)||[];
+    for(const c of allCeps){
+      const digits=c.replace(/\D/g,'');
+      if(LOJA_CEP[digits]){prs.lo=LOJA_CEP[digits];break;}
+    }
   }
   if(!prs.lo){
     for(const loja of S.lojas){
