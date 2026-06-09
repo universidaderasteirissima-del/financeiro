@@ -2330,9 +2330,13 @@ function extractNFData(txt){
   const prs={};
   const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ');
 
-  // NF Number — "Nº 2590" ou "Nº: 2590"
-  let m=txt.match(/N[º°o][\s.:]*(\d{2,6})(?!\d)/i)||txt.match(/NF[- e]*N[º°o]\s*(\d+)/i);
-  if(m)prs.nn=m[1];
+  // NF Number — primary: "NF-e … 000009232" (strips leading zeros → "9232")
+  const nfeNN=extractNFeNumber(txt);
+  if(nfeNN){prs.nn=nfeNN;}
+  else{
+    const mn=txt.match(/N[º°o][\s.:]*(\d{2,9})(?!\d)/i)||txt.match(/NF[- e]*N[º°o][\s.:]*(\d+)/i);
+    if(mn)prs.nn=String(parseInt(mn[1],10)||mn[1]);
+  }
 
   // Emission date
   m=txt.match(/[Ee]miss[aã]o\s+(\d{2}\/\d{2}\/\d{4})/)||txt.match(/EMISS[ÃA]O[\s\S]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
@@ -2372,12 +2376,18 @@ function extractNFData(txt){
     }
   }
 
-  // Vencimentos — seção Informações Adicionais
-  const addIdx=txt.search(/INFORMA[ÇC][ÕO]ES ADICIONAIS/i);
-  if(addIdx>=0){
-    const section=txt.substring(addIdx,addIdx+600);
-    const dates=section.match(/\d{2}\/\d{2}\/\d{4}/g);
-    if(dates&&dates.length)prs.vencimentos=dates.map(d=>br2iso(d));
+  // Vencimentos — FATURA/DUPLICATA first (DANFE-style), then INFORMAÇÕES ADICIONAIS
+  const parcelas=extractFaturaParcelas(txt);
+  if(parcelas.length>0){
+    prs.vencimentos=parcelas.map(p=>p.dv);
+    prs.parcelaVals=parcelas.map(p=>parseFloat(p.vn));
+  }else{
+    const addIdx=txt.search(/INFORMA[ÇC][ÕO]ES ADICIONAIS/i);
+    if(addIdx>=0){
+      const section=txt.substring(addIdx,addIdx+600);
+      const dates=section.match(/\d{2}\/\d{2}\/\d{4}/g);
+      if(dates&&dates.length)prs.vencimentos=dates.map(d=>br2iso(d));
+    }
   }
 
   return prs;
@@ -2433,10 +2443,15 @@ async function parseNF(){
   if(prs.vencimentos&&prs.vencimentos.length>0){
     prs.vencimentos.forEach(()=>nfAddVenc());
     document.querySelectorAll('.nf-venc-date').forEach((el,i)=>{if(prs.vencimentos[i])el.value=prs.vencimentos[i];});
+    if(prs.parcelaVals&&prs.parcelaVals.length){
+      // use exact per-installment values from FATURA/DUPLICATA table
+      document.querySelectorAll('.nf-venc-val').forEach((el,i)=>{
+        if(prs.parcelaVals[i]!=null)el.value=prs.parcelaVals[i].toFixed(2).replace('.',',');
+      });
+    }else{nfCalcValues();}
   }else{
-    nfAddVenc();
+    nfAddVenc();nfCalcValues();
   }
-  nfCalcValues();
 
   // Info bar
   const parts=[];
