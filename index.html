@@ -965,7 +965,7 @@ function rtable(){
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap"><span style="font-size:.7rem;padding:.25rem .6rem;border-radius:2px" class="'+sc+'">'+sl+'</span></td>'+
       '<td style="padding:.625rem 1rem;font-size:.775rem;color:#9B6B50;white-space:nowrap">'+fDt(r.dp)+'</td>'+
       '<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap">'+
-        (r.url?'<a href="'+r.url+'" target="_blank" style="font-size:.72rem;color:#1E6B3A;font-weight:700;padding:.2rem .5rem;border:1px solid #B8DFC8;border-radius:2px;text-decoration:none" title="Ver PDF">📄 Boleto</a> ':'')+
+        (r.url?'<a href="'+r.url+'" target="_blank" style="font-size:.72rem;color:#1E6B3A;font-weight:700;padding:.2rem .5rem;border:1px solid #B8DFC8;border-radius:2px;text-decoration:none" title="Ver PDF">'+(r.url.includes('/notas-fiscais/')?'📄 NF':'📄 Boleto')+'</a> ':'')+
 '<button onclick="editRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
         '<button onclick="delRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td></tr>';
@@ -1099,7 +1099,8 @@ async function delRec(id){
       else toast('Excluído e arquivado ✓');
     }catch(e){toast('Excluído localmente (sem conexão)','warn');}
   }else{toast('Excluído!');}
-  if(rec&&rec.url)deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
+  // NF PDFs are shared across multiple vencimento records — don't auto-delete
+  if(rec&&rec.url&&!rec.url.includes('/notas-fiscais/'))deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
 }
 
 // ============================================================
@@ -2180,73 +2181,66 @@ async function advanceToNextFile(){
 // ============================================================
 // GITHUB PDF UPLOAD
 // ============================================================
-async function uploadBoletoToGitHub(rec){
-  // Reuse URL if this file was already uploaded
-  if(S.fileUrls&&S.fileUrls[S.fileQueueIdx])return S.fileUrls[S.fileQueueIdx];
+// Shared core: uploads `file` to `folder/{yr}/{mo}/{fname}` in the configured repo.
+// `folder` is 'boletos' or 'notas-fiscais'. `rec` needs {dv, fo, vn, nn?}.
+async function _uploadPDFToGitHub(file,folder,rec){
   var token=localStorage.getItem('r_gh_pdf_token');
-  // Normalize repo: accept full URL or just "owner/repo"
   var repoRaw=localStorage.getItem('r_gh_pdf_repo')||'';
   var repo=repoRaw.replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
-  var file=S.fileQueue&&S.fileQueue.length>0?S.fileQueue[S.fileQueueIdx]:null;
   if(!token){toast('Configure o Token GitHub em ⚙ Config','warn');return '';}
   if(!repo){toast('Configure o Repositório GitHub em ⚙ Config','warn');return '';}
   if(!repo.includes('/')){toast('Repositório inválido. Use o formato: usuario/repositorio','warn');return '';}
-  if(!file){console.log('GitHub PDF: nenhum arquivo na fila');return '';}
+  if(!file){console.log('[GH] nenhum arquivo para upload');return '';}
   try{
     toast('Enviando PDF...','info');
     var dv=rec.dv||new Date().toISOString().substring(0,10);
     var yr=dv.substring(0,4),mo=dv.substring(5,7);
-    // Filename: only safe chars (no $, no comma)
-    var fo=(rec.fo||'boleto').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,15);
+    var fo=(rec.fo||folder).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,15);
     var val=Math.round((rec.vn||0)).toString();
-    var fname=dv+'_'+fo+'_'+val+'.pdf';
-    // URL-encode path segments to avoid issues with special chars
-    var apiBase='https://api.github.com/repos/'+repo+'/contents/boletos/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
-    var rawUrl='https://raw.githubusercontent.com/'+repo+'/main/boletos/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
-    console.log('[GH] repo:',repo,'url:',apiBase,'file:',file.name,'size:',file.size);
-    // Convert PDF to base64 in chunks
+    var nn=rec.nn?'_NF'+String(rec.nn).replace(/[^a-zA-Z0-9\-]/g,'_').substring(0,12):'';
+    var fname=dv+'_'+fo+(folder==='boletos'?'':nn)+'_'+val+'.pdf';
+    var apiBase='https://api.github.com/repos/'+repo+'/contents/'+folder+'/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
+    var rawUrl='https://raw.githubusercontent.com/'+repo+'/main/'+folder+'/'+yr+'/'+mo+'/'+encodeURIComponent(fname);
+    console.log('[GH]',folder,'->',apiBase,'file:',file.name,'size:',file.size);
     var buf=await file.arrayBuffer();
     var bytes=new Uint8Array(buf);
-    var binary='';
-    var chunk=8192;
+    var binary='';var chunk=8192;
     for(var i=0;i<bytes.length;i+=chunk){
       binary+=String.fromCharCode.apply(null,bytes.slice(i,Math.min(i+chunk,bytes.length)));
     }
     var b64=btoa(binary);
-    console.log('[GH] b64 length:',b64.length);
     var hdrs={'Authorization':'token '+token,'Content-Type':'application/json'};
-    // Check if file exists (get SHA for update)
     var sha=null;
-    try{
-      var ck=await fetch(apiBase,{headers:hdrs});
-      console.log('[GH] check status:',ck.status);
-      if(ck.ok){var ckj=await ck.json();sha=ckj.sha||null;}
-    }catch(e){console.log('[GH] check failed (probably new file):',e.message);}
-    var body={message:'Boleto '+dv+': '+(rec.fo||''),content:b64};
+    try{var ck=await fetch(apiBase,{headers:hdrs});if(ck.ok){var ckj=await ck.json();sha=ckj.sha||null;}}
+    catch(e){console.log('[GH] check failed:',e.message);}
+    var label=folder==='notas-fiscais'?'NF':'Boleto';
+    var body={message:label+' '+dv+': '+(rec.fo||''),content:b64};
     if(sha)body.sha=sha;
-    console.log('[GH] uploading to',apiBase);
     var resp=await fetch(apiBase,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
     if(resp.ok){
       var data=await resp.json();
-      // For private repos: use html_url (GitHub web viewer, requires login)
-      // For public repos: download_url works directly
       var url=(data.content&&data.content.html_url)?data.content.html_url:rawUrl;
-      if(!S.fileUrls)S.fileUrls=[];
-      S.fileUrls[S.fileQueueIdx]=url;
       toast('PDF salvo! '+fname,'ok');
       return url;
     }else{
       var errBody=await resp.text().catch(function(){return 'sem detalhes';});
-      var errMsg='';
-      try{errMsg=JSON.parse(errBody).message;}catch(e2){errMsg=errBody.substring(0,100);}
-      console.error('GitHub PDF error',resp.status,errMsg);
+      var errMsg='';try{errMsg=JSON.parse(errBody).message;}catch(e2){errMsg=errBody.substring(0,100);}
+      console.error('[GH] error',resp.status,errMsg);
       toast('Erro ao salvar PDF ('+resp.status+'): '+errMsg,'err');
     }
   }catch(e){
-    console.error('GitHub upload exception:',e);
+    console.error('[GH] upload exception:',e);
     toast('Erro de conexão ao enviar PDF: '+e.message,'err');
   }
   return '';
+}
+
+async function uploadBoletoToGitHub(rec){
+  if(S.fileUrls&&S.fileUrls[S.fileQueueIdx])return S.fileUrls[S.fileQueueIdx];
+  var file=S.fileQueue&&S.fileQueue.length>0?S.fileQueue[S.fileQueueIdx]:null;
+  var url=await _uploadPDFToGitHub(file,'boletos',rec);
+  if(url){if(!S.fileUrls)S.fileUrls=[];S.fileUrls[S.fileQueueIdx]=url;}
+  return url;
 }
 
 // Delete PDF from GitHub when record is deleted
@@ -2510,6 +2504,14 @@ async function confirmNF(){
   });
   if(!valid)return;
 
+  // Upload PDF to GitHub before saving records (all vencimentos share the same PDF)
+  var pdfUrl='';
+  var nfFile=document.getElementById('nfPDF').files[0];
+  if(nfFile){
+    try{pdfUrl=await _uploadPDFToGitHub(nfFile,'notas-fiscais',{dv:vencs[0]&&vencs[0].dv||de,fo,vn:totalVN,nn});}
+    catch(e){console.warn('[GH] NF upload failed:',e);}
+  }
+
   const n=vencs.length;
   for(let i=0;i<n;i++){
     const suffix=n>1?'-'+(i+1):'';
@@ -2521,7 +2523,7 @@ async function confirmNF(){
       mk:Math.round(totalMK*ratio*100)/100,
       pr:Math.round(totalPR*ratio*100)/100,
       sv:Math.round(totalSV*ratio*100)/100,
-      st:'em aberto',dp:'',mv:0,url:''
+      st:'em aberto',dp:'',mv:0,url:pdfUrl
     };
     S.recs.push(rec);
     S.lastId=rec._id;
