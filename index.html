@@ -570,7 +570,7 @@ th:hover{background:#EAD9C8!important}
         <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Adicionar Nota Fiscal</h2>
         <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de DANFE (PDF)</p>
       </div>
-      <button onclick="cm('mNF')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+      <button onclick="hideMagnifier();cm('mNF')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
     <!-- Step 1 -->
     <div id="nfS1">
@@ -582,7 +582,7 @@ th:hover{background:#EAD9C8!important}
       <input type="file" id="nfPDF" accept=".pdf" style="display:none" onchange="document.getElementById('nfPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
       <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
       <div style="display:flex;gap:.75rem;margin-top:1rem">
-        <button onclick="cm('mNF')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="hideMagnifier();cm('mNF')" class="btn-secondary" style="flex:1">Cancelar</button>
         <button onclick="parseNF()" class="btn-primary" style="flex:2">Analisar NF →</button>
       </div>
     </div>
@@ -2315,9 +2315,21 @@ async function renderNFPDF(pdfDoc){
     canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
     canvas.style.width='100%';canvas.style.display='block';
     canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    canvas.dataset.page=String(i);
     await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
     viewer.appendChild(canvas);
   }
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
 }
 
 function extractNFData(txt){
@@ -2516,7 +2528,7 @@ async function confirmNF(){
     push2Sheets(rec,null);
   }
   svData();applyF();
-  cm('mNF');
+  hideMagnifier();cm('mNF');
   toast(n+' lançamento'+(n>1?'s':'')+' adicionado'+(n>1?'s':'')+' ✓');
 }
 
