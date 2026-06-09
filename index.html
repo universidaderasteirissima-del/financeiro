@@ -71,15 +71,38 @@ th:hover{background:#EAD9C8!important}
 </head>
 <body>
 
+<!-- ===== SELEÇÃO DE SISTEMA ===== -->
+<div id="pgSistema" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2C1810 0%,#5C3D2E 50%,#9B6B50 100%)">
+  <div style="width:100%;max-width:540px;padding:2rem">
+    <div style="text-align:center;margin-bottom:2.5rem">
+      <div style="font-size:2rem;font-weight:800;letter-spacing:.15em;color:#fff;line-height:1">RASTEIRISSIMA</div>
+      <div style="width:40px;height:2px;background:#C8A882;margin:.5rem auto"></div>
+      <p style="font-size:.72rem;color:#C8A882;font-weight:500;letter-spacing:.1em;text-transform:uppercase;margin-top:.3rem">Sistema Financeiro — Selecione o módulo</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div onclick="selSistema('lp')" style="background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:6px;padding:2rem 1.5rem;cursor:pointer;text-align:center" onmouseover="this.style.background='rgba(255,255,255,.18)';this.style.borderColor='#C8A882'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.borderColor='rgba(255,255,255,.15)'">
+        <div style="font-size:1.6rem;margin-bottom:.75rem">🏪</div>
+        <div style="color:#fff;font-size:.95rem;font-weight:700;letter-spacing:.04em">Lojas Próprias</div>
+        <div style="color:#C8A882;font-size:.7rem;margin-top:.4rem">Rede própria</div>
+      </div>
+      <div onclick="selSistema('fr')" style="background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);border-radius:6px;padding:2rem 1.5rem;cursor:pointer;text-align:center" onmouseover="this.style.background='rgba(255,255,255,.18)';this.style.borderColor='#C8A882'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.borderColor='rgba(255,255,255,.15)'">
+        <div style="font-size:1.6rem;margin-bottom:.75rem">🤝</div>
+        <div style="color:#fff;font-size:.95rem;font-weight:700;letter-spacing:.04em">Franquias</div>
+        <div style="color:#C8A882;font-size:.7rem;margin-top:.4rem">Lojas franqueadas</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== LOGIN ===== -->
-<div id="pgLogin" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2C1810 0%,#5C3D2E 50%,#9B6B50 100%)">
+<div id="pgLogin" style="min-height:100vh;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#2C1810 0%,#5C3D2E 50%,#9B6B50 100%)">
   <div style="background:#fff;border-radius:4px;padding:2.5rem;width:100%;max-width:360px;box-shadow:0 24px 60px rgba(0,0,0,.3)" class="fade">
     <div style="text-align:center;margin-bottom:2rem">
       <div id="loginLogo" style="min-height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:.5rem">
         <div style="font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810;line-height:1">RASTEIRISSIMA</div>
       </div>
       <div style="width:40px;height:2px;background:#9B6B50;margin:.25rem auto 0"></div>
-      <p style="font-size:.75rem;color:#9B6B50;margin-top:.5rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase">Sistema Financeiro</p>
+      <p id="loginModoNome" style="font-size:.75rem;color:#9B6B50;margin-top:.5rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase">Lojas Próprias</p>
     </div>
     <div id="loginErr" style="display:none;background:#FDF0F0;color:#8B1A1A;font-size:.85rem;padding:.75rem 1rem;border-radius:3px;margin-bottom:1rem;border:1px solid #F0C0C0;text-align:center;font-weight:600">⚠ Senha incorreta. Tente novamente.</div>
     <div style="position:relative;margin-bottom:.75rem">
@@ -92,7 +115,9 @@ th:hover{background:#EAD9C8!important}
     <button onclick="doLogin()" style="width:100%;background:#2C1810;color:#fff;border:none;border-radius:3px;padding:.875rem;font-size:.875rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;letter-spacing:.04em;transition:background .15s" onmouseover="this.style.background='#5C3D2E'" onmouseout="this.style.background='#2C1810'">
       ENTRAR
     </button>
-    <p style="font-size:.7rem;color:#C8A882;text-align:center;margin-top:1.25rem">Senha padrão: <strong>rasteira2024</strong></p>
+    <div style="text-align:center;margin-top:1rem">
+      <button onclick="document.getElementById('pgLogin').style.display='none';document.getElementById('pgSistema').style.display='flex'" style="background:none;border:none;color:#9B6B50;cursor:pointer;font-size:.72rem;font-family:'Plus Jakarta Sans',sans-serif;padding:.25rem .5rem">← Voltar</button>
+    </div>
   </div>
 </div>
 
@@ -105,7 +130,7 @@ th:hover{background:#EAD9C8!important}
       <div style="display:flex;align-items:center;gap:1rem">
         <div id="logoArea">
           <div style="font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff;line-height:1">RASTEIRISSIMA</div>
-          <div style="font-size:.65rem;color:#C8A882;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;font-weight:500">Mercadorias a Pagar — Lojas Próprias</div>
+          <div id="hdrSubtitle" style="font-size:.65rem;color:#C8A882;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;font-weight:500">Mercadorias a Pagar — Lojas Próprias</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:.25rem">
@@ -647,37 +672,56 @@ th:hover{background:#EAD9C8!important}
 // CONSTANTS
 // ============================================================
 const APP_VER='9'; // bump to force localStorage refresh
-const DEF_URL='https://script.google.com/macros/s/AKfycbyIBXg5bDs0-BBnGsAOXSc1KiRrPvEQCmCtSPjIzStQFhhKZxkkaJDdWHLVs-ddW0pg7w/exec';
-const DEF_LOJAS=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Redenção','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
+const DEF_URL_LP='https://script.google.com/macros/s/AKfycbyIBXg5bDs0-BBnGsAOXSc1KiRrPvEQCmCtSPjIzStQFhhKZxkkaJDdWHLVs-ddW0pg7w/exec';
+const DEF_URL_FR='';
+const DEF_LOJAS_LP=['Araguaína','Balsas','Belém','Fortaleza','Imperial','Marabá','New Marabá','Palmas','Redenção','Rio anil','São Paulo','Shopping da Ilha','Sousa Lima'];
+const DEF_LOJAS_FR=[];
 // CEP -> Loja (8 digits, no hyphen). Source: user-provided lojas.csv
 const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65904296':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil','68553052':'Redenção'};
-const DEF_FORNS=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
+const DEF_FORNS_LP=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
+const DEF_FORNS_FR=[];
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const DEF_PWD='rasteira2024';
-// Force reload from data.json if version changed
+const DEF_PWD_LP='Claudia01';
+const DEF_PWD_FR='Franquia01';
+// Prefixo do modo ativo no localStorage ('lp_' ou 'fr_')
+let MODO='';
+function lsk(k){return MODO+k;}
+// Limpa dados armazenados quando a versão muda
 if(localStorage.getItem('r_ver')!==APP_VER){
-  localStorage.removeItem('r_data');
-  try{const _c=localStorage.getItem('r_cfg');if(_c){const _o=JSON.parse(_c);_o.url=DEF_URL;localStorage.setItem('r_cfg',JSON.stringify(_o));}}catch(e){}
+  ['lp_','fr_'].forEach(function(m){localStorage.removeItem(m+'r_data');});
   localStorage.setItem('r_ver',APP_VER);
 }
 
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],selIds:new Set(),lojas:[...DEF_LOJAS],forns:[...DEF_FORNS],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // ============================================================
 // AUTH
 // ============================================================
+function selSistema(modo){
+  MODO=modo+'_';
+  var nome=modo==='lp'?'Lojas Próprias':'Franquias';
+  document.getElementById('loginModoNome').textContent=nome;
+  document.getElementById('loginPwd').value='';
+  document.getElementById('loginErr').style.display='none';
+  document.getElementById('pgSistema').style.display='none';
+  document.getElementById('pgLogin').style.display='flex';
+  document.getElementById('loginPwd').focus();
+}
 function doLogin(){
-  const v=document.getElementById('loginPwd').value;
-  const p=localStorage.getItem('r_pwd')||DEF_PWD;
-  const errEl=document.getElementById('loginErr');
+  var v=document.getElementById('loginPwd').value;
+  var defPwd=MODO==='lp_'?DEF_PWD_LP:DEF_PWD_FR;
+  var p=localStorage.getItem(lsk('r_pwd'))||defPwd;
+  var errEl=document.getElementById('loginErr');
   if(v===p){
     errEl.style.display='none';
-    localStorage.setItem('r_ok','1');
+    localStorage.setItem(lsk('r_ok'),'1');
+    localStorage.setItem('r_mode',MODO);
     document.getElementById('pgLogin').style.display='none';
     document.getElementById('pgApp').style.display='flex';
+    document.getElementById('hdrSubtitle').textContent='Mercadorias a Pagar — '+(MODO==='lp_'?'Lojas Próprias':'Franquias');
     init();
   }else{
     errEl.style.display='block';
@@ -686,13 +730,21 @@ function doLogin(){
   }
 }
 function togglePwdVis(){
-  const inp=document.getElementById('loginPwd');
-  const btn=document.getElementById('btnEye');
+  var inp=document.getElementById('loginPwd');
+  var btn=document.getElementById('btnEye');
   if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
   else{inp.type='password';btn.textContent='👁';}
 }
-function doLogout(){localStorage.removeItem('r_ok');location.reload();}
-function chgPwd(){const np=document.getElementById('cfPwd').value.trim();if(!np)return;localStorage.setItem('r_pwd',np);document.getElementById('cfPwd').value='';toast('Senha alterada!');}
+function doLogout(){
+  localStorage.removeItem(lsk('r_ok'));
+  localStorage.removeItem('r_mode');
+  MODO='';
+  S.recs=[];S.filt=[];S.stFilter=[];S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
+  document.getElementById('pgApp').style.display='none';
+  document.getElementById('pgLogin').style.display='none';
+  document.getElementById('pgSistema').style.display='flex';
+}
+function chgPwd(){var np=document.getElementById('cfPwd').value.trim();if(!np)return;localStorage.setItem(lsk('r_pwd'),np);document.getElementById('cfPwd').value='';toast('Senha alterada!');}
 
 // ============================================================
 // INIT
@@ -711,24 +763,29 @@ function applyLogo(){
 }
 
 function ldCfg(){
-  const r=localStorage.getItem('r_cfg');
-  if(r){const c=JSON.parse(r);S.url=c.url||DEF_URL;S.logoUrl=c.logo||'';if(c.lo&&c.lo.length)S.lojas=c.lo;if(c.fo&&c.fo.length)S.forns=c.fo;}
-  else{S.url=DEF_URL;}
+  var defUrl=MODO==='fr_'?DEF_URL_FR:DEF_URL_LP;
+  var defLo=MODO==='fr_'?[...DEF_LOJAS_FR]:[...DEF_LOJAS_LP];
+  var defFo=MODO==='fr_'?[...DEF_FORNS_FR]:[...DEF_FORNS_LP];
+  var r=localStorage.getItem(lsk('r_cfg'));
+  if(r){var c=JSON.parse(r);S.url=c.url||defUrl;S.logoUrl=c.logo||'';S.lojas=c.lo&&c.lo.length?c.lo:defLo;S.forns=c.fo&&c.fo.length?c.fo:defFo;}
+  else{S.url=defUrl;S.lojas=defLo;S.forns=defFo;}
 }
-function svCfgStore(){localStorage.setItem('r_cfg',JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns}));}
+function svCfgStore(){localStorage.setItem(lsk('r_cfg'),JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns}));}
 
 async function ldData(){
-  const raw=localStorage.getItem('r_data');
+  var raw=localStorage.getItem(lsk('r_data'));
   if(raw){S.recs=JSON.parse(raw);return;}
+  // data.json é exclusivo do modo Lojas Próprias (dados históricos)
+  if(MODO!=='lp_'){S.recs=[];return;}
   try{
-    const res=await fetch('data.json');
+    var res=await fetch('data.json');
     if(!res.ok)throw new Error();
-    const arr=await res.json();
-    S.recs=arr.map((r,i)=>({_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0,url:r.url||''}));
+    var arr=await res.json();
+    S.recs=arr.map(function(r,i){return{_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0,url:r.url||''};});
     svData();
-  }catch(e){S.recs=[];console.warn('data.json not loaded',e);}
+  }catch(e){S.recs=[];console.warn('data.json não carregado',e);}
 }
-function svData(){localStorage.setItem('r_data',JSON.stringify(S.recs));}
+function svData(){localStorage.setItem(lsk('r_data'),JSON.stringify(S.recs));}
 
 // ============================================================
 // GOOGLE SHEETS
@@ -782,8 +839,8 @@ function openCfg(){
   hideMagnifier();
   document.getElementById('cfUrl').value=S.url;
   document.getElementById('cfLogo').value=S.logoUrl;
-  document.getElementById('cfGhPdfToken').value=localStorage.getItem('r_gh_pdf_token')||'';
-  document.getElementById('cfGhPdfRepo').value=localStorage.getItem('r_gh_pdf_repo')||'';
+  document.getElementById('cfGhPdfToken').value=localStorage.getItem(lsk('r_gh_pdf_token'))||'';
+  document.getElementById('cfGhPdfRepo').value=localStorage.getItem(lsk('r_gh_pdf_repo'))||'';
   document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
   document.getElementById('cfFoList').textContent=S.forns.join(' · ');
   var m=document.getElementById('mCfg');document.body.appendChild(m);m.style.display='flex';
@@ -793,8 +850,8 @@ function saveCfg(){
   S.logoUrl=document.getElementById('cfLogo').value.trim();
   var ghTok=document.getElementById('cfGhPdfToken').value.trim();
   var ghRepo=document.getElementById('cfGhPdfRepo').value.trim();
-  if(ghTok)localStorage.setItem('r_gh_pdf_token',ghTok);
-  if(ghRepo)localStorage.setItem('r_gh_pdf_repo',ghRepo);
+  if(ghTok)localStorage.setItem(lsk('r_gh_pdf_token'),ghTok);
+  if(ghRepo)localStorage.setItem(lsk('r_gh_pdf_repo'),ghRepo);
   svCfgStore();cm('mCfg');
   applyLogo();
   if(S.url){document.getElementById('btnSync').style.display='inline-block';syncSheets();}
@@ -1732,16 +1789,16 @@ function toast(msg,type='ok'){
 // ============================================================
 
 function ldFornData(){
-  const raw=localStorage.getItem('r_forn_data');
+  var raw=localStorage.getItem(lsk('r_forn_data'));
   if(raw){S.fornData=JSON.parse(raw);}
   else{
-    // Seed with defaults (empty params)
     S.fornData={};
-    DEF_FORNS.forEach(f=>{S.fornData[f]={cnpj:'',mkt:0,produto:0,servico:0};});
+    var defForns=MODO==='fr_'?DEF_FORNS_FR:DEF_FORNS_LP;
+    defForns.forEach(function(f){S.fornData[f]={cnpj:'',mkt:0,produto:0,servico:0};});
     svFornData();
   }
 }
-function svFornData(){localStorage.setItem('r_forn_data',JSON.stringify(S.fornData));}
+function svFornData(){localStorage.setItem(lsk('r_forn_data'),JSON.stringify(S.fornData));}
 
 function openFornMgmt(){
   try{
@@ -2184,8 +2241,8 @@ async function advanceToNextFile(){
 // Shared core: uploads `file` to `folder/{yr}/{mo}/{fname}` in the configured repo.
 // `folder` is 'boletos' or 'notas-fiscais'. `rec` needs {dv, fo, vn, nn?}.
 async function _uploadPDFToGitHub(file,folder,rec){
-  var token=localStorage.getItem('r_gh_pdf_token');
-  var repoRaw=localStorage.getItem('r_gh_pdf_repo')||'';
+  var token=localStorage.getItem(lsk('r_gh_pdf_token'));
+  var repoRaw=localStorage.getItem(lsk('r_gh_pdf_repo'))||'';
   var repo=repoRaw.replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
   if(!token){toast('Configure o Token GitHub em ⚙ Config','warn');return '';}
   if(!repo){toast('Configure o Repositório GitHub em ⚙ Config','warn');return '';}
@@ -2245,8 +2302,8 @@ async function uploadBoletoToGitHub(rec){
 
 // Delete PDF from GitHub when record is deleted
 async function deletePDFFromGitHub(rawUrl){
-  var token=localStorage.getItem('r_gh_pdf_token');
-  var repo=(localStorage.getItem('r_gh_pdf_repo')||'').replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
+  var token=localStorage.getItem(lsk('r_gh_pdf_token'));
+  var repo=(localStorage.getItem(lsk('r_gh_pdf_repo'))||'').replace(/^https?:\/\/github\.com\//i,'').replace(/\/$/,'').trim();
   if(!token||!repo||!rawUrl)return;
   // Extract path from raw URL: https://raw.githubusercontent.com/owner/repo/main/path
   var m=rawUrl.match(/raw\.githubusercontent\.com\/[^\/]+\/[^\/]+\/[^\/]+\/(.+)$/);
@@ -2552,22 +2609,25 @@ async function confirmNF(){
 // ============================================================
 // BOOT
 // ============================================================
-// Apply logo on login page immediately (before auth)
+// Restaura sessão anterior se ainda válida (modo + r_ok salvo)
 (function(){
-  try{
-    const c=JSON.parse(localStorage.getItem('r_cfg')||'{}');
-    if(c.logo){
-      const el=document.getElementById('loginLogo');
-      if(el)el.innerHTML='<img src="'+c.logo.replace(/"/g,'&quot;')+'" style="max-height:80px;max-width:240px;object-fit:contain" alt="Rasteirissima" />';
-    }
-  }catch(e){}
+  var savedMode=localStorage.getItem('r_mode');
+  if(savedMode&&localStorage.getItem(savedMode+'r_ok')==='1'){
+    MODO=savedMode;
+    try{
+      var c=JSON.parse(localStorage.getItem(lsk('r_cfg'))||'{}');
+      if(c.logo){
+        var el=document.getElementById('loginLogo');
+        if(el)el.innerHTML='<img src="'+c.logo.replace(/"/g,'&quot;')+'" style="max-height:80px;max-width:240px;object-fit:contain" alt="Rasteirissima" />';
+      }
+    }catch(e){}
+    document.getElementById('pgSistema').style.display='none';
+    document.getElementById('pgLogin').style.display='none';
+    document.getElementById('pgApp').style.display='flex';
+    document.getElementById('hdrSubtitle').textContent='Mercadorias a Pagar — '+(MODO==='lp_'?'Lojas Próprias':'Franquias');
+    init();
+  }
 })();
-
-if(localStorage.getItem('r_ok')==='1'){
-  document.getElementById('pgLogin').style.display='none';
-  document.getElementById('pgApp').style.display='flex';
-  init();
-}
 </script>
 </body>
 </html>
