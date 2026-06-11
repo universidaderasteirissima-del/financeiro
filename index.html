@@ -828,7 +828,11 @@ async function push2Sheets(rec,rowIdx){
     const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv,rec.url||''];
     const fd=S.fornData[rec.fo]||{};
     const pcts={mkt:fd.mkt||null,produto:fd.produto||null,servico:fd.servico||null};
-    await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row,pcts})});
+    const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',rowIndex:rowIdx,row,pcts})});
+    const j=await res.json();
+    if(j.error)return false;
+    if(!rowIdx&&j.rowIndex)rec._id=j.rowIndex;
+    rec._synced=true;
     return true;
   }catch(e){return false;}
 }
@@ -1149,7 +1153,7 @@ async function delRec(id){
   const rec=S.recs.find(x=>x._id===id);
   if(!rec)return;
   S.recs=S.recs.filter(x=>x._id!==id);S.selIds.delete(id);svData();applyF();
-  if(S.url&&rec._id&&rec._id<1000000){
+  if(S.url&&rec._id&&(rec._synced||rec._id<1000000)){
     try{
       const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
       const j=await res.json();
@@ -1950,12 +1954,12 @@ function fPct(v){return v?'<strong>'+parseFloat(v).toFixed(2).replace('.',',')+'
 // AUTO-CALCULATE SPLIT IN BOLETO FORM
 // ============================================================
 function fornPctVals(fo,vn){
-  const d=S.fornData[fo];
-  if(!d||!vn)return null;
+  const d=S.fornData[fo]||{mkt:0,produto:0,servico:0};
+  vn=vn||0;
   return{
-    mk:d.mkt?(vn*d.mkt/100):null,
-    pr:d.produto?(vn*d.produto/100):null,
-    sv:d.servico?(vn*d.servico/100):null
+    mk:vn*(d.mkt||0)/100,
+    pr:vn*(d.produto||0)/100,
+    sv:vn*(d.servico||0)/100
   };
 }
 function calcFornSplit(){
@@ -2600,7 +2604,7 @@ async function confirmNF(){
     };
     S.recs.push(rec);
     S.lastId=rec._id;
-    push2Sheets(rec,null);
+    await push2Sheets(rec,null);
   }
   svData();applyF();
   hideMagnifier();cm('mNF');
