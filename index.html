@@ -521,9 +521,9 @@ th:hover{background:#EAD9C8!important}
           <div><label class="lbl">CNPJ</label><input type="text" id="ff_cnpj" class="inp" placeholder="00.000.000/0001-00" /></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.6rem;margin-bottom:.75rem">
-          <div><label class="lbl">MKT %</label><input type="number" step="0.01" min="0" max="100" id="ff_mkt" value="0" class="inp" /></div>
-          <div><label class="lbl">Produto %</label><input type="number" step="0.01" min="0" max="100" id="ff_pr" value="0" class="inp" /></div>
-          <div><label class="lbl">Serviço %</label><input type="number" step="0.01" min="0" max="100" id="ff_sv" value="0" class="inp" /></div>
+          <div><label class="lbl">MKT %</label><input type="number" step="0.01" min="0" max="100" id="ff_mkt" value="3" class="inp" /></div>
+          <div><label class="lbl">Produto %</label><input type="number" step="0.01" min="0" max="100" id="ff_pr" value="100" class="inp" /></div>
+          <div><label class="lbl">Serviço %</label><input type="number" step="0.01" min="0" max="100" id="ff_sv" value="10" class="inp" /></div>
           <div style="display:flex;align-items:flex-end;gap:.4rem">
             <button onclick="saveForn()" class="btn-primary" style="flex:1;padding:.5rem">Salvar</button>
             <button onclick="cancelFornEdit()" class="btn-secondary" style="padding:.5rem .6rem" id="ff_cancel" style="display:none">✕</button>
@@ -682,6 +682,8 @@ const DEF_LOJAS_FR=[];
 const LOJA_CEP={'65900320':'Sousa Lima','65074115':'Shopping da Ilha','77804010':'Araguaína','65904296':'Araguaína','65800000':'Balsas','60740020':'Fortaleza','66023710':'Belém','68500430':'New Marabá','65913015':'Imperial','68501690':'Marabá','65065470':'Rio anil','68553052':'Redenção'};
 const DEF_FORNS_LP=['ADDAN 5','ADDAN 6-1','ADDAN 6-2','ADDAN 7','ADDAN 8','AMORA','BRILHANTE','FÁBRICA','FRANCHISING','GA','GV','ITAMBÉ','MARKETING','MISS LOVE','REDAK','REDAK 2','REDAK 2/2','REDAK 2/3','REDAK 3','TINA TEEN','VILA ROSA'];
 const DEF_FORNS_FR=[];
+// Percentuais padrão de fornecedor (editáveis na tela de Fornecedores)
+const DEF_FORN_PCTS={cnpj:'',mkt:3,produto:100,servico:10};
 const MESES=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DEF_PWD_LP='Claudia01';
 const DEF_PWD_FR='Franquia01';
@@ -783,7 +785,9 @@ async function ldData(){
     var res=await fetch('data.json');
     if(!res.ok)throw new Error();
     var arr=await res.json();
-    S.recs=arr.map(function(r,i){return{_id:i+1,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0,url:r.url||''};});
+    // _id = i+2 porque a linha 1 da planilha é o cabeçalho e data.json[0]
+    // corresponde à primeira linha de dados (linha 2), igual ao _rowIndex do Apps Script
+    S.recs=arr.map(function(r,i){return{_id:i+2,lo:r.lo,fo:r.fo,nn:r.nn,de:br2iso(r.de),dv:br2iso(r.dv),vn:+r.vn||0,mk:+r.mk||0,pr:+r.pr||0,sv:+r.sv||0,st:r.st,dp:br2iso(r.dp),mv:+r.mv||0,url:r.url||''};});
     svData();
   }catch(e){S.recs=[];console.warn('data.json não carregado',e);}
 }
@@ -1187,8 +1191,8 @@ function delRec(id){
         const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
         const j=await res.json();
         if(j.error)toast('Excluído localmente. Erro ao arquivar: '+j.error,'warn');
-        else toast('Excluído e arquivado ✓');
-      }catch(e){toast('Excluído localmente (sem conexão)','warn');}
+        else toast('Excluído e arquivado ✓ (linha '+rec._id+')');
+      }catch(e){toast('Excluído localmente. Falha ao arquivar: '+e.message,'warn');}
     }else{toast('Excluído!');}
     // PDFs de NF são compartilhados entre vários vencimentos — não excluir automaticamente
     if(rec.url&&!rec.url.includes('/notas-fiscais/'))deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
@@ -1829,7 +1833,7 @@ function ldFornData(){
   else{
     S.fornData={};
     var defForns=MODO==='fr_'?DEF_FORNS_FR:DEF_FORNS_LP;
-    defForns.forEach(function(f){S.fornData[f]={cnpj:'',mkt:0,produto:0,servico:0};});
+    defForns.forEach(function(f){S.fornData[f]=Object.assign({},DEF_FORN_PCTS);});
     svFornData();
   }
 }
@@ -1861,7 +1865,7 @@ function renderFornTable(){
   if(!tbody)return;
   if(!S.forns.length){tbody.innerHTML='<tr><td colspan="6" style="padding:1.5rem;text-align:center;color:#C8A882">Nenhum fornecedor cadastrado</td></tr>';return;}
   tbody.innerHTML=S.forns.map((f,i)=>{
-    const d=S.fornData[f]||{cnpj:'',mkt:0,produto:0,servico:0};
+    const d=S.fornData[f]||DEF_FORN_PCTS;
     const bg=i%2===0?'#fff':'#FAF7F4';
     return '<tr style="border-bottom:1px solid #F2EAE0;background:'+bg+'">'+
       '<td style="padding:.5rem .75rem;font-weight:600;color:#2C1810">'+xe(f)+'</td>'+
@@ -1915,7 +1919,7 @@ function saveForn(){
 }
 
 function editForn(nome){
-  const d=S.fornData[nome]||{cnpj:'',mkt:0,produto:0,servico:0};
+  const d=S.fornData[nome]||DEF_FORN_PCTS;
   document.getElementById('fornFormTitle').textContent='Editar: '+nome;
   document.getElementById('ff_orig').value=nome;
   document.getElementById('ff_nome').value=nome;
@@ -1932,9 +1936,9 @@ function cancelFornEdit(){
   document.getElementById('ff_orig').value='';
   document.getElementById('ff_nome').value='';
   document.getElementById('ff_cnpj').value='';
-  document.getElementById('ff_mkt').value='0';
-  document.getElementById('ff_pr').value='0';
-  document.getElementById('ff_sv').value='0';
+  document.getElementById('ff_mkt').value=DEF_FORN_PCTS.mkt;
+  document.getElementById('ff_pr').value=DEF_FORN_PCTS.produto;
+  document.getElementById('ff_sv').value=DEF_FORN_PCTS.servico;
   document.getElementById('ff_cancel').style.display='none';
 }
 
@@ -1985,7 +1989,7 @@ function fPct(v){return v?'<strong>'+parseFloat(v).toFixed(2).replace('.',',')+'
 // AUTO-CALCULATE SPLIT IN BOLETO FORM
 // ============================================================
 function fornPctVals(fo,vn){
-  const d=S.fornData[fo]||{mkt:0,produto:0,servico:0};
+  const d=S.fornData[fo]||DEF_FORN_PCTS;
   vn=vn||0;
   return{
     mk:vn*(d.mkt||0)/100,
