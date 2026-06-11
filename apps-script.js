@@ -111,6 +111,9 @@ function addRow(rowData, pcts) {
   range.setValues([rowData]);
   range.setBackground(COR_SISTEMA);
   if (pcts) applyPercentFormulas(sheet, rowIndex, pcts);
+  // Garante que a escrita seja confirmada antes de responder, para que a
+  // próxima chamada (ex: NF com vários vencimentos) veja o getLastRow() atualizado
+  SpreadsheetApp.flush();
   return { success: true, rowIndex: rowIndex, message: 'Linha adicionada com sucesso.' };
 }
 
@@ -124,6 +127,7 @@ function updateRow(rowIndex, rowData, pcts) {
   range.setValues([rowData]);
   range.setBackground(COR_SISTEMA);
   if (pcts) applyPercentFormulas(sheet, rowIndex, pcts);
+  SpreadsheetApp.flush();
   return { success: true, message: 'Linha ' + rowIndex + ' atualizada.' };
 }
 
@@ -177,6 +181,7 @@ function deleteRow(rowIndex) {
   const sheet = getSheet();
   if (!rowIndex || rowIndex < 2) throw new Error('rowIndex inválido: ' + rowIndex);
   sheet.deleteRow(rowIndex);
+  SpreadsheetApp.flush();
   return { success: true, message: 'Linha ' + rowIndex + ' excluída.' };
 }
 
@@ -213,6 +218,7 @@ function archiveRow(rowIndex) {
 
   deletedSheet.getRange(deletedSheet.getLastRow() + 1, 1, 1, archiveData.length).setValues([archiveData]);
   sheet.deleteRow(rowIndex);
+  SpreadsheetApp.flush();
 
   return { success: true, message: 'Arquivado em "Excluídos".' };
 }

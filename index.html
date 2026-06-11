@@ -236,6 +236,7 @@ th:hover{background:#EAD9C8!important}
       </div>
       <div style="display:flex;gap:.5rem;align-items:center">
         <button onclick="bulkMarkPaid()" class="btn-accent" style="font-size:.78rem;padding:.45rem .9rem">✓ Dar baixa (marcar como pago)</button>
+        <button onclick="bulkDeleteSelected()" style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#8B1A1A;border:none;border-radius:3px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">🗑 Excluir selecionados</button>
         <button onclick="clearSel()" style="font-size:.75rem;padding:.4rem .7rem;color:#6B5500;background:transparent;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-decoration:underline">✕ Limpar seleção</button>
       </div>
     </div>
@@ -579,7 +580,7 @@ th:hover{background:#EAD9C8!important}
       <div style="font-size:2.5rem;margin-bottom:.75rem">⚠️</div>
       <h2 style="font-size:1rem;font-weight:700;color:#2C1810;margin-bottom:.5rem">Confirmar Exclusão</h2>
       <p style="font-size:.85rem;color:#7A4F3A" id="mConfDelMsg">Deseja excluir este item?</p>
-      <p style="font-size:.72rem;color:#B8896A;margin-top:.4rem">Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.</p>
+      <p style="font-size:.72rem;color:#B8896A;margin-top:.4rem" id="mConfDelSub">Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.</p>
     </div>
     <div style="display:flex;gap:.75rem;margin-top:.5rem">
       <button onclick="cm('mConfDel')" class="btn-secondary" style="flex:1">Cancelar</button>
@@ -1085,25 +1086,53 @@ function updateSelBar(){
   document.getElementById('selSums').innerHTML='MKT: <strong>'+fBRL(mk)+'</strong> · Produto: <strong>'+fBRL(pr)+'</strong> · Serviço: <strong>'+fBRL(sv)+'</strong> · Soma total: <strong>'+fBRL(mk+pr+sv)+'</strong>';
 }
 
-async function bulkMarkPaid(){
+function bulkMarkPaid(){
   const sel=S.recs.filter(r=>S.selIds.has(r._id));
   if(!sel.length)return;
   const pend=sel.filter(r=>r.st!=='pago');
   if(!pend.length){toast('Os lançamentos selecionados já estão pagos.','warn');return;}
-  if(!confirm('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)? A data de pagamento será definida como hoje.'))return;
-  const today=toISO(new Date());
-  let okCount=0;
-  for(const rec of pend){
-    const i=S.recs.findIndex(x=>x._id===rec._id);
-    if(i<0)continue;
-    S.recs[i]={...S.recs[i],st:'pago',dp:today};
-    const ok=await push2Sheets(S.recs[i],S.recs[i]._id);
-    if(ok)okCount++;
-  }
-  svData();
-  S.selIds.clear();
-  applyF();
-  toast(okCount+' de '+pend.length+' lançamento(s) marcado(s) como pago ✓'+(okCount<pend.length?' (alguns sem sincronizar)':''));
+  confirmDel('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)?',async()=>{
+    const today=toISO(new Date());
+    let okCount=0;
+    for(const rec of pend){
+      const i=S.recs.findIndex(x=>x._id===rec._id);
+      if(i<0)continue;
+      S.recs[i]={...S.recs[i],st:'pago',dp:today};
+      const ok=await push2Sheets(S.recs[i],S.recs[i]._id);
+      if(ok)okCount++;
+    }
+    svData();
+    S.selIds.clear();
+    applyF();
+    toast(okCount+' de '+pend.length+' lançamento(s) marcado(s) como pago ✓'+(okCount<pend.length?' (alguns sem sincronizar)':''));
+  },'A data de pagamento será definida como hoje.');
+}
+
+async function bulkDeleteSelected(){
+  const sel=S.recs.filter(r=>S.selIds.has(r._id));
+  if(!sel.length)return;
+  confirmDel('Excluir '+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+'?',async()=>{
+    // Arquiva do maior rowIndex para o menor: ao excluir uma linha do Sheets,
+    // as linhas abaixo dela mudam de número, então processar de baixo pra cima
+    // evita arquivar a linha errada nas próximas iterações.
+    const ordered=[...sel].sort((a,b)=>b._id-a._id);
+    let archived=0;
+    for(const rec of ordered){
+      if(S.url&&rec._id&&(rec._synced||rec._id<1000000)){
+        try{
+          const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
+          const j=await res.json();
+          if(!j.error)archived++;
+        }catch(e){}
+      }
+      if(rec.url&&!rec.url.includes('/notas-fiscais/'))deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
+    }
+    const ids=new Set(sel.map(r=>r._id));
+    S.recs=S.recs.filter(x=>!ids.has(x._id));
+    S.selIds.clear();
+    svData();applyF();
+    toast(sel.length+' lançamento'+(sel.length!==1?'s':'')+' excluído'+(sel.length!==1?'s':'')+' ('+archived+' arquivado'+(archived!==1?'s':'')+' no Sheets) ✓');
+  },'Os registros serão movidos para a aba "Excluídos" no Google Sheets.');
 }
 
 // ============================================================
@@ -1148,21 +1177,22 @@ async function saveRec(){
   cm('mRec');applyF();
   toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
-async function delRec(id){
-  if(!confirm('Excluir este registro? Ele será movido para a aba "Excluídos" no Google Sheets.'))return;
+function delRec(id){
   const rec=S.recs.find(x=>x._id===id);
   if(!rec)return;
-  S.recs=S.recs.filter(x=>x._id!==id);S.selIds.delete(id);svData();applyF();
-  if(S.url&&rec._id&&(rec._synced||rec._id<1000000)){
-    try{
-      const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
-      const j=await res.json();
-      if(j.error)toast('Excluído localmente. Erro ao arquivar: '+j.error,'warn');
-      else toast('Excluído e arquivado ✓');
-    }catch(e){toast('Excluído localmente (sem conexão)','warn');}
-  }else{toast('Excluído!');}
-  // NF PDFs are shared across multiple vencimento records — don't auto-delete
-  if(rec&&rec.url&&!rec.url.includes('/notas-fiscais/'))deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
+  confirmDel('Excluir este registro?',async()=>{
+    S.recs=S.recs.filter(x=>x._id!==id);S.selIds.delete(id);svData();applyF();
+    if(S.url&&rec._id&&(rec._synced||rec._id<1000000)){
+      try{
+        const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
+        const j=await res.json();
+        if(j.error)toast('Excluído localmente. Erro ao arquivar: '+j.error,'warn');
+        else toast('Excluído e arquivado ✓');
+      }catch(e){toast('Excluído localmente (sem conexão)','warn');}
+    }else{toast('Excluído!');}
+    // PDFs de NF são compartilhados entre vários vencimentos — não excluir automaticamente
+    if(rec.url&&!rec.url.includes('/notas-fiscais/'))deletePDFFromGitHub(rec.url).catch(function(e){console.warn('PDF delete:',e);});
+  },'O registro será movido para a aba "Excluídos" no Google Sheets.');
 }
 
 // ============================================================
@@ -1942,10 +1972,11 @@ function delLoja(nome){
   );
 }
 
-function confirmDel(msg,fn){
+function confirmDel(msg,fn,sub){
   document.getElementById('mConfDelMsg').textContent=msg;
+  document.getElementById('mConfDelSub').innerHTML=sub||'Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.';
   document.getElementById('mConfDelBtn').onclick=()=>{cm('mConfDel');fn();};
-  document.getElementById('mConfDel').style.display='flex';
+  var _md=document.getElementById('mConfDel');document.body.appendChild(_md);_md.style.display='flex';
 }
 
 function fPct(v){return v?'<strong>'+parseFloat(v).toFixed(2).replace('.',',')+'%</strong>':'<span style="color:#C8A882">0%</span>';}
@@ -2590,6 +2621,7 @@ async function confirmNF(){
   }
 
   const n=vencs.length;
+  let synced=0;
   for(let i=0;i<n;i++){
     const suffix=n>1?'-'+(i+1):'';
     const ratio=totalVN>0?vencs[i].vn/totalVN:1/n;
@@ -2604,11 +2636,11 @@ async function confirmNF(){
     };
     S.recs.push(rec);
     S.lastId=rec._id;
-    await push2Sheets(rec,null);
+    if(await push2Sheets(rec,null))synced++;
   }
   svData();applyF();
   hideMagnifier();cm('mNF');
-  toast(n+' lançamento'+(n>1?'s':'')+' adicionado'+(n>1?'s':'')+' ✓');
+  toast(n+' lançamento'+(n>1?'s':'')+' adicionado'+(n>1?'s':'')+' ✓'+(synced<n?' ('+synced+' de '+n+' sincronizados com o Sheets — verifique a conexão)':''),synced<n?'warn':'ok');
 }
 
 // ============================================================
