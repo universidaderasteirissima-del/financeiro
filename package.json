@@ -1,0 +1,12 @@
+{
+  "name": "financeiro-extract-qg",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Script de extração de dados da planilha 'Cópia de Financeiro - QG.xlsx' (área Franquias)",
+  "scripts": {
+    "extract-qg": "node extract-qg.js"
+  },
+  "devDependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
