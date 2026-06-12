@@ -577,8 +577,8 @@ th:hover{background:#EAD9C8!important}
 <div id="mConfDel" class="modal-overlay" style="display:none">
   <div class="modal-box fade" style="max-width:420px">
     <div style="text-align:center;padding:.5rem 0 1.25rem">
-      <div style="font-size:2.5rem;margin-bottom:.75rem">⚠️</div>
-      <h2 style="font-size:1rem;font-weight:700;color:#2C1810;margin-bottom:.5rem">Confirmar Exclusão</h2>
+      <div style="font-size:2.5rem;margin-bottom:.75rem" id="mConfDelIcon">⚠️</div>
+      <h2 style="font-size:1rem;font-weight:700;color:#2C1810;margin-bottom:.5rem" id="mConfDelTitle">Confirmar Exclusão</h2>
       <p style="font-size:.85rem;color:#7A4F3A" id="mConfDelMsg">Deseja excluir este item?</p>
       <p style="font-size:.72rem;color:#B8896A;margin-top:.4rem" id="mConfDelSub">Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.</p>
     </div>
@@ -1109,7 +1109,7 @@ function bulkMarkPaid(){
     S.selIds.clear();
     applyF();
     toast(okCount+' de '+pend.length+' lançamento(s) marcado(s) como pago ✓'+(okCount<pend.length?' (alguns sem sincronizar)':''));
-  },'A data de pagamento será definida como hoje.');
+  },'A data de pagamento será definida como hoje.',{icon:'✅',title:'Confirmar Pagamento',btnText:'Confirmar',btnColor:'#2E7D32'});
 }
 
 async function bulkDeleteSelected(){
@@ -1976,10 +1976,18 @@ function delLoja(nome){
   );
 }
 
-function confirmDel(msg,fn,sub){
+// opts permite reaproveitar o modal para confirmações que não são exclusão
+// (ex: dar baixa), trocando ícone, título e cor/texto do botão de confirmação
+function confirmDel(msg,fn,sub,opts){
+  opts=opts||{};
+  document.getElementById('mConfDelIcon').textContent=opts.icon||'⚠️';
+  document.getElementById('mConfDelTitle').textContent=opts.title||'Confirmar Exclusão';
   document.getElementById('mConfDelMsg').textContent=msg;
   document.getElementById('mConfDelSub').innerHTML=sub||'Os registros existentes na tabela e na planilha <strong>não serão alterados</strong>.';
-  document.getElementById('mConfDelBtn').onclick=()=>{cm('mConfDel');fn();};
+  const btn=document.getElementById('mConfDelBtn');
+  btn.textContent=opts.btnText||'Excluir';
+  btn.style.background=opts.btnColor||'#8B1A1A';
+  btn.onclick=()=>{cm('mConfDel');fn();};
   var _md=document.getElementById('mConfDel');document.body.appendChild(_md);_md.style.display='flex';
 }
 
