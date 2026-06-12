@@ -168,9 +168,11 @@ function applyPercentFormulas(sheet, rowIndex, pcts) {
     { col: findCol(['serviço', 'servico']), pct: pcts.servico }
   ];
   targets.forEach(function(t) {
-    if (t.col && t.pct) {
-      sheet.getRange(rowIndex, t.col).setFormula('=' + valRef + '*' + t.pct + '/100');
-    }
+    if (!t.col) return;
+    const cell = sheet.getRange(rowIndex, t.col);
+    if (t.pct) cell.setFormula('=' + valRef + '*' + t.pct + '/100');
+    // Mantém a fórmula/valor na célula, só muda a exibição para moeda (R$)
+    cell.setNumberFormat('R$ #,##0.00');
   });
 }
 
