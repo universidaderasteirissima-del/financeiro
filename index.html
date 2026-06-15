@@ -291,6 +291,7 @@ th:hover{background:#EAD9C8!important}
             <!-- ACTIONS -->
             <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
               <button class="btn-primary" onclick="qgOpenAdd()">+ Novo Lançamento</button>
+              <button id="qgImportNFBtn" class="btn-accent" onclick="qgOpenNF()" style="display:none">📄 Importar NF</button>
               <button class="btn-secondary" onclick="qgExportCSV()">⬇ Exportar CSV</button>
               <span id="qgRecCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
             </div>
@@ -506,6 +507,77 @@ th:hover{background:#EAD9C8!important}
     <div style="display:flex;gap:.75rem;margin-top:1.5rem">
       <button onclick="cm('mQg')" class="btn-secondary" style="flex:1">Cancelar</button>
       <button onclick="qgSaveRec()" class="btn-accent" style="flex:1">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: IMPORTAR NF (A RECEBER — FRANQUIAS) ===== -->
+<div id="mQgNF" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" id="mQgNFBox" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Importar Nota Fiscal</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de DANFE (PDF) — A receber</p>
+      </div>
+      <button onclick="hideMagnifier();cm('mQgNF')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Step 1 -->
+    <div id="qgnfS1">
+      <div onclick="document.getElementById('qgnfPDF').click()" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.3rem">📄</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF da Nota Fiscal</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="qgnfPDFNm">Nenhum arquivo selecionado</p>
+      </div>
+      <input type="file" id="qgnfPDF" accept=".pdf" style="display:none" onchange="document.getElementById('qgnfPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button onclick="hideMagnifier();cm('mQgNF')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="qgParseNF()" class="btn-primary" style="flex:2">Analisar NF →</button>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div id="qgnfS2" style="display:none">
+      <div style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="qgnfPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="qgnfViewerMsg">Nenhum PDF carregado</p>
+          </div>
+        </div>
+        <!-- RIGHT: Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <p style="font-size:.7rem;color:#7A4F3A" id="qgnfInf"></p>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Loja *</label><select id="qgnfLoja" class="sel" style="font-size:.8rem" onchange="qgCalcVNota()"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Fornecedor *</label><select id="qgnfForn" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Tipo</label><select id="qgnfTipo" class="sel" style="font-size:.8rem"><option value="FRANQUIA">FRANQUIA</option><option value="LOJA PRÓPRIA">LOJA PRÓPRIA</option></select></div>
+                <div><label class="lbl">Nº da NF *</label><input type="text" id="qgnfNota" class="inp" style="font-size:.8rem" placeholder="2590" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Data de Emissão</label><input type="date" id="qgnfDE" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Total da Nota (R$)</label><input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem" oninput="qgCalcVNota()" /></div>
+              </div>
+              <div>
+                <label class="lbl">Valor da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado pelo % cadastrado na loja</span></label>
+                <input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem" />
+              </div>
+              <p style="font-size:.7rem;color:#9B6B50">Após confirmar, a tela de edição será aberta para você completar boletos, parcelas e status.</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="qgNfSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="qgConfirmNF()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar e completar lançamento</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2793,21 +2865,28 @@ const AR_FIELDS=[
   {key:'nota',label:'Nota',type:'text',section:'Identificação'},
   {key:'vNota',label:'Valor da Nota',type:'money',section:'Valores'},
   {key:'totalNota',label:'Total da Nota',type:'money',section:'Valores'},
-  {key:'dv1',label:'Venc. 1ª Parcela',type:'date',section:'Parcela 1'},
-  {key:'st1',label:'Status 1ª Parcela',type:'status',dueKey:'dv1',payKey:'dp1',section:'Parcela 1'},
-  {key:'dp1',label:'Dt. Pagto 1ª Parcela',type:'date',section:'Parcela 1'},
-  {key:'dv2',label:'Venc. 2ª Parcela',type:'date',section:'Parcela 2'},
-  {key:'st2',label:'Status 2ª Parcela',type:'status',dueKey:'dv2',payKey:'dp2',section:'Parcela 2'},
-  {key:'dp2',label:'Dt. Pagto 2ª Parcela',type:'date',section:'Parcela 2'},
   {key:'boletoMkt',label:'Boleto Marketing',type:'money',section:'Boletos'},
   {key:'boletoFran',label:'Boleto Franchising',type:'money',section:'Boletos'},
-  {key:'boletoBri1',label:'Boleto Brilhante/Fábrica 1ª',type:'money',section:'Boletos'},
-  {key:'boletoBri2',label:'Boleto Brilhante/Fábrica 2ª',type:'money',section:'Boletos'},
-  {key:'pagFran',label:'Pagamento Franchising',type:'money',section:'Pagamentos e Saldos'},
-  {key:'pagMkt',label:'Pagamento Marketing',type:'money',section:'Pagamentos e Saldos'},
-  {key:'saldoFran',label:'Saldo Franchising',type:'money',section:'Pagamentos e Saldos'},
-  {key:'saldoBri',label:'Saldo Brilhante',type:'money',section:'Pagamentos e Saldos'},
+  {key:'dv1',label:'Venc. 1ª Parcela',type:'date',section:'Parcela 1'},
+  {key:'boletoBri1',label:'Boleto Brilhante/Fábrica 1ª',type:'money',section:'Parcela 1'},
+  {key:'dp1',label:'Dt. Pagto 1ª Parcela',type:'date',section:'Parcela 1'},
+  {key:'st1',label:'Status 1ª Parcela',type:'status',dueKey:'dv1',payKey:'dp1',section:'Parcela 1'},
+  {key:'dv2',label:'Venc. 2ª Parcela',type:'date',section:'Parcela 2'},
+  {key:'boletoBri2',label:'Boleto Brilhante/Fábrica 2ª',type:'money',section:'Parcela 2'},
+  {key:'dp2',label:'Dt. Pagto 2ª Parcela',type:'date',section:'Parcela 2'},
+  {key:'st2',label:'Status 2ª Parcela',type:'status',dueKey:'dv2',payKey:'dp2',section:'Parcela 2'},
 ];
+
+// LOJA_FIELDS: esquema do "Cadastro de Lojas" (franquia/própria + % padrão sobre Valor da Nota)
+const LOJA_FIELDS=[
+  {key:'loja',label:'Loja',type:'text',required:true,wide:true},
+  {key:'tipo',label:'Tipo',type:'select',options:['FRANQUIA','LOJA PRÓPRIA'],required:true},
+  {key:'pctNota',label:'% Valor da Nota',type:'percent'},
+];
+
+// AR_FORNS: fornecedores conhecidos da aba "A receber", usados na
+// identificação automática do fornecedor ao importar uma Nota Fiscal
+const AR_FORNS=['BRILHANTE','FÁBRICA','FRANCHISING'];
 
 const QG_VIEWS={
   brilhante:{label:'A pagar brilhante',file:'data_fr_brilhante.json',fields:AP_FIELDS_ANO,dateField:'dv',statusFields:['st'],search:['cat','desc'],sumFields:['va','vp'],statKind:'ap',
@@ -2844,13 +2923,18 @@ const QG_VIEWS={
       {key:'_q',label:'Buscar',kind:'search'},
       {key:'dv1',label:'Período (Venc. 1ª Parc.)',kind:'period'},
     ]},
+  lojas:{label:'Cadastro de Lojas',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',
+    filterFields:[
+      {key:'tipo',label:'Tipo',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
+      {key:'_q',label:'Buscar',kind:'search'},
+    ]},
 };
 
 // ------------------------------------------------------------
 // Helpers genéricos
 // ------------------------------------------------------------
 function qgAlign(type){
-  if(type==='money'||type==='number')return 'right';
+  if(type==='money'||type==='number'||type==='percent')return 'right';
   if(type==='status')return 'center';
   return 'left';
 }
@@ -2873,6 +2957,7 @@ function qgFmtVal(rec,f){
     case 'month':return MESES[v]||'';
     case 'status':return qgStatusBadge(qgEffStatus(v,f.dueKey?rec[f.dueKey]:null));
     case 'number':return (v||v===0)?String(v):'';
+    case 'percent':return (v||v===0)?(String(v)+'%'):'';
     default:return xe(v);
   }
 }
@@ -2906,6 +2991,8 @@ function qgRenderTabs(){
 function qgSwitchTab(view){
   S.qg.view=view;
   S.qg.pg=1;S.qg.sc='';S.qg.sd='asc';S.qg.selIds=new Set();S.qg.filters={};
+  const nfBtn=document.getElementById('qgImportNFBtn');
+  if(nfBtn)nfBtn.style.display=view==='areceber'?'':'none';
   qgRenderTabs();
   qgLoadData(view).then(()=>{
     qgBuildHeader();
@@ -2938,12 +3025,12 @@ function qgSaveData(view){
 function qgBuildHeader(){
   const view=QG_VIEWS[S.qg.view];
   let html='<tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">';
-  html+='<th style="padding:.75rem .6rem;text-align:center;width:2.25rem"><input type="checkbox" id="qgSelAllChk" onchange="qgToggleSelAll(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50" title="Selecionar todos nesta página"/></th>';
+  html+='<th style="padding:.75rem .6rem;text-align:center;width:2.25rem;position:sticky;left:0;z-index:11;background:#F2EAE0;box-shadow:2px 0 4px -2px rgba(44,24,16,.25)"><input type="checkbox" id="qgSelAllChk" onchange="qgToggleSelAll(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50" title="Selecionar todos nesta página"/></th>';
   view.fields.forEach(function(f){
     const align=qgAlign(f.type);
-    html+='<th class="si" onclick="qgSortBy(\''+f.key+'\')" id="qgth-'+f.key+'" style="padding:.75rem 1rem;text-align:'+align+';font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">'+xe(f.label)+'</th>';
+    html+='<th class="si" onclick="qgSortBy(\''+f.key+'\')" id="qgth-'+f.key+'" style="padding:.6rem .6rem;text-align:'+align+';font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">'+xe(f.label)+'</th>';
   });
-  html+='<th style="padding:.75rem 1rem;text-align:center;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em">Ações</th>';
+  html+='<th style="padding:.6rem .6rem;text-align:center;font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em;position:sticky;right:0;z-index:11;background:#F2EAE0;box-shadow:-2px 0 4px -2px rgba(44,24,16,.25)">Ações</th>';
   html+='</tr>';
   document.getElementById('qgThead').innerHTML=html;
 }
@@ -2966,11 +3053,7 @@ function qgBuildFilters(){
   view.filterFields.forEach(function(ff){
     if(ff.kind==='select'){
       const opts=ff.options||qgDistinct(recs,ff.key);
-      const cur=S.qg.filters[ff.key]!=null?S.qg.filters[ff.key]:'';
-      html+='<div style="min-width:160px"><label class="lbl">'+xe(ff.label)+'</label><select class="sel" onchange="qgSetFilter(\''+ff.key+'\',this.value)">'+
-        '<option value="">Todos</option>'+
-        opts.map(function(o){return '<option value="'+xe(o)+'"'+(String(o)===String(cur)?' selected':'')+'>'+xe(qgOptLabel(ff,o))+'</option>';}).join('')+
-        '</select></div>';
+      html+=qgMultiFilterHtml(ff,opts);
     }else if(ff.kind==='status'){
       html+=qgStatusFilterHtml(ff);
     }else if(ff.kind==='search'){
@@ -2998,6 +3081,34 @@ function qgStatusFilterHtml(ff){
     '<div id="'+id+'Btn" onclick="qgToggleStDrop(event,\''+ff.key+'\')" class="sel" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">'+
     '<span id="'+id+'Lbl">'+xe(lblTxt)+'</span><span style="font-size:.65rem;color:#C8A882">▾</span></div>'+
     '<div id="'+id+'Drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1.5px solid var(--border);border-radius:3px;box-shadow:0 6px 16px rgba(44,24,16,.12);margin-top:.25rem;padding:.4rem">'+opts+'</div></div>';
+}
+
+function qgMultiFilterHtml(ff,opts){
+  const sel=(S.qg.filters[ff.key]||[]).map(String);
+  const lblTxt=sel.length?opts.filter(function(o){return sel.includes(String(o));}).map(function(o){return qgOptLabel(ff,o);}).join(', '):'Todos';
+  let optsHtml='';
+  opts.forEach(function(o){
+    optsHtml+='<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background=\'#FAF7F4\'" onmouseout="this.style.background=\'transparent\'">'+
+      '<input type="checkbox" value="'+xe(o)+'" '+(sel.includes(String(o))?'checked':'')+' onchange="qgToggleMultiFilter(\''+ff.key+'\',this)"/> '+xe(qgOptLabel(ff,o))+'</label>';
+  });
+  return '<div style="position:relative;min-width:160px"><label class="lbl">'+xe(ff.label)+'</label>'+
+    '<div id="qgSt_'+ff.key+'Btn" onclick="qgToggleStDrop(event,\''+ff.key+'\')" class="sel" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;overflow:hidden">'+
+    '<span id="qgSt_'+ff.key+'Lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+xe(lblTxt)+'</span><span style="font-size:.65rem;color:#C8A882;flex-shrink:0;margin-left:.4rem">▾</span></div>'+
+    '<div id="qgSt_'+ff.key+'Drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1.5px solid var(--border);border-radius:3px;box-shadow:0 6px 16px rgba(44,24,16,.12);margin-top:.25rem;padding:.4rem;max-height:240px;overflow-y:auto">'+optsHtml+'</div></div>';
+}
+
+function qgToggleMultiFilter(key,chk){
+  const v=chk.value;
+  let arr=(S.qg.filters[key]||[]).map(String);
+  if(chk.checked){if(!arr.includes(v))arr.push(v);}else{arr=arr.filter(function(x){return x!==v;});}
+  S.qg.filters[key]=arr;
+  const view=QG_VIEWS[S.qg.view];
+  const ff=view.filterFields.find(function(x){return x.key===key;});
+  const recs=S.qg.recs[S.qg.view]||[];
+  const opts=ff.options||qgDistinct(recs,key);
+  const lbl=document.getElementById('qgSt_'+key+'Lbl');
+  if(lbl)lbl.textContent=arr.length?opts.filter(function(o){return arr.includes(String(o));}).map(function(o){return qgOptLabel(ff,o);}).join(', '):'Todos';
+  qgApplyF();
 }
 
 function qgToggleStDrop(ev,key){
@@ -3050,8 +3161,12 @@ function qgApplyF(){
       if(val==null||val===''||(Array.isArray(val)&&!val.length))continue;
       if(Array.isArray(val)){
         const fd=view.fields.find(function(x){return x.key===key;});
-        const eff=qgEffStatus(r[key],fd&&fd.dueKey?r[fd.dueKey]:null);
-        if(!val.includes(eff))return false;
+        if(fd&&fd.type==='status'){
+          const eff=qgEffStatus(r[key],fd.dueKey?r[fd.dueKey]:null);
+          if(!val.includes(eff))return false;
+        }else{
+          if(!val.includes(String(r[key]==null?'':r[key])))return false;
+        }
       }else{
         if(String(r[key]==null?'':r[key])!==String(val))return false;
       }
@@ -3092,15 +3207,23 @@ function qgRenderStats(){
       scrd('VENCIDO',fBRL(venc.reduce(function(s,r){return s+(r.va||0);},0)),venc.length+' conta'+(venc.length!==1?'s':''),'#8B1A1A','#F0C0C0','#FDF0F0')+
       scrd('PAGO',fBRL(pago.reduce(function(s,r){return s+(r.vp||0);},0)),pago.length+' conta'+(pago.length!==1?'s':''),'#1E6B3A','#B8DFC8','#EEF7F0')+
       scrd('VENCE HOJE',hoje.length,'conta'+(hoje.length!==1?'s':''),'#7A3300','#F0C898','#FDF5EE');
+  }else if(view.statKind==='lojas'){
+    const franq=rs.filter(function(r){return r.tipo==='FRANQUIA';});
+    const propria=rs.filter(function(r){return r.tipo==='LOJA PRÓPRIA';});
+    const comPct=rs.filter(function(r){return r.pctNota>0;});
+    html=scrd('TOTAL DE LOJAS',rs.length,'cadastradas','#6B5500','#E8D880','#FDFBF0')+
+      scrd('FRANQUIAS',franq.length,'','#1E6B3A','#B8DFC8','#EEF7F0')+
+      scrd('LOJAS PRÓPRIAS',propria.length,'','#7A3300','#F0C898','#FDF5EE')+
+      scrd('COM % DEFINIDO',comPct.length,'de '+rs.length,'#8B1A1A','#F0C0C0','#FDF0F0');
   }else{
     const totalNota=rs.reduce(function(s,r){return s+(r.totalNota||0);},0);
+    const vNotaSum=rs.reduce(function(s,r){return s+(r.vNota||0);},0);
     const pend1=rs.filter(function(r){return qgEffStatus(r.st1,r.dv1)!=='pago';});
-    const saldoFran=rs.reduce(function(s,r){return s+(r.saldoFran||0);},0);
-    const saldoBri=rs.reduce(function(s,r){return s+(r.saldoBri||0);},0);
+    const pend2=rs.filter(function(r){return qgEffStatus(r.st2,r.dv2)!=='pago';});
     html=scrd('TOTAL NOTAS',fBRL(totalNota),rs.length+' registro'+(rs.length!==1?'s':''),'#6B5500','#E8D880','#FDFBF0')+
+      scrd('VALOR DA NOTA',fBRL(vNotaSum),'','#1E6B3A','#B8DFC8','#EEF7F0')+
       scrd('PENDENTES 1ª PARC.',pend1.length,'de '+rs.length,'#8B1A1A','#F0C0C0','#FDF0F0')+
-      scrd('SALDO FRANCHISING',fBRL(saldoFran),'',  '#1E6B3A','#B8DFC8','#EEF7F0')+
-      scrd('SALDO BRILHANTE',fBRL(saldoBri),'','#7A3300','#F0C898','#FDF5EE');
+      scrd('PENDENTES 2ª PARC.',pend2.length,'de '+rs.length,'#7A3300','#F0C898','#FDF5EE');
   }
   document.getElementById('qgStats').innerHTML=html;
 }
@@ -3120,13 +3243,13 @@ function qgRenderTable(){
   }
   document.getElementById('qgTbody').innerHTML=rows.map(function(r,i){
     const bg=i%2===0?'#fff':'#FAF7F4';
-    let tds='<td style="padding:.625rem .6rem;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" '+(S.qg.selIds.has(r._id)?'checked':'')+' onchange="qgToggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>';
+    let tds='<td style="padding:.625rem .6rem;text-align:center;position:sticky;left:0;z-index:1;background:'+bg+';box-shadow:2px 0 4px -2px rgba(44,24,16,.15)" onclick="event.stopPropagation()"><input type="checkbox" '+(S.qg.selIds.has(r._id)?'checked':'')+' onchange="qgToggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>';
     view.fields.forEach(function(f){
       const align=qgAlign(f.type);
       const fw=(f.type==='money'||f.key===view.dateField)?'600':'400';
-      tds+='<td style="padding:.625rem 1rem;font-size:.8rem;color:#2C1810;text-align:'+align+';white-space:nowrap;font-weight:'+fw+'">'+qgFmtVal(r,f)+'</td>';
+      tds+='<td style="padding:.625rem .6rem;font-size:.8rem;color:#2C1810;text-align:'+align+';white-space:nowrap;font-weight:'+fw+'">'+qgFmtVal(r,f)+'</td>';
     });
-    tds+='<td style="padding:.625rem 1rem;text-align:center;white-space:nowrap">'+
+    tds+='<td style="padding:.625rem .6rem;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:1;background:'+bg+';box-shadow:-2px 0 4px -2px rgba(44,24,16,.15)">'+
       '<button onclick="qgEditRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
       '<button onclick="qgDelRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td>';
@@ -3239,7 +3362,8 @@ function qgFieldInputHtml(f,val){
   switch(f.type){
     case 'money':
     case 'number':
-      return '<input type="number" step="'+(f.type==='money'?'0.01':'1')+'" id="'+id+'" class="inp" value="'+xe(val)+'"/>';
+    case 'percent':
+      return '<input type="number" step="'+(f.type==='number'?'1':'0.01')+'" id="'+id+'" class="inp" value="'+xe(val)+'"/>';
     case 'date':
       return '<input type="date" id="'+id+'" class="inp" value="'+xe(val)+'"/>';
     case 'month':
@@ -3316,7 +3440,7 @@ function qgSaveRec(){
     const el=document.getElementById('qgf_'+f.key);
     if(!el)return;
     let v=el.value;
-    if(f.type==='money'||f.type==='number'||f.type==='month'){
+    if(f.type==='money'||f.type==='number'||f.type==='month'||f.type==='percent'){
       v=v===''?0:(+v||0);
     }
     if(f.required&&(v===''||v==null))missing.push(f.label);
@@ -3368,6 +3492,204 @@ function qgExportCSV(){
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='qg-'+S.qg.view+'-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+// ------------------------------------------------------------
+// Importação de Nota Fiscal (PDF/DANFE) — aba "A receber"
+// Mesmo motor de leitura de PDF (pdf.js) e visualizador com lupa
+// usados em Mercadorias a Pagar, com extração própria: identifica o
+// fornecedor, a loja (destinatário), nº/emissão da NF e o "Valor Total
+// dos Produtos" (-> Total da Nota); o Valor da Nota é calculado pelo
+// percentual cadastrado em "Cadastro de Lojas".
+// ------------------------------------------------------------
+let qgnfPdfDoc=null,qgnfPdfTxt='';
+
+function extractARNFData(txt){
+  const prs={};
+  if(!txt)return prs;
+  const nt=norm(txt);
+
+  // Nº da NF
+  const nfeNN=extractNFeNumber(txt);
+  if(nfeNN)prs.nota=nfeNN;
+  else{
+    const mn=txt.match(/N[º°o][\s.:]*(\d{2,9})(?!\d)/i)||txt.match(/NF[- e]*N[º°o][\s.:]*(\d+)/i);
+    if(mn)prs.nota=String(parseInt(mn[1],10)||mn[1]);
+  }
+
+  // Data de emissão
+  let m=txt.match(/[Ee]miss[aã]o\s+(\d{2}\/\d{2}\/\d{4})/)||txt.match(/EMISS[ÃA]O[\s\S]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
+  if(m)prs.de=br2iso(m[1]);
+
+  // Total da Nota <- "VALOR TOTAL DOS PRODUTOS" do documento
+  m=txt.match(/VALOR TOTAL DOS PRODUTOS\s+([\d.,]+)/i)||txt.match(/V\.?\s*TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
+  if(m)prs.totalNota=tof(m[1]);
+
+  // Fornecedor — compara com a lista conhecida de "A receber"
+  for(const fo of AR_FORNS){
+    if(nt.includes(norm(fo))){prs.forn=fo;break;}
+  }
+
+  // Loja — procura, na seção do Destinatário, um nome cadastrado em
+  // "Cadastro de Lojas"; se não achar, procura no documento inteiro
+  const lojas=S.qg.recs.lojas||[];
+  const destIdx=txt.search(/DESTINAT[ÁA]RIO/i);
+  const section=destIdx>=0?txt.substring(destIdx,destIdx+1500):'';
+  let lj=section&&lojas.find(function(l){const ln=norm(l.loja).trim();return ln.length>2&&norm(section).includes(ln);});
+  if(!lj)lj=lojas.find(function(l){const ln=norm(l.loja).trim();return ln.length>2&&nt.includes(ln);});
+  if(lj){
+    prs.loja=lj.loja;
+    prs.tipo=lj.tipo;
+    if(prs.totalNota!=null&&lj.pctNota)prs.vNota=Math.round(prs.totalNota*(lj.pctNota/100)*100)/100;
+  }
+
+  return prs;
+}
+
+function qgFillNFLojaSelect(){
+  const sel=document.getElementById('qgnfLoja');
+  const lojas=S.qg.recs.lojas||[];
+  sel.innerHTML='<option value="">Selecione</option>'+lojas.map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
+}
+
+function qgFillNFFornSelect(){
+  const sel=document.getElementById('qgnfForn');
+  sel.innerHTML='<option value="">Selecione</option>'+AR_FORNS.map(function(f){return '<option value="'+xe(f)+'">'+xe(f)+'</option>';}).join('');
+}
+
+function qgCalcVNota(){
+  const lj=(S.qg.recs.lojas||[]).find(function(l){return l.loja===document.getElementById('qgnfLoja').value;});
+  if(!lj)return;
+  document.getElementById('qgnfTipo').value=lj.tipo||'FRANQUIA';
+  const total=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
+  if(lj.pctNota)document.getElementById('qgnfVNota').value=Math.round(total*(lj.pctNota/100)*100)/100;
+}
+
+function qgOpenNF(){
+  qgnfPdfTxt='';qgnfPdfDoc=null;
+  document.getElementById('qgnfPDF').value='';
+  document.getElementById('qgnfPDFNm').textContent='Nenhum arquivo selecionado';
+  document.getElementById('qgnfInf').textContent='';
+  ['qgnfNota','qgnfDE','qgnfTotalNota','qgnfVNota'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('qgnfTipo').value='FRANQUIA';
+  qgFillNFFornSelect();
+  qgLoadData('lojas').then(qgFillNFLojaSelect);
+  qgNfSt(1);
+  var m=document.getElementById('mQgNF');document.body.appendChild(m);m.style.display='flex';
+  // Já abre o seletor de arquivos junto com o modal, para que o clique em
+  // "Importar NF" leve direto à janela de escolha do PDF
+  document.getElementById('qgnfPDF').click();
+}
+
+function qgNfSt(n){
+  document.getElementById('qgnfS1').style.display=n===1?'block':'none';
+  document.getElementById('qgnfS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mQgNFBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&qgnfPdfDoc)setTimeout(function(){qgRenderNFPDF(qgnfPdfDoc).catch(function(){});},120);
+}
+
+async function qgRenderNFPDF(pdfDoc){
+  var viewer=document.getElementById('qgnfPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('qgnfViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=Math.min(1080/nat.width,3.0);
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';canvas.style.display='block';
+    canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    canvas.dataset.page=String(i);
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
+}
+
+async function qgParseNF(){
+  const file=document.getElementById('qgnfPDF').files[0];
+  if(file){
+    try{
+      toast('Lendo PDF...','info');
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      qgnfPdfDoc=doc;
+      let txt='';
+      for(let i=1;i<=doc.numPages;i++){
+        const pg=await doc.getPage(i);
+        const tc=await pg.getTextContent();
+        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+      }
+      qgnfPdfTxt=txt;
+    }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
+  }
+
+  await qgLoadData('lojas');
+  qgFillNFLojaSelect();
+
+  const prs=extractARNFData(qgnfPdfTxt||'');
+
+  document.getElementById('qgnfNota').value=prs.nota||'';
+  document.getElementById('qgnfDE').value=prs.de||'';
+  document.getElementById('qgnfTotalNota').value=(prs.totalNota||prs.totalNota===0)?prs.totalNota:'';
+  document.getElementById('qgnfVNota').value=(prs.vNota||prs.vNota===0)?prs.vNota:'';
+  document.getElementById('qgnfTipo').value=prs.tipo||'FRANQUIA';
+  if(prs.loja)document.getElementById('qgnfLoja').value=prs.loja;
+  if(prs.forn)document.getElementById('qgnfForn').value=prs.forn;
+
+  const parts=[];
+  if(prs.forn)parts.push(prs.forn);
+  if(prs.loja)parts.push(prs.loja);
+  if(prs.totalNota||prs.totalNota===0)parts.push('Total dos produtos: R$ '+prs.totalNota.toFixed(2).replace('.',','));
+  if(prs.de)parts.push('Emissão: '+fDt(prs.de));
+  document.getElementById('qgnfInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
+
+  qgNfSt(2);
+}
+
+function qgConfirmNF(){
+  const tipo=document.getElementById('qgnfTipo').value||'FRANQUIA';
+  const loja=document.getElementById('qgnfLoja').value.trim();
+  const forn=document.getElementById('qgnfForn').value.trim();
+  const de=document.getElementById('qgnfDE').value;
+  const nota=document.getElementById('qgnfNota').value.trim();
+  const totalNota=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
+  const vNota=parseFloat(document.getElementById('qgnfVNota').value)||0;
+
+  if(!loja){toast('Selecione a Loja','warn');return;}
+  if(!forn){toast('Selecione o Fornecedor','warn');return;}
+  if(!nota){toast('Informe o número da NF','warn');return;}
+
+  const recs=S.qg.recs.areceber;
+  const rec={
+    _id:Math.max(1,...recs.map(function(x){return x._id;}))+1,
+    tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
+    vNota:vNota,totalNota:totalNota,
+    boletoMkt:0,boletoFran:0,
+    dv1:'',boletoBri1:0,dp1:'',st1:'em aberto',
+    dv2:'',boletoBri2:0,dp2:'',st2:'em aberto',
+  };
+  recs.push(rec);
+  qgSaveData('areceber');
+  hideMagnifier();cm('mQgNF');
+  if(S.qg.view==='areceber')qgApplyF();
+  toast('Nota fiscal importada ✓ Complete os boletos e parcelas.');
+  qgEditRec(rec._id);
 }
 
 // ============================================================
