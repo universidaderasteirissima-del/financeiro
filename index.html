@@ -555,7 +555,11 @@ th:hover{background:#EAD9C8!important}
             <div style="display:grid;gap:.6rem">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Loja *</label><select id="qgnfLoja" class="sel" style="font-size:.8rem" onchange="qgCalcNF()"><option value="">Selecione</option></select></div>
-                <div><label class="lbl">Fornecedor *</label><select id="qgnfForn" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Fornecedor *</label><select id="qgnfForn" class="sel" style="font-size:.8rem" onchange="qgFornChanged()"><option value="">Selecione</option></select></div>
+              </div>
+              <div id="qgnfFornExtRow" style="display:none">
+                <label class="lbl">Fornecedor Externo (emitente da NF)</label>
+                <select id="qgnfFornExt" class="sel" style="font-size:.8rem" onchange="qgFornExtSel()"><option value="">Selecione</option></select>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Tipo</label><select id="qgnfTipo" class="sel" style="font-size:.8rem"><option value="FRANQUIA">FRANQUIA</option><option value="LOJA PRÓPRIA">LOJA PRÓPRIA</option></select></div>
@@ -2877,10 +2881,11 @@ const AR_FIELDS=[
   {key:'st2',label:'Status 2ª Parcela',type:'status',dueKey:'dv2',payKey:'dp2',section:'Parcela 2'},
 ];
 
-// LOJA_FIELDS: esquema do "Cadastro de Lojas" (franquia/própria + % padrão sobre Valor da Nota)
+// LOJA_FIELDS: esquema do "Cadastro" (lojas + fornecedores externos)
 const LOJA_FIELDS=[
-  {key:'loja',label:'Loja',type:'text',required:true,wide:true},
-  {key:'tipo',label:'Tipo',type:'select',options:['FRANQUIA','LOJA PRÓPRIA'],required:true},
+  {key:'kind',label:'Tipo de Cadastro',type:'select',options:['Loja','Fornecedor Externo'],required:true},
+  {key:'loja',label:'Nome',type:'text',required:true,wide:true},
+  {key:'tipo',label:'Tipo (Loja)',type:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
   {key:'pctNota',label:'% Valor da Nota',type:'percent'},
 ];
 
@@ -2923,9 +2928,10 @@ const QG_VIEWS={
       {key:'_q',label:'Buscar',kind:'search'},
       {key:'dv1',label:'Período (Venc. 1ª Parc.)',kind:'period'},
     ]},
-  lojas:{label:'Cadastro de Lojas',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',
+  lojas:{label:'Cadastro',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',
     filterFields:[
-      {key:'tipo',label:'Tipo',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
+      {key:'kind',label:'Tipo de Cadastro',kind:'select',options:['Loja','Fornecedor Externo']},
+      {key:'tipo',label:'Tipo (Loja)',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
       {key:'_q',label:'Buscar',kind:'search'},
     ]},
 };
@@ -3543,11 +3549,11 @@ function extractARNFData(txt){
     prs.dv2=_d2.toISOString().slice(0,10);
   }
 
-  // Datas de vencimento — preferência: seção FATURA/DUPLICATA do próprio documento
-  // (mais preciso que o cálculo +30/+60 quando o fornecedor usa parcelamento explícito)
-  const _faturaDvs=[...txt.matchAll(/VENCTO\s+(\d{2}\/\d{2}\/\d{4})/gi)];
-  if(_faturaDvs.length>=1)prs.dv1=br2iso(_faturaDvs[0][1]);
-  if(_faturaDvs.length>=2)prs.dv2=br2iso(_faturaDvs[1][1]);
+  // Seção FATURA/DUPLICATA — extrai data de vencimento E valor de cada parcela
+  // (tem precedência sobre o cálculo +30/+60 e sobre os boletos calculados)
+  const _faturas=[...txt.matchAll(/VENCTO\s+(\d{2}\/\d{2}\/\d{4})\s+VALOR\s+([\d.,]+)/gi)];
+  if(_faturas.length>=1){prs.dv1=br2iso(_faturas[0][1]);prs.boletoBri1=tof(_faturas[0][2]);}
+  if(_faturas.length>=2){prs.dv2=br2iso(_faturas[1][1]);prs.boletoBri2=tof(_faturas[1][2]);}
 
   // Status das parcelas (mesma lógica da fórmula N/P da planilha)
   const _today=new Date(); _today.setHours(0,0,0,0);
@@ -3577,9 +3583,9 @@ function extractARNFData(txt){
     }
   }
 
-  // Loja — procura, na seção do Destinatário, um nome cadastrado em
-  // "Cadastro de Lojas"; se não achar, procura no documento inteiro
-  const lojas=S.qg.recs.lojas||[];
+  // Loja — procura somente registros do tipo Loja no Cadastro (exclui Fornecedores Externos)
+  const _todosRecs=S.qg.recs.lojas||[];
+  const lojas=_todosRecs.filter(function(l){return !l.kind||l.kind==='Loja';});
   const destIdx=txt.search(/DESTINAT[ÁA]RIO/i);
   const section=destIdx>=0?txt.substring(destIdx,destIdx+1500):'';
   let lj=section&&lojas.find(function(l){const ln=norm(l.loja).trim();return ln.length>2&&norm(section).includes(ln);});
@@ -3589,18 +3595,57 @@ function extractARNFData(txt){
     prs.tipo=lj.tipo;
   }
 
+  // Fornecedor Externo — tenta encontrar no Cadastro um registro do tipo Fornecedor Externo
+  // cujo nome apareça no texto da NF; serve para auto-detectar o emitente
+  const _fornExts=_todosRecs.filter(function(l){return l.kind==='Fornecedor Externo';});
+  for(const _fe of _fornExts){
+    if(nt.includes(norm(_fe.loja))){prs.fornExt=_fe.loja;break;}
+  }
+  // Prefixa o número da NF com o nome do fornecedor externo (ex: "MISS LOVE 9224")
+  if(prs.nota&&prs.fornExt)prs.nota=prs.fornExt+' '+prs.nota;
+
   return prs;
 }
 
 function qgFillNFLojaSelect(){
   const sel=document.getElementById('qgnfLoja');
-  const lojas=S.qg.recs.lojas||[];
+  const lojas=(S.qg.recs.lojas||[]).filter(function(l){return !l.kind||l.kind==='Loja';});
   sel.innerHTML='<option value="">Selecione</option>'+lojas.map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
 }
 
 function qgFillNFFornSelect(){
   const sel=document.getElementById('qgnfForn');
   sel.innerHTML='<option value="">Selecione</option>'+AR_FORNS.map(function(f){return '<option value="'+xe(f)+'">'+xe(f)+'</option>';}).join('');
+}
+
+function qgFillFornExtSelect(){
+  const fornExts=(S.qg.recs.lojas||[]).filter(function(l){return l.kind==='Fornecedor Externo';});
+  const sel=document.getElementById('qgnfFornExt');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Selecione</option>'+fornExts.map(function(f){return '<option value="'+xe(f.loja)+'">'+xe(f.loja)+'</option>';}).join('');
+  if(cur)sel.value=cur;
+}
+
+function qgFornChanged(){
+  const forn=document.getElementById('qgnfForn').value;
+  const show=(forn==='FRANCHISING'||forn==='FÁBRICA');
+  const row=document.getElementById('qgnfFornExtRow');
+  row.style.display=show?'block':'none';
+  if(show){
+    qgFillFornExtSelect();
+  }else{
+    const notaEl=document.getElementById('qgnfNota');
+    notaEl.value=notaEl.dataset.rawNota||notaEl.value;
+    document.getElementById('qgnfFornExt').value='';
+  }
+}
+
+function qgFornExtSel(){
+  const fornExt=document.getElementById('qgnfFornExt').value;
+  const notaEl=document.getElementById('qgnfNota');
+  const raw=notaEl.dataset.rawNota||notaEl.value;
+  notaEl.dataset.rawNota=raw;
+  notaEl.value=fornExt?(fornExt+' '+raw):raw;
 }
 
 function qgCalcNF(){
@@ -3615,8 +3660,10 @@ function qgOpenNF(){
   document.getElementById('qgnfPDF').value='';
   document.getElementById('qgnfPDFNm').textContent='Nenhum arquivo selecionado';
   document.getElementById('qgnfInf').textContent='';
-  ['qgnfNota','qgnfDE','qgnfTotalNota','qgnfVNota'].forEach(function(id){document.getElementById(id).value='';});
+  ['qgnfNota','qgnfDE','qgnfTotalNota','qgnfVNota'].forEach(function(id){var el=document.getElementById(id);el.value='';if(el.dataset)el.dataset.rawNota='';});
   document.getElementById('qgnfTipo').value='FRANQUIA';
+  document.getElementById('qgnfFornExt').value='';
+  document.getElementById('qgnfFornExtRow').style.display='none';
   qgFillNFFornSelect();
   qgLoadData('lojas').then(qgFillNFLojaSelect);
   qgNfSt(1);
@@ -3686,13 +3733,24 @@ async function qgParseNF(){
 
   const prs=extractARNFData(qgnfPdfTxt||'');
 
-  document.getElementById('qgnfNota').value=prs.nota||'';
+  // Guarda o número bruto antes do prefixo (para quando o usuário trocar o fornecedor externo)
+  const _rawNota=prs.fornExt&&prs.nota?prs.nota.replace(prs.fornExt+' ',''):prs.nota||'';
+  const notaEl=document.getElementById('qgnfNota');
+  notaEl.value=prs.nota||'';
+  notaEl.dataset.rawNota=_rawNota;
   document.getElementById('qgnfDE').value=prs.de||'';
   document.getElementById('qgnfVNota').value=prs.vNota!=null?prs.vNota:'';
   document.getElementById('qgnfTotalNota').value=prs.totalNota!=null?prs.totalNota:'';
   document.getElementById('qgnfTipo').value=prs.tipo||'FRANQUIA';
   if(prs.loja)document.getElementById('qgnfLoja').value=prs.loja;
   if(prs.forn)document.getElementById('qgnfForn').value=prs.forn;
+  // Fornecedor externo: mostra linha e preenche select quando aplicável
+  const _showFE=(prs.forn==='FRANCHISING'||prs.forn==='FÁBRICA');
+  document.getElementById('qgnfFornExtRow').style.display=_showFE?'block':'none';
+  if(_showFE){
+    qgFillFornExtSelect();
+    if(prs.fornExt)document.getElementById('qgnfFornExt').value=prs.fornExt;
+  }
 
   const parts=[];
   if(prs.forn)parts.push(prs.forn);
