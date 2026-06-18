@@ -570,8 +570,8 @@ th:hover{background:#EAD9C8!important}
                 <div><label class="lbl">Total da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— extraído da NF</span></label><input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem" oninput="qgCalcNF()" /></div>
               </div>
               <div>
-                <label class="lbl">Valor dos Produtos (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado (Total ÷ % do fornecedor)</span></label>
-                <input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem;background:#F5EEE8;color:#7A4F3A" readonly />
+                <label class="lbl">Valor dos Produtos (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— auto-calculado, editável</span></label>
+                <input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem" />
               </div>
               <p style="font-size:.7rem;color:#9B6B50">Após confirmar, datas de vencimento, boletos e status são preenchidos automaticamente com os valores da NF.</p>
             </div>
@@ -3551,17 +3551,28 @@ function extractARNFData(txt){
     prs.dv2=_d2.toISOString().slice(0,10);
   }
 
-  // Seção FATURA/DUPLICATA — extrai datas e valores reais dos boletos
-  // O PDF extrai o cabeçalho (NÚMERO VENCTO VALOR) uma vez; as linhas de dados
-  // têm o padrão: nº-sequencial  DD/MM/AAAA  valor
-  const _fatIdx=txt.search(/FATURA\s*[\/|]\s*DUPLICATA|DUPLICATA/i);
+  // FATURA/DUPLICATA — 3 estratégias em cascata pois PDFs diferentes
+  // produzem texto em layouts distintos (linha por linha / coluna por coluna / cabeçalho fixo)
+  const _fatIdx=txt.search(/FATURA\s*[\/|]\s*DUPLICATA|FATURA\s+DUPLICATA|DUPLICATA/i);
   if(_fatIdx>=0){
-    const _fatSec=txt.substring(_fatIdx,_fatIdx+600);
-    const _fatRows=[..._fatSec.matchAll(/\b(\d{1,4})\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.,]+)/g)];
-    if(_fatRows.length>=1){prs.dv1=br2iso(_fatRows[0][2]);prs.boletoBri1=tof(_fatRows[0][3]);}
-    if(_fatRows.length>=2){prs.dv2=br2iso(_fatRows[1][2]);prs.boletoBri2=tof(_fatRows[1][3]);}
-    // Se só há uma parcela na FATURA, boletoBri2 = boletoBri1 e dv2 = dv1+30d
-    if(_fatRows.length===1&&prs.dv1&&!prs.dv2){
+    const _fatSec=txt.substring(_fatIdx,_fatIdx+800);
+    let _fatDts=[],_fatVls=[];
+    // S1: "VENCTO DD/MM/AAAA VALOR X,XX" — cabeçalho repete por parcela
+    const _s1=[..._fatSec.matchAll(/VENCTO\s+(\d{2}\/\d{2}\/\d{4})\s+VALOR\s+([\d.,]+)/gi)];
+    if(_s1.length){_fatDts=_s1.map(function(m){return br2iso(m[1]);});_fatVls=_s1.map(function(m){return tof(m[2]);});}
+    // S2: "nro DD/MM/AAAA valor" — uma linha por parcela (extração row-first)
+    if(!_fatDts.length){
+      const _s2=[..._fatSec.matchAll(/\b\d{1,4}\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.,]+)/g)];
+      if(_s2.length){_fatDts=_s2.map(function(m){return br2iso(m[1]);});_fatVls=_s2.map(function(m){return tof(m[2]);});}
+    }
+    // S3: datas e valores em colunas separadas (extração column-first)
+    if(!_fatDts.length){
+      _fatDts=[..._fatSec.matchAll(/(\d{2}\/\d{2}\/\d{4})/g)].map(function(m){return br2iso(m[1]);});
+      _fatVls=[..._fatSec.matchAll(/\b(\d+[.,]\d{2})\b/g)].map(function(m){return tof(m[1]);});
+    }
+    if(_fatDts.length>=1){prs.dv1=_fatDts[0];prs.boletoBri1=_fatVls[0]||0;}
+    if(_fatDts.length>=2){prs.dv2=_fatDts[1];prs.boletoBri2=_fatVls[1]||0;}
+    if(_fatDts.length===1&&prs.dv1){
       const _dd=new Date(prs.dv1+'T00:00:00');_dd.setDate(_dd.getDate()+30);
       prs.dv2=_dd.toISOString().slice(0,10);
       prs.boletoBri2=prs.boletoBri1;
