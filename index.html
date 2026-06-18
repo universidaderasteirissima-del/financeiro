@@ -554,7 +554,7 @@ th:hover{background:#EAD9C8!important}
           <div style="flex:1;overflow-y:auto;padding-right:.15rem">
             <div style="display:grid;gap:.6rem">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
-                <div><label class="lbl">Loja *</label><select id="qgnfLoja" class="sel" style="font-size:.8rem" onchange="qgCalcVNota()"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Loja *</label><select id="qgnfLoja" class="sel" style="font-size:.8rem" onchange="qgCalcNF()"><option value="">Selecione</option></select></div>
                 <div><label class="lbl">Fornecedor *</label><select id="qgnfForn" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
@@ -563,13 +563,13 @@ th:hover{background:#EAD9C8!important}
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Data de Emissão</label><input type="date" id="qgnfDE" class="inp" style="font-size:.8rem" /></div>
-                <div><label class="lbl">Total da Nota (R$)</label><input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem" oninput="qgCalcVNota()" /></div>
+                <div><label class="lbl">Valor dos Produtos (R$)</label><input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem" oninput="qgCalcNF()" /></div>
               </div>
               <div>
-                <label class="lbl">Valor da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado pelo % cadastrado na loja</span></label>
-                <input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem" />
+                <label class="lbl">Total da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado automaticamente (× 2)</span></label>
+                <input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem;background:#F5EEE8;color:#7A4F3A" readonly />
               </div>
-              <p style="font-size:.7rem;color:#9B6B50">Após confirmar, a tela de edição será aberta para você completar boletos, parcelas e status.</p>
+              <p style="font-size:.7rem;color:#9B6B50">Após confirmar, datas de vencimento, boletos e status são preenchidos automaticamente.</p>
             </div>
           </div>
           <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
@@ -3521,9 +3521,39 @@ function extractARNFData(txt){
   let m=txt.match(/[Ee]miss[aã]o\s+(\d{2}\/\d{2}\/\d{4})/)||txt.match(/EMISS[ÃA]O[\s\S]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
   if(m)prs.de=br2iso(m[1]);
 
-  // Total da Nota <- "VALOR TOTAL DOS PRODUTOS" do documento
+  // Valor dos Produtos (H) ← "VALOR TOTAL DOS PRODUTOS" do documento
   m=txt.match(/VALOR TOTAL DOS PRODUTOS\s+([\d.,]+)/i)||txt.match(/V\.?\s*TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
-  if(m)prs.totalNota=tof(m[1]);
+  if(m){
+    prs.vNota=tof(m[1]);
+    // Total da Nota (I) = H × 2 (fórmula da planilha)
+    prs.totalNota=Math.round(prs.vNota*2*100)/100;
+    // Boletos calculados sobre o Total da Nota
+    prs.boletoMkt=Math.round(prs.totalNota*3/100*100)/100;
+    prs.boletoFran=Math.round(prs.totalNota*10/100*100)/100;
+    prs.boletoBri1=Math.round((prs.totalNota*90/100)/2*100)/100;
+    prs.boletoBri2=prs.boletoBri1;
+  }
+
+  // Datas de vencimento = emissão + 30 / + 60 dias
+  if(prs.de){
+    const _d=new Date(prs.de+'T00:00:00');
+    const _d1=new Date(_d); _d1.setDate(_d1.getDate()+30);
+    const _d2=new Date(_d); _d2.setDate(_d2.getDate()+60);
+    prs.dv1=_d1.toISOString().slice(0,10);
+    prs.dv2=_d2.toISOString().slice(0,10);
+  }
+
+  // Status das parcelas (mesma lógica da fórmula N/P da planilha)
+  const _today=new Date(); _today.setHours(0,0,0,0);
+  function _calcSt(dv){
+    if(!dv)return'em aberto';
+    const dvD=new Date(dv+'T00:00:00');
+    if(dvD.getTime()===_today.getTime())return'vence hoje';
+    if(dvD<_today)return'vencida';
+    return'em aberto';
+  }
+  prs.st1=_calcSt(prs.dv1);
+  prs.st2=_calcSt(prs.dv2);
 
   // Fornecedor — compara com a lista conhecida de "A receber"
   for(const fo of AR_FORNS){
@@ -3540,7 +3570,6 @@ function extractARNFData(txt){
   if(lj){
     prs.loja=lj.loja;
     prs.tipo=lj.tipo;
-    if(prs.totalNota!=null&&lj.pctNota)prs.vNota=Math.round(prs.totalNota*(lj.pctNota/100)*100)/100;
   }
 
   return prs;
@@ -3557,12 +3586,11 @@ function qgFillNFFornSelect(){
   sel.innerHTML='<option value="">Selecione</option>'+AR_FORNS.map(function(f){return '<option value="'+xe(f)+'">'+xe(f)+'</option>';}).join('');
 }
 
-function qgCalcVNota(){
+function qgCalcNF(){
   const lj=(S.qg.recs.lojas||[]).find(function(l){return l.loja===document.getElementById('qgnfLoja').value;});
-  if(!lj)return;
-  document.getElementById('qgnfTipo').value=lj.tipo||'FRANQUIA';
-  const total=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
-  if(lj.pctNota)document.getElementById('qgnfVNota').value=Math.round(total*(lj.pctNota/100)*100)/100;
+  if(lj)document.getElementById('qgnfTipo').value=lj.tipo||'FRANQUIA';
+  const vNota=parseFloat(document.getElementById('qgnfVNota').value)||0;
+  document.getElementById('qgnfTotalNota').value=vNota?Math.round(vNota*2*100)/100:'';
 }
 
 function qgOpenNF(){
@@ -3643,8 +3671,8 @@ async function qgParseNF(){
 
   document.getElementById('qgnfNota').value=prs.nota||'';
   document.getElementById('qgnfDE').value=prs.de||'';
-  document.getElementById('qgnfTotalNota').value=(prs.totalNota||prs.totalNota===0)?prs.totalNota:'';
-  document.getElementById('qgnfVNota').value=(prs.vNota||prs.vNota===0)?prs.vNota:'';
+  document.getElementById('qgnfVNota').value=prs.vNota!=null?prs.vNota:'';
+  document.getElementById('qgnfTotalNota').value=prs.totalNota!=null?prs.totalNota:'';
   document.getElementById('qgnfTipo').value=prs.tipo||'FRANQUIA';
   if(prs.loja)document.getElementById('qgnfLoja').value=prs.loja;
   if(prs.forn)document.getElementById('qgnfForn').value=prs.forn;
@@ -3652,8 +3680,14 @@ async function qgParseNF(){
   const parts=[];
   if(prs.forn)parts.push(prs.forn);
   if(prs.loja)parts.push(prs.loja);
-  if(prs.totalNota||prs.totalNota===0)parts.push('Total dos produtos: R$ '+prs.totalNota.toFixed(2).replace('.',','));
   if(prs.de)parts.push('Emissão: '+fDt(prs.de));
+  if(prs.vNota!=null)parts.push('Produtos: '+fBRL(prs.vNota));
+  if(prs.totalNota!=null)parts.push('Total nota: '+fBRL(prs.totalNota));
+  if(prs.dv1)parts.push('Venc. 1ª: '+fDt(prs.dv1));
+  if(prs.dv2)parts.push('Venc. 2ª: '+fDt(prs.dv2));
+  if(prs.boletoMkt)parts.push('Mkt: '+fBRL(prs.boletoMkt));
+  if(prs.boletoFran)parts.push('Fran: '+fBRL(prs.boletoFran));
+  if(prs.boletoBri1)parts.push('Bri 1ª/2ª: '+fBRL(prs.boletoBri1));
   document.getElementById('qgnfInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
 
   qgNfSt(2);
@@ -3665,27 +3699,48 @@ function qgConfirmNF(){
   const forn=document.getElementById('qgnfForn').value.trim();
   const de=document.getElementById('qgnfDE').value;
   const nota=document.getElementById('qgnfNota').value.trim();
-  const totalNota=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
   const vNota=parseFloat(document.getElementById('qgnfVNota').value)||0;
 
   if(!loja){toast('Selecione a Loja','warn');return;}
   if(!forn){toast('Selecione o Fornecedor','warn');return;}
   if(!nota){toast('Informe o número da NF','warn');return;}
 
+  // Cálculos automáticos baseados nas fórmulas da planilha
+  const totalNota=Math.round(vNota*2*100)/100;
+  const boletoMkt=Math.round(totalNota*3/100*100)/100;
+  const boletoFran=Math.round(totalNota*10/100*100)/100;
+  const boletoBri1=Math.round((totalNota*90/100)/2*100)/100;
+  let dv1='',dv2='';
+  if(de){
+    const _d=new Date(de+'T00:00:00');
+    const _d1=new Date(_d); _d1.setDate(_d1.getDate()+30);
+    const _d2=new Date(_d); _d2.setDate(_d2.getDate()+60);
+    dv1=_d1.toISOString().slice(0,10);
+    dv2=_d2.toISOString().slice(0,10);
+  }
+  const _t=new Date(); _t.setHours(0,0,0,0);
+  function _st(dv){
+    if(!dv)return'em aberto';
+    const d=new Date(dv+'T00:00:00');
+    if(d.getTime()===_t.getTime())return'vence hoje';
+    if(d<_t)return'vencida';
+    return'em aberto';
+  }
+
   const recs=S.qg.recs.areceber;
   const rec={
     _id:Math.max(1,...recs.map(function(x){return x._id;}))+1,
     tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
     vNota:vNota,totalNota:totalNota,
-    boletoMkt:0,boletoFran:0,
-    dv1:'',boletoBri1:0,dp1:'',st1:'em aberto',
-    dv2:'',boletoBri2:0,dp2:'',st2:'em aberto',
+    boletoMkt:boletoMkt,boletoFran:boletoFran,
+    dv1:dv1,boletoBri1:boletoBri1,dp1:'',st1:_st(dv1),
+    dv2:dv2,boletoBri2:boletoBri1,dp2:'',st2:_st(dv2),
   };
   recs.push(rec);
   qgSaveData('areceber');
   hideMagnifier();cm('mQgNF');
   if(S.qg.view==='areceber')qgApplyF();
-  toast('Nota fiscal importada ✓ Complete os boletos e parcelas.');
+  toast('Nota fiscal importada ✓ Boletos e parcelas preenchidos automaticamente.');
   qgEditRec(rec._id);
 }
 
