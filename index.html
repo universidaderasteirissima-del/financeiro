@@ -3628,7 +3628,7 @@ function qgFillFornExtSelect(){
 
 function qgFornChanged(){
   const forn=document.getElementById('qgnfForn').value;
-  const show=(forn==='FRANCHISING'||forn==='FÁBRICA');
+  const show=(forn==='FRANCHISING');
   const row=document.getElementById('qgnfFornExtRow');
   row.style.display=show?'block':'none';
   if(show){
@@ -3745,7 +3745,7 @@ async function qgParseNF(){
   if(prs.loja)document.getElementById('qgnfLoja').value=prs.loja;
   if(prs.forn)document.getElementById('qgnfForn').value=prs.forn;
   // Fornecedor externo: mostra linha e preenche select quando aplicável
-  const _showFE=(prs.forn==='FRANCHISING'||prs.forn==='FÁBRICA');
+  const _showFE=(prs.forn==='FRANCHISING');
   document.getElementById('qgnfFornExtRow').style.display=_showFE?'block':'none';
   if(_showFE){
     qgFillFornExtSelect();
