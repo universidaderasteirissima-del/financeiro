@@ -3534,7 +3534,7 @@ function extractARNFData(txt){
     prs.boletoBri2=prs.boletoBri1;
   }
 
-  // Datas de vencimento = emissão + 30 / + 60 dias
+  // Datas de vencimento — fallback: emissão + 30 / + 60 dias
   if(prs.de){
     const _d=new Date(prs.de+'T00:00:00');
     const _d1=new Date(_d); _d1.setDate(_d1.getDate()+30);
@@ -3542,6 +3542,12 @@ function extractARNFData(txt){
     prs.dv1=_d1.toISOString().slice(0,10);
     prs.dv2=_d2.toISOString().slice(0,10);
   }
+
+  // Datas de vencimento — preferência: seção FATURA/DUPLICATA do próprio documento
+  // (mais preciso que o cálculo +30/+60 quando o fornecedor usa parcelamento explícito)
+  const _faturaDvs=[...txt.matchAll(/VENCTO\s+(\d{2}\/\d{2}\/\d{4})/gi)];
+  if(_faturaDvs.length>=1)prs.dv1=br2iso(_faturaDvs[0][1]);
+  if(_faturaDvs.length>=2)prs.dv2=br2iso(_faturaDvs[1][1]);
 
   // Status das parcelas (mesma lógica da fórmula N/P da planilha)
   const _today=new Date(); _today.setHours(0,0,0,0);
@@ -3555,9 +3561,20 @@ function extractARNFData(txt){
   prs.st1=_calcSt(prs.dv1);
   prs.st2=_calcSt(prs.dv2);
 
-  // Fornecedor — compara com a lista conhecida de "A receber"
+  // Fornecedor — 1º tenta os nomes canônicos do sistema (AR_FORNS)
   for(const fo of AR_FORNS){
     if(nt.includes(norm(fo))){prs.forn=fo;break;}
+  }
+  // 2º tenta aliases conhecidos de emitentes → fornecedor canônico
+  // (ex: "MISS LOVE" é uma fábrica, não aparece como "FÁBRICA" no texto da NF)
+  if(!prs.forn){
+    const _aliases=[
+      ['MISS LOVE','FÁBRICA'],
+      ['INDUSTRIA E COM DE CALCADOS','FÁBRICA'],
+    ];
+    for(const [_pat,_fo] of _aliases){
+      if(nt.includes(norm(_pat))){prs.forn=_fo;break;}
+    }
   }
 
   // Loja — procura, na seção do Destinatário, um nome cadastrado em
