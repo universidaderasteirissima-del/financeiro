@@ -567,13 +567,13 @@ th:hover{background:#EAD9C8!important}
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Data de Emissão</label><input type="date" id="qgnfDE" class="inp" style="font-size:.8rem" /></div>
-                <div><label class="lbl">Valor dos Produtos (R$)</label><input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem" oninput="qgCalcNF()" /></div>
+                <div><label class="lbl">Total da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— extraído da NF</span></label><input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem" oninput="qgCalcNF()" /></div>
               </div>
               <div>
-                <label class="lbl">Total da Nota (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado automaticamente (× 2)</span></label>
-                <input type="number" step="0.01" id="qgnfTotalNota" class="inp" style="font-size:.8rem;background:#F5EEE8;color:#7A4F3A" readonly />
+                <label class="lbl">Valor dos Produtos (R$) <span style="font-weight:400;text-transform:none;letter-spacing:0">— calculado (Total ÷ % do fornecedor)</span></label>
+                <input type="number" step="0.01" id="qgnfVNota" class="inp" style="font-size:.8rem;background:#F5EEE8;color:#7A4F3A" readonly />
               </div>
-              <p style="font-size:.7rem;color:#9B6B50">Após confirmar, datas de vencimento, boletos e status são preenchidos automaticamente.</p>
+              <p style="font-size:.7rem;color:#9B6B50">Após confirmar, datas de vencimento, boletos e status são preenchidos automaticamente com os valores da NF.</p>
             </div>
           </div>
           <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
@@ -3508,7 +3508,7 @@ function qgExportCSV(){
 // dos Produtos" (-> Total da Nota); o Valor da Nota é calculado pelo
 // percentual cadastrado em "Cadastro de Lojas".
 // ------------------------------------------------------------
-let qgnfPdfDoc=null,qgnfPdfTxt='';
+let qgnfPdfDoc=null,qgnfPdfTxt='',_lastNFPrs={};
 
 function extractARNFData(txt){
   const prs={};
@@ -3527,17 +3527,19 @@ function extractARNFData(txt){
   let m=txt.match(/[Ee]miss[aã]o\s+(\d{2}\/\d{2}\/\d{4})/)||txt.match(/EMISS[ÃA]O[\s\S]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
   if(m)prs.de=br2iso(m[1]);
 
-  // Valor dos Produtos (H) ← "VALOR TOTAL DOS PRODUTOS" do documento
-  m=txt.match(/VALOR TOTAL DOS PRODUTOS\s+([\d.,]+)/i)||txt.match(/V\.?\s*TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
-  if(m){
-    prs.vNota=tof(m[1]);
-    // Total da Nota (I) = H × 2 (fórmula da planilha)
-    prs.totalNota=Math.round(prs.vNota*2*100)/100;
-    // Boletos calculados sobre o Total da Nota
+  // Total da Nota ← "VALOR TOTAL DA NOTA" do documento (valor definitivo da NF)
+  m=txt.match(/VALOR\s+TOTAL\s+DA\s+NOTA\s+([\d.,]+)/i);
+  if(m) prs.totalNota=tof(m[1]);
+
+  // Valor dos Produtos (bruto da NF) — guardado para usar como fallback do vNota
+  let _vNotaNF=null;
+  const _mProd=txt.match(/VALOR\s+TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
+  if(_mProd) _vNotaNF=tof(_mProd[1]);
+
+  // Boletos provisórios (serão sobrescritos pela seção FATURA abaixo)
+  if(prs.totalNota){
     prs.boletoMkt=Math.round(prs.totalNota*3/100*100)/100;
     prs.boletoFran=Math.round(prs.totalNota*10/100*100)/100;
-    prs.boletoBri1=Math.round((prs.totalNota*90/100)/2*100)/100;
-    prs.boletoBri2=prs.boletoBri1;
   }
 
   // Datas de vencimento — fallback: emissão + 30 / + 60 dias
@@ -3549,11 +3551,22 @@ function extractARNFData(txt){
     prs.dv2=_d2.toISOString().slice(0,10);
   }
 
-  // Seção FATURA/DUPLICATA — extrai data de vencimento E valor de cada parcela
-  // (tem precedência sobre o cálculo +30/+60 e sobre os boletos calculados)
-  const _faturas=[...txt.matchAll(/VENCTO\s+(\d{2}\/\d{2}\/\d{4})\s+VALOR\s+([\d.,]+)/gi)];
-  if(_faturas.length>=1){prs.dv1=br2iso(_faturas[0][1]);prs.boletoBri1=tof(_faturas[0][2]);}
-  if(_faturas.length>=2){prs.dv2=br2iso(_faturas[1][1]);prs.boletoBri2=tof(_faturas[1][2]);}
+  // Seção FATURA/DUPLICATA — extrai datas e valores reais dos boletos
+  // O PDF extrai o cabeçalho (NÚMERO VENCTO VALOR) uma vez; as linhas de dados
+  // têm o padrão: nº-sequencial  DD/MM/AAAA  valor
+  const _fatIdx=txt.search(/FATURA\s*[\/|]\s*DUPLICATA|DUPLICATA/i);
+  if(_fatIdx>=0){
+    const _fatSec=txt.substring(_fatIdx,_fatIdx+600);
+    const _fatRows=[..._fatSec.matchAll(/\b(\d{1,4})\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.,]+)/g)];
+    if(_fatRows.length>=1){prs.dv1=br2iso(_fatRows[0][2]);prs.boletoBri1=tof(_fatRows[0][3]);}
+    if(_fatRows.length>=2){prs.dv2=br2iso(_fatRows[1][2]);prs.boletoBri2=tof(_fatRows[1][3]);}
+    // Se só há uma parcela na FATURA, boletoBri2 = boletoBri1 e dv2 = dv1+30d
+    if(_fatRows.length===1&&prs.dv1&&!prs.dv2){
+      const _dd=new Date(prs.dv1+'T00:00:00');_dd.setDate(_dd.getDate()+30);
+      prs.dv2=_dd.toISOString().slice(0,10);
+      prs.boletoBri2=prs.boletoBri1;
+    }
+  }
 
   // Status das parcelas (mesma lógica da fórmula N/P da planilha)
   const _today=new Date(); _today.setHours(0,0,0,0);
@@ -3598,11 +3611,23 @@ function extractARNFData(txt){
   // Fornecedor Externo — tenta encontrar no Cadastro um registro do tipo Fornecedor Externo
   // cujo nome apareça no texto da NF; serve para auto-detectar o emitente
   const _fornExts=_todosRecs.filter(function(l){return l.kind==='Fornecedor Externo';});
+  let _feRec=null;
   for(const _fe of _fornExts){
-    if(nt.includes(norm(_fe.loja))){prs.fornExt=_fe.loja;break;}
+    if(nt.includes(norm(_fe.loja))){prs.fornExt=_fe.loja;_feRec=_fe;break;}
   }
   // Prefixa o número da NF com o nome do fornecedor externo (ex: "MISS LOVE 9224")
   if(prs.nota&&prs.fornExt)prs.nota=prs.fornExt+' '+prs.nota;
+
+  // vNota = totalNota ÷ (pctNota/100) se o fornecedor externo tiver % cadastrado
+  // Caso contrário usa o "VALOR TOTAL DOS PRODUTOS" da NF (ou o próprio totalNota)
+  if(prs.totalNota){
+    const _pct=_feRec&&parseFloat(_feRec.pctNota);
+    if(_pct&&_pct>0){
+      prs.vNota=Math.round(prs.totalNota/(_pct/100)*100)/100;
+    }else{
+      prs.vNota=_vNotaNF!=null?_vNotaNF:prs.totalNota;
+    }
+  }
 
   return prs;
 }
@@ -3646,17 +3671,23 @@ function qgFornExtSel(){
   const raw=notaEl.dataset.rawNota||notaEl.value;
   notaEl.dataset.rawNota=raw;
   notaEl.value=fornExt?(fornExt+' '+raw):raw;
+  qgCalcNF();
 }
 
 function qgCalcNF(){
   const lj=(S.qg.recs.lojas||[]).find(function(l){return l.loja===document.getElementById('qgnfLoja').value;});
   if(lj)document.getElementById('qgnfTipo').value=lj.tipo||'FRANQUIA';
-  const vNota=parseFloat(document.getElementById('qgnfVNota').value)||0;
-  document.getElementById('qgnfTotalNota').value=vNota?Math.round(vNota*2*100)/100:'';
+  const totalNota=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
+  if(!totalNota){document.getElementById('qgnfVNota').value='';return;}
+  const fornExt=document.getElementById('qgnfFornExt').value;
+  const feRec=fornExt&&(S.qg.recs.lojas||[]).find(function(l){return l.loja===fornExt&&l.kind==='Fornecedor Externo';});
+  const pct=feRec&&parseFloat(feRec.pctNota);
+  const vNota=(pct&&pct>0)?Math.round(totalNota/(pct/100)*100)/100:totalNota;
+  document.getElementById('qgnfVNota').value=vNota||'';
 }
 
 function qgOpenNF(){
-  qgnfPdfTxt='';qgnfPdfDoc=null;
+  qgnfPdfTxt='';qgnfPdfDoc=null;_lastNFPrs={};
   document.getElementById('qgnfPDF').value='';
   document.getElementById('qgnfPDFNm').textContent='Nenhum arquivo selecionado';
   document.getElementById('qgnfInf').textContent='';
@@ -3732,6 +3763,7 @@ async function qgParseNF(){
   qgFillNFLojaSelect();
 
   const prs=extractARNFData(qgnfPdfTxt||'');
+  _lastNFPrs=prs;
 
   // Guarda o número bruto antes do prefixo (para quando o usuário trocar o fornecedor externo)
   const _rawNota=prs.fornExt&&prs.nota?prs.nota.replace(prs.fornExt+' ',''):prs.nota||'';
@@ -3739,8 +3771,8 @@ async function qgParseNF(){
   notaEl.value=prs.nota||'';
   notaEl.dataset.rawNota=_rawNota;
   document.getElementById('qgnfDE').value=prs.de||'';
-  document.getElementById('qgnfVNota').value=prs.vNota!=null?prs.vNota:'';
   document.getElementById('qgnfTotalNota').value=prs.totalNota!=null?prs.totalNota:'';
+  document.getElementById('qgnfVNota').value=prs.vNota!=null?prs.vNota:'';
   document.getElementById('qgnfTipo').value=prs.tipo||'FRANQUIA';
   if(prs.loja)document.getElementById('qgnfLoja').value=prs.loja;
   if(prs.forn)document.getElementById('qgnfForn').value=prs.forn;
@@ -3780,20 +3812,21 @@ function qgConfirmNF(){
   if(!forn){toast('Selecione o Fornecedor','warn');return;}
   if(!nota){toast('Informe o número da NF','warn');return;}
 
-  // Cálculos automáticos baseados nas fórmulas da planilha
-  const totalNota=Math.round(vNota*2*100)/100;
+  const totalNota=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
+  // boletoMkt e boletoFran calculados sobre o Total da Nota
   const boletoMkt=Math.round(totalNota*3/100*100)/100;
   const boletoFran=Math.round(totalNota*10/100*100)/100;
-  const boletoBri1=Math.round((totalNota*90/100)/2*100)/100;
-  let dv1='',dv2='';
-  if(de){
+  // dv1/dv2 e boletoBri1/2 vêm da seção FATURA da NF; fallback: emissão +30/+60
+  let dv1=_lastNFPrs.dv1||'',dv2=_lastNFPrs.dv2||'';
+  let boletoBri1=_lastNFPrs.boletoBri1||0,boletoBri2=_lastNFPrs.boletoBri2||boletoBri1;
+  if(!dv1&&de){
     const _d=new Date(de+'T00:00:00');
-    const _d1=new Date(_d); _d1.setDate(_d1.getDate()+30);
-    const _d2=new Date(_d); _d2.setDate(_d2.getDate()+60);
+    const _d1=new Date(_d);_d1.setDate(_d1.getDate()+30);
+    const _d2=new Date(_d);_d2.setDate(_d2.getDate()+60);
     dv1=_d1.toISOString().slice(0,10);
     dv2=_d2.toISOString().slice(0,10);
   }
-  const _t=new Date(); _t.setHours(0,0,0,0);
+  const _t=new Date();_t.setHours(0,0,0,0);
   function _st(dv){
     if(!dv)return'em aberto';
     const d=new Date(dv+'T00:00:00');
@@ -3809,7 +3842,7 @@ function qgConfirmNF(){
     vNota:vNota,totalNota:totalNota,
     boletoMkt:boletoMkt,boletoFran:boletoFran,
     dv1:dv1,boletoBri1:boletoBri1,dp1:'',st1:_st(dv1),
-    dv2:dv2,boletoBri2:boletoBri1,dp2:'',st2:_st(dv2),
+    dv2:dv2,boletoBri2:boletoBri2,dp2:'',st2:_st(dv2),
   };
   recs.push(rec);
   qgSaveData('areceber');
