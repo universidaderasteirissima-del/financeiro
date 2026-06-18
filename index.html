@@ -523,12 +523,12 @@ th:hover{background:#EAD9C8!important}
     </div>
     <!-- Step 1 -->
     <div id="qgnfS1">
-      <div onclick="document.getElementById('qgnfPDF').click()" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+      <label for="qgnfPDF" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s;display:block" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
         <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.3rem">📄</div>
         <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF da Nota Fiscal</p>
         <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="qgnfPDFNm">Nenhum arquivo selecionado</p>
-      </div>
-      <input type="file" id="qgnfPDF" accept=".pdf" style="display:none" onchange="document.getElementById('qgnfPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      </label>
+      <input type="file" id="qgnfPDF" accept=".pdf" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px" onchange="document.getElementById('qgnfPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
       <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
       <div style="display:flex;gap:.75rem;margin-top:1rem">
         <button onclick="hideMagnifier();cm('mQgNF')" class="btn-secondary" style="flex:1">Cancelar</button>
@@ -3576,9 +3576,6 @@ function qgOpenNF(){
   qgLoadData('lojas').then(qgFillNFLojaSelect);
   qgNfSt(1);
   var m=document.getElementById('mQgNF');document.body.appendChild(m);m.style.display='flex';
-  // Já abre o seletor de arquivos junto com o modal, para que o clique em
-  // "Importar NF" leve direto à janela de escolha do PDF
-  document.getElementById('qgnfPDF').click();
 }
 
 function qgNfSt(n){
