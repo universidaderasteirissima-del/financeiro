@@ -3433,23 +3433,33 @@ function qgUpdateSelBar(){
 }
 
 function qgBulkMarkPaid(stKey,dpKey){
-  const recs=S.qg.recs[S.qg.view];
+  const viewKey=S.qg.view;
+  const view=QG_VIEWS[viewKey];
+  const canSync=S.url&&!view.noSync;
+  const recs=S.qg.recs[viewKey];
   const sel=recs.filter(function(r){return S.qg.selIds.has(r._id);});
   if(!sel.length)return;
   const pend=sel.filter(function(r){return r[stKey]!=='pago';});
   if(!pend.length){toast('Os lançamentos selecionados já estão pagos.','warn');return;}
-  confirmDel('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)?',function(){
-    const today=toISO(new Date());
-    pend.forEach(function(rec){
-      const i=recs.findIndex(function(x){return x._id===rec._id;});
-      if(i<0)return;
-      const upd={};upd[stKey]='pago';upd[dpKey]=today;
-      recs[i]=Object.assign({},recs[i],upd);
-    });
-    qgSaveData();
-    S.qg.selIds.clear();
-    qgApplyF();
-    toast(pend.length+' lançamento(s) marcado(s) como pago ✓');
+  confirmDel('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)?',async function(){
+    showLoading();
+    try{
+      const today=toISO(new Date());
+      let synced=0;
+      for(const rec of pend){
+        const i=recs.findIndex(function(x){return x._id===rec._id;});
+        if(i<0)continue;
+        const upd={};upd[stKey]='pago';upd[dpKey]=today;
+        recs[i]=Object.assign({},recs[i],upd);
+        if(canSync&&recs[i]._synced){
+          if(await qgPush2Sheets(viewKey,recs[i],recs[i]._id))synced++;
+        }
+      }
+      qgSaveData(viewKey);
+      S.qg.selIds.clear();
+      qgApplyF();
+      toast(pend.length+' lançamento(s) marcado(s) como pago ✓'+(canSync?' ('+synced+' de '+pend.length+' sincronizados com o Sheets)':''));
+    }finally{hideLoading();}
   },'A data de pagamento será definida como hoje.',{icon:'✅',title:'Confirmar Pagamento',btnText:'Confirmar',btnColor:'#2E7D32'});
 }
 
@@ -3681,12 +3691,6 @@ function extractARNFData(txt){
   const _mProd=txt.match(/VALOR\s+TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
   if(_mProd) _vNotaNF=tof(_mProd[1]);
 
-  // Boletos provisórios (serão sobrescritos pela seção FATURA abaixo)
-  if(prs.totalNota){
-    prs.boletoMkt=Math.round(prs.totalNota*3/100*100)/100;
-    prs.boletoFran=Math.round(prs.totalNota*10/100*100)/100;
-  }
-
   // Datas de vencimento — fallback: emissão + 30 / + 60 dias
   if(prs.de){
     const _d=new Date(prs.de+'T00:00:00');
@@ -3783,6 +3787,12 @@ function extractARNFData(txt){
     }else{
       prs.vNota=_vNotaNF!=null?_vNotaNF:prs.totalNota;
     }
+  }
+
+  // Boletos marketing/franchising calculados sobre o Valor da Nota (não o Total da Nota)
+  if(prs.vNota){
+    prs.boletoMkt=Math.round(prs.vNota*3/100*100)/100;
+    prs.boletoFran=Math.round(prs.vNota*10/100*100)/100;
   }
 
   return prs;
@@ -3969,9 +3979,9 @@ function qgConfirmNF(){
   if(!nota){toast('Informe o número da NF','warn');return;}
 
   const totalNota=parseFloat(document.getElementById('qgnfTotalNota').value)||0;
-  // boletoMkt e boletoFran calculados sobre o Total da Nota
-  const boletoMkt=Math.round(totalNota*3/100*100)/100;
-  const boletoFran=Math.round(totalNota*10/100*100)/100;
+  // boletoMkt e boletoFran calculados sobre o Valor da Nota (não o Total da Nota)
+  const boletoMkt=Math.round(vNota*3/100*100)/100;
+  const boletoFran=Math.round(vNota*10/100*100)/100;
   // dv1/dv2 e boletoBri1/2 vêm da seção FATURA da NF; fallback: emissão +30/+60
   let dv1=_lastNFPrs.dv1||'',dv2=_lastNFPrs.dv2||'';
   let boletoBri1=_lastNFPrs.boletoBri1||0,boletoBri2=_lastNFPrs.boletoBri2||boletoBri1;

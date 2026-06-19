@@ -42,8 +42,13 @@ const HEADER_MAP = {
     va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento'
   },
   areceber: {
+    // OBS: no sistema, "totalNota" é o valor direto da NF (menor) e "vNota" é
+    // o valor calculado pelo % do fornecedor externo (geralmente maior). Na
+    // planilha, a coluna "Valor da nota" deve receber o valor menor/direto e
+    // "Total da Nota" o valor maior/calculado — por isso o mapeamento abaixo
+    // é invertido em relação às chaves do sistema.
     tipo:'Tipo', loja:'Loja', forn:'Fornecedor', de:'Data de emissão', nota:'Nota',
-    vNota:'Valor da nota', totalNota:'Total da Nota',
+    vNota:'Total da Nota', totalNota:'Valor da nota',
     boletoMkt:'Boleto marketing', boletoFran:'Boleto franchising',
     dv1:'Venc. 1ª Parcela', boletoBri1:'Boleto brilhante/fábrica 1ª', dp1:'Data pagto 1ª', st1:'Status 1ª Parcela',
     dv2:'Venc. 2ª Parcela', boletoBri2:'Boleto brilhante/fábrica 2ª', dp2:'Data pagto 2ª', st2:'Status 2ª Parcela'
