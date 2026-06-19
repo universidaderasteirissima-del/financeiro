@@ -140,7 +140,7 @@ th:hover{background:#EAD9C8!important}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:.25rem">
-        <button onclick="syncSheets()" id="btnSync" style="display:none;color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">↻ Sincronizar</button>
+        <button onclick="doSync()" id="btnSync" style="display:none;color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">↻ Sincronizar</button>
         <button onclick="openCfg()" style="color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">⚙ Config</button>
         <button onclick="doLogout()" style="color:#C8A882;background:transparent;border:none;font-size:.75rem;padding:.4rem .8rem;border-radius:2px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:500" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">Sair</button>
       </div>
@@ -293,6 +293,7 @@ th:hover{background:#EAD9C8!important}
               <button class="btn-primary" onclick="qgOpenAdd()">+ Novo Lançamento</button>
               <button id="qgImportNFBtn" class="btn-accent" onclick="qgOpenNF()" style="display:none">📄 Importar NF</button>
               <button class="btn-secondary" onclick="qgExportCSV()">⬇ Exportar CSV</button>
+              <button class="btn-secondary" onclick="qgOpenExcluidos()">🗑 Excluídos</button>
               <span id="qgRecCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
             </div>
 
@@ -583,6 +584,18 @@ th:hover{background:#EAD9C8!important}
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: QG EXCLUÍDOS (Franquias) ===== -->
+<div id="mQgExcluidos" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" style="max-width:600px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <h2 style="font-size:1rem;font-weight:700;color:#2C1810">🗑 Excluídos</h2>
+      <button onclick="cm('mQgExcluidos')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <p style="font-size:.72rem;color:#9B6B50;margin-bottom:.75rem">Registros excluídos de qualquer aba de Franquias, arquivados na aba "Excluídos" do Google Sheets. Clique em Restaurar para devolver o lançamento à aba de origem.</p>
+    <div id="qgExcluidosList" style="max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:4px"></div>
   </div>
 </div>
 
@@ -1031,7 +1044,7 @@ function saveCfg(){
   if(ghRepo)localStorage.setItem(lsk('r_gh_pdf_repo'),ghRepo);
   svCfgStore();cm('mCfg');
   applyLogo();
-  if(S.url){document.getElementById('btnSync').style.display='inline-block';syncSheets();}
+  if(S.url){document.getElementById('btnSync').style.display='inline-block';doSync();}
   else document.getElementById('btnSync').style.display='none';
   toast('Configurações salvas!');
 }
@@ -2928,7 +2941,7 @@ const QG_VIEWS={
       {key:'_q',label:'Buscar',kind:'search'},
       {key:'dv1',label:'Período (Venc. 1ª Parc.)',kind:'period'},
     ]},
-  lojas:{label:'Cadastro',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',
+  lojas:{label:'Cadastro',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',noSync:true,
     filterFields:[
       {key:'kind',label:'Tipo de Cadastro',kind:'select',options:['Loja','Fornecedor Externo']},
       {key:'tipo',label:'Tipo (Loja)',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
@@ -3023,6 +3036,100 @@ function qgLoadData(view){
 function qgSaveData(view){
   view=view||S.qg.view;
   localStorage.setItem(lsk('qg_'+view),JSON.stringify(S.qg.recs[view]||[]));
+}
+
+// ------------------------------------------------------------
+// Sincronização com Google Sheets (apps-script-fr.js) — independente
+// da sincronização de Lojas Próprias (apps-script.js / push2Sheets).
+// A aba "Cadastro" (lojas/fornecedores externos) nunca sincroniza
+// (QG_VIEWS[view].noSync), fica só no localStorage.
+// ------------------------------------------------------------
+function doSync(){
+  if(MODO==='fr_')qgSyncSheets();
+  else syncSheets();
+}
+
+async function qgSyncSheets(view){
+  view=view||S.qg.view;
+  if(QG_VIEWS[view].noSync){toast('Esta aba não sincroniza com o Sheets.','warn');return;}
+  if(!S.url){toast('Configure a URL do Apps Script.','warn');return;}
+  showLoading();
+  try{
+    toast('Sincronizando...','info');
+    const res=await fetch(S.url+'?action=getData&view='+view);
+    const j=await res.json();
+    if(j.error){toast('Erro do servidor: '+j.error,'err');return;}
+    if(!j.data){toast('Resposta inesperada do servidor.','err');return;}
+    const fields=QG_VIEWS[view].fields;
+    S.qg.recs[view]=j.data.map(function(r){
+      const rec={_id:r._rowIndex,_synced:true};
+      fields.forEach(function(f){
+        let v=r[f.key];
+        if(f.type==='money'||f.type==='number'||f.type==='percent')v=tof(String(v===undefined||v===null?0:v));
+        else if(f.type==='month')v=+v||0;
+        else v=String(v===undefined||v===null?'':v);
+        rec[f.key]=v;
+      });
+      return rec;
+    });
+    qgSaveData(view);
+    if(S.qg.view===view)qgApplyF();
+    toast('Sincronizado! '+S.qg.recs[view].length+' registros.');
+  }catch(e){toast('Erro de conexão: '+e.message,'err');}
+  finally{hideLoading();}
+}
+
+async function qgPush2Sheets(view,rec,rowIdx){
+  if(!S.url)return false;
+  showLoading();
+  try{
+    const fields=QG_VIEWS[view].fields;
+    const data={};
+    fields.forEach(function(f){data[f.key]=rec[f.key];});
+    const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:rowIdx?'update':'add',view:view,rowIndex:rowIdx,fields:data})});
+    const j=await res.json();
+    if(j.error)return false;
+    if(!rowIdx&&j.rowIndex)rec._id=j.rowIndex;
+    rec._synced=true;
+    return true;
+  }catch(e){return false;}
+  finally{hideLoading();}
+}
+
+async function qgOpenExcluidos(){
+  if(!S.url){toast('Configure a URL do Apps Script para usar os Excluídos.','warn');return;}
+  var _m=document.getElementById('mQgExcluidos');document.body.appendChild(_m);_m.style.display='flex';
+  document.getElementById('qgExcluidosList').innerHTML='<p style="padding:1rem;color:#9B6B50;font-size:.8rem">Carregando...</p>';
+  showLoading();
+  try{
+    const res=await fetch(S.url+'?action=getDeleted');
+    const j=await res.json();
+    if(j.error){document.getElementById('qgExcluidosList').innerHTML='<p style="padding:1rem;color:#B33;font-size:.8rem">Erro: '+xe(j.error)+'</p>';return;}
+    const rows=j.data||[];
+    if(!rows.length){document.getElementById('qgExcluidosList').innerHTML='<p style="padding:1rem;color:#9B6B50;font-size:.8rem">Nenhum registro excluído.</p>';return;}
+    document.getElementById('qgExcluidosList').innerHTML=rows.map(function(r){
+      const lbl=QG_VIEWS[r.view]?QG_VIEWS[r.view].label:r.view;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.7rem .9rem;border-bottom:1px solid var(--border)">'+
+        '<div style="min-width:0"><p style="font-size:.78rem;font-weight:700;color:#5C3D2E">'+xe(lbl)+' — '+xe(r.data_exclusao)+'</p>'+
+        '<p style="font-size:.72rem;color:#9B6B50;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+xe(r.resumo)+'</p></div>'+
+        '<button class="btn-accent" style="font-size:.75rem;padding:.4rem .8rem;white-space:nowrap" onclick="qgRestoreRec('+r._rowIndex+')">↺ Restaurar</button>'+
+        '</div>';
+    }).join('');
+  }catch(e){document.getElementById('qgExcluidosList').innerHTML='<p style="padding:1rem;color:#B33;font-size:.8rem">Erro de conexão: '+xe(e.message)+'</p>';}
+  finally{hideLoading();}
+}
+
+async function qgRestoreRec(deletedRowIndex){
+  showLoading();
+  try{
+    const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'restore',deletedRowIndex:deletedRowIndex})});
+    const j=await res.json();
+    if(j.error){toast('Erro ao restaurar: '+j.error,'err');return;}
+    toast('Registro restaurado em "'+(QG_VIEWS[j.view]?QG_VIEWS[j.view].label:j.view)+'" ✓');
+    if(S.qg.recs[j.view])await qgSyncSheets(j.view);
+    qgOpenExcluidos();
+  }catch(e){toast('Erro de conexão: '+e.message,'err');}
+  finally{hideLoading();}
 }
 
 // ------------------------------------------------------------
@@ -3347,16 +3454,35 @@ function qgBulkMarkPaid(stKey,dpKey){
 }
 
 function qgBulkDelete(){
-  const recs=S.qg.recs[S.qg.view];
+  const viewKey=S.qg.view;
+  const canSync=S.url&&!QG_VIEWS[viewKey].noSync;
+  const recs=S.qg.recs[viewKey];
   const sel=recs.filter(function(r){return S.qg.selIds.has(r._id);});
   if(!sel.length)return;
-  confirmDel('Excluir '+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+'?',function(){
-    const ids=new Set(sel.map(function(r){return r._id;}));
-    S.qg.recs[S.qg.view]=recs.filter(function(r){return !ids.has(r._id);});
-    S.qg.selIds.clear();
-    qgSaveData();qgApplyF();
-    toast(sel.length+' lançamento'+(sel.length!==1?'s':'')+' excluído'+(sel.length!==1?'s':'')+' ✓');
-  },'Esta ação não pode ser desfeita.');
+  confirmDel('Excluir '+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+'?',async function(){
+    showLoading();
+    try{
+      let archived=0;
+      if(canSync){
+        // Ordem decrescente por _rowIndex evita desalinhar as próximas exclusões
+        // da mesma planilha (cada delete desloca as linhas abaixo dela)
+        const ordered=[...sel].sort(function(a,b){return b._id-a._id;});
+        for(const rec of ordered){
+          if(!rec._synced)continue;
+          try{
+            const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',view:viewKey,rowIndex:rec._id})});
+            const j=await res.json();
+            if(!j.error)archived++;
+          }catch(e){}
+        }
+      }
+      const ids=new Set(sel.map(function(r){return r._id;}));
+      S.qg.recs[viewKey]=recs.filter(function(r){return !ids.has(r._id);});
+      S.qg.selIds.clear();
+      qgSaveData(viewKey);qgApplyF();
+      toast(sel.length+' lançamento'+(sel.length!==1?'s':'')+' excluído'+(sel.length!==1?'s':'')+(canSync?' ('+archived+' arquivado'+(archived!==1?'s':'')+' no Sheets)':'')+' ✓');
+    }finally{hideLoading();}
+  },canSync?'Os registros serão movidos para a aba "Excluídos" no Google Sheets.':'Esta ação não pode ser desfeita.');
 }
 
 // ------------------------------------------------------------
@@ -3437,9 +3563,10 @@ function qgEditRec(id){
   var _m=document.getElementById('mQg');document.body.appendChild(_m);_m.style.display='flex';
 }
 
-function qgSaveRec(){
-  const view=QG_VIEWS[S.qg.view];
-  const recs=S.qg.recs[S.qg.view];
+async function qgSaveRec(){
+  const viewKey=S.qg.view;
+  const view=QG_VIEWS[viewKey];
+  const recs=S.qg.recs[viewKey];
   const rec={};
   const missing=[];
   view.fields.forEach(function(f){
@@ -3453,30 +3580,48 @@ function qgSaveRec(){
     rec[f.key]=v;
   });
   if(missing.length){toast('Preencha: '+missing.join(', ')+'.','warn');return;}
+  let rowIdx=null;
   const editId=S.qg.editId;
   if(editId!=null){
     const i=recs.findIndex(function(x){return x._id===editId;});
     if(i<0){toast('Erro: registro não encontrado.','err');return;}
+    rowIdx=recs[i]._id;rec._id=editId;
     recs[i]=Object.assign({},recs[i],rec);
   }else{
-    rec._id=Math.max(1,...recs.map(function(x){return x._id;}))+1;
+    rec._id=Math.max(0,...recs.map(function(x){return x._id;}))+1;
     recs.push(rec);
   }
-  qgSaveData();
+  qgSaveData(viewKey);
   cm('mQg');qgApplyF();
-  toast(editId!=null?'Lançamento atualizado!':'Lançamento adicionado!');
+  let ok=false;
+  if(!view.noSync){ok=await qgPush2Sheets(viewKey,rec,rowIdx);qgSaveData(viewKey);}
+  toast((editId!=null?'Lançamento atualizado!':'Lançamento adicionado!')+(ok?' ✓ Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
 }
 
 function qgDelRec(id){
-  const recs=S.qg.recs[S.qg.view];
+  const viewKey=S.qg.view;
+  const view=QG_VIEWS[viewKey];
+  const recs=S.qg.recs[viewKey];
   const rec=recs.find(function(x){return x._id===id;});
   if(!rec)return;
-  confirmDel('Excluir este registro?',function(){
-    S.qg.recs[S.qg.view]=recs.filter(function(x){return x._id!==id;});
+  const canSync=S.url&&!view.noSync;
+  confirmDel('Excluir este registro?',async function(){
+    if(canSync&&rec._synced){
+      showLoading();
+      try{
+        const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',view:viewKey,rowIndex:rec._id})});
+        const j=await res.json();
+        if(j.error)toast('Excluído localmente. Erro ao arquivar: '+j.error,'warn');
+        else toast('Excluído e arquivado ✓ (linha '+rec._id+')');
+      }catch(e){toast('Excluído localmente. Sem conexão com o Sheets.','warn');}
+      finally{hideLoading();}
+    }else{
+      toast('Excluído!');
+    }
+    S.qg.recs[viewKey]=S.qg.recs[viewKey].filter(function(x){return x._id!==id;});
     S.qg.selIds.delete(id);
-    qgSaveData();qgApplyF();
-    toast('Excluído!');
-  },'Esta ação não pode ser desfeita.');
+    qgSaveData(viewKey);qgApplyF();
+  },canSync?'O registro será movido para a aba "Excluídos" no Google Sheets.':'Esta ação não pode ser desfeita.');
 }
 
 // ------------------------------------------------------------
