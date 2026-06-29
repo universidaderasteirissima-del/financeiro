@@ -4638,7 +4638,7 @@ function qgOpenPedido(){
   lojaSel.innerHTML='<option value="">Selecione</option>'+lojas.map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
   const fornSel=document.getElementById('qgPedForn');
   fornSel.innerHTML='<option value="">Selecione</option>'+AR_FORNS.map(function(f){return '<option value="'+xe(f)+'">'+xe(f)+'</option>';}).join('');
-  fornSel.value='FRANCHISING';
+  fornSel.value='BRILHANTE';
   qgLoadData('lojas').then(function(){
     lojaSel.innerHTML='<option value="">Selecione</option>'+(S.qg.recs.lojas||[]).filter(function(l){return !l.kind||l.kind==='Loja';}).map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
   });
@@ -4757,13 +4757,20 @@ async function qgConfirmPedido(){
     return'em aberto';
   }
 
+  // Venc. 1ª Parcela = Data de emissão + 30 dias
+  let dv1='';
+  if(de){
+    const _d=new Date(de+'T00:00:00');_d.setDate(_d.getDate()+30);
+    dv1=_d.toISOString().slice(0,10);
+  }
+
   const recs=S.qg.recs.areceber;
   const rec={
     _id:Math.max(1,...recs.map(function(x){return x._id;}),0)+1,
     tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
     vNota:valor,totalNota:valor,
     boletoMkt:0,boletoFran:0,
-    dv1:de,boletoBri1:0,dp1:'',st1:_st(de),
+    dv1:dv1,boletoBri1:0,dp1:'',st1:_st(dv1),
     dv2:'',boletoBri2:0,dp2:'',st2:'em aberto',
   };
   recs.push(rec);
