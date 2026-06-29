@@ -47,13 +47,32 @@ const HEADER_MAP = {
     // planilha, a coluna "Valor da nota" deve receber o valor menor/direto e
     // "Total da Nota" o valor maior/calculado — por isso o mapeamento abaixo
     // é invertido em relação às chaves do sistema.
+    // Cabeçalhos confirmados via diagnosticarCabecalhos() em 2026-06-29.
     tipo:'Tipo', loja:'Loja', forn:'Fornecedor', de:'Data de emissão', nota:'Nota',
     vNota:'Total da Nota', totalNota:'Valor da nota',
     boletoMkt:'Boleto marketing', boletoFran:'Boleto franchising',
-    dv1:'Venc. 1ª Parcela', boletoBri1:'Boleto brilhante/fábrica 1ª', dp1:'Data pagto 1ª', st1:'Status 1ª Parcela',
-    dv2:'Venc. 2ª Parcela', boletoBri2:'Boleto brilhante/fábrica 2ª', dp2:'Data pagto 2ª', st2:'Status 2ª Parcela'
+    dv1:'Data de vencimento 1° Parcela', dp1:'Data de pagamento 1° Parcela', st1:'Status 1° Parcela',
+    dv2:'Data de vencimento 2° Parcela', dp2:'Data de pagamento 2° Parcela', st2:'Status 2° Parcela'
+    // boletoBri1/boletoBri2 (valor R$) ainda não têm coluna própria confirmada
+    // na planilha — "Boleto brilhante / fábrica N° Parcela" é uma coluna de
+    // DATA (recebe a mesma data de dv1/dv2, ver applyBoletoBriDates abaixo)
   }
 };
+
+// "Boleto brilhante / fábrica N° Parcela" — colunas de DATA (não valor),
+// recebem sempre a mesma data de dv1/dv2 da parcela correspondente
+const BOLETO_BRI_DATE_HEADERS = {
+  dv1: 'Boleto brilhante / fábrica 1° Parcela',
+  dv2: 'Boleto brilhante / fábrica 2° Parcela'
+};
+function applyBoletoBriDates(view, fields, headers, row) {
+  if (view !== 'areceber') return;
+  Object.keys(BOLETO_BRI_DATE_HEADERS).forEach(function (key) {
+    if (!fields[key]) return;
+    const idx = findHeaderIdx(headers, BOLETO_BRI_DATE_HEADERS[key]);
+    if (idx >= 0) row[idx] = isoToBr(fields[key]);
+  });
+}
 
 // Campos que são datas (DD/MM/AAAA na planilha, AAAA-MM-DD no sistema)
 const DATE_FIELDS = {
@@ -102,8 +121,16 @@ function respond(data) {
 function getSheet(view) {
   const name = VIEW_SHEETS[view];
   if (!name) throw new Error('View desconhecida: ' + view);
+  return getSheetByNameLoose(name);
+}
+// Tolerante a espaços extras no nome da aba (ex: "A pagar franchising "
+// com espaço no final, como está na planilha original)
+function getSheetByNameLoose(name) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(name);
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.getSheets().find(function (s) { return s.getName().trim() === name.trim(); });
+  }
   if (!sheet) throw new Error('Aba "' + name + '" não encontrada na planilha.');
   return sheet;
 }
@@ -197,6 +224,7 @@ function addRow(view, fields) {
     if (dateKeys.indexOf(key) >= 0 && v) v = isoToBr(v);
     newRow[idx] = v;
   });
+  applyBoletoBriDates(view, fields || {}, headers, newRow);
   const range = sheet.getRange(rowIndex, 1, 1, newRow.length);
   range.setValues([newRow]);
   range.setBackground(COR_SISTEMA);
@@ -219,6 +247,7 @@ function updateRow(view, rowIndex, fields) {
     if (dateKeys.indexOf(key) >= 0 && v) v = isoToBr(v);
     existing[idx] = v;
   });
+  applyBoletoBriDates(view, fields || {}, headers, existing);
   const range = sheet.getRange(rowIndex, 1, 1, existing.length);
   range.setValues([existing]);
   range.setBackground(COR_SISTEMA);
@@ -308,8 +337,9 @@ function getDeleted() {
 // ============================================================
 function diagnosticarCabecalhos() {
   Object.keys(VIEW_SHEETS).forEach(function (view) {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(VIEW_SHEETS[view]);
-    if (!sheet) { Logger.log(view + ': ABA NÃO ENCONTRADA (' + VIEW_SHEETS[view] + ')'); return; }
+    let sheet;
+    try { sheet = getSheetByNameLoose(VIEW_SHEETS[view]); }
+    catch (e) { Logger.log(view + ': ABA NÃO ENCONTRADA (' + VIEW_SHEETS[view] + ')'); return; }
     const headers = getHeaders(sheet);
     Logger.log('--- ' + view + ' (' + VIEW_SHEETS[view] + ') — cabeçalhos na planilha: ' + JSON.stringify(headers));
     Object.keys(HEADER_MAP[view]).forEach(function (key) {
