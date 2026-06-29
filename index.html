@@ -183,9 +183,13 @@ th:hover{background:#EAD9C8!important}
           <label class="lbl">Loja</label>
           <select id="fLo" onchange="applyF()" class="sel"></select>
         </div>
-        <div>
+        <div style="position:relative">
           <label class="lbl">Fornecedor</label>
-          <select id="fFo" onchange="applyF()" class="sel"></select>
+          <div id="fFoBtn" onclick="toggleFoDrop(event)" class="sel" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+            <span id="fFoLbl">Todos</span>
+            <span style="font-size:.65rem;color:#C8A882">▾</span>
+          </div>
+          <div id="fFoDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1.5px solid var(--border);border-radius:3px;box-shadow:0 6px 16px rgba(44,24,16,.12);margin-top:.25rem;padding:.4rem;max-height:260px;overflow-y:auto"></div>
         </div>
         <div style="position:relative">
           <label class="lbl">Status</label>
@@ -864,7 +868,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],foFilter:[],selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // Estado das abas "QG" (Franquias) — aditivo, não interfere em S acima
 S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
@@ -913,7 +917,7 @@ function doLogout(){
   localStorage.removeItem(lsk('r_ok'));
   localStorage.removeItem('r_mode');
   MODO='';
-  S.recs=[];S.filt=[];S.stFilter=[];S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
+  S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
   S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
   document.getElementById('qgTabs').style.display='none';
   document.getElementById('qgView').style.display='none';
@@ -1057,8 +1061,10 @@ function addForn(){const v=document.getElementById('cfNvFo').value.trim();if(!v|
 function bldFilters(){
   const lo=document.getElementById('fLo'),cur=lo.value;
   lo.innerHTML='<option value="">Todas as lojas</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
-  const fo=document.getElementById('fFo'),curf=fo.value;
-  fo.innerHTML='<option value="">Todos</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===curf?' selected':'')+'>'+xe(v)+'</option>').join('');
+  // Fornecedor é multi-seleção (checkboxes), igual ao filtro de Status
+  const fd=document.getElementById('fFoDrop');
+  fd.innerHTML=S.forns.map(v=>'<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background=\'#FAF7F4\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" value="'+xe(v)+'"'+(S.foFilter.includes(v)?' checked':'')+' onchange="toggleFoFilter(this)" /> '+xe(v)+'</label>').join('');
+  updateFoLbl();
 }
 function bldSels(){
   ['rf_lo','bf_lo','nfLO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
@@ -1089,14 +1095,15 @@ function setPeriod(preset){
 }
 
 function applyF(){
-  const flo=g('fLo'),ffo=g('fFo'),fsq=g('fSq').toLowerCase();
+  const flo=g('fLo'),fsq=g('fSq').toLowerCase();
   const fde=g('fDe'),fate=g('fAte');
   // Permite buscar várias notas/termos de uma vez, separados por vírgula ou ponto-e-vírgula
   // (ex: "ped702, 9271") — registro entra se bater com QUALQUER um dos termos.
   const sqTerms=fsq.split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
   S.filt=S.recs.filter(r=>{
     if(flo&&r.lo!==flo)return false;
-    if(ffo&&r.fo!==ffo)return false;
+    // Permite selecionar vários fornecedores ao mesmo tempo (filtro tipo "Status")
+    if(S.foFilter.length&&!S.foFilter.includes(r.fo))return false;
     if(S.stFilter.length&&!S.stFilter.includes(r.st))return false;
     if(sqTerms.length){
       const hay=(r.fo+' '+r.nn+' '+r.lo+' '+r.st).toLowerCase();
@@ -1125,12 +1132,14 @@ function sBy(col){
 }
 
 function clearF(){
-  ['fLo','fFo','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
+  ['fLo','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fSq').value='';
-  S.stFilter=[];
+  S.stFilter=[];S.foFilter=[];
   document.querySelectorAll('#fStDrop input[type=checkbox]').forEach(c=>c.checked=false);
-  updateStLbl();
+  document.querySelectorAll('#fFoDrop input[type=checkbox]').forEach(c=>c.checked=false);
+  updateStLbl();updateFoLbl();
   const drop=document.getElementById('fStDrop');if(drop)drop.style.display='none';
+  const fdrop=document.getElementById('fFoDrop');if(fdrop)fdrop.style.display='none';
   applyF();
 }
 
@@ -1160,11 +1169,36 @@ function updateStLbl(){
   lbl.textContent=S.stFilter.map(s=>map[s]||s).join(', ');
 }
 
+function toggleFoDrop(ev){
+  if(ev)ev.stopPropagation();
+  const drop=document.getElementById('fFoDrop');
+  if(!drop)return;
+  drop.style.display=drop.style.display==='none'?'block':'none';
+}
+
+function toggleFoFilter(chk){
+  const v=chk.value;
+  if(chk.checked){
+    if(!S.foFilter.includes(v))S.foFilter.push(v);
+  }else{
+    S.foFilter=S.foFilter.filter(x=>x!==v);
+  }
+  updateFoLbl();
+  applyF();
+}
+
+function updateFoLbl(){
+  const lbl=document.getElementById('fFoLbl');
+  if(!lbl)return;
+  if(!S.foFilter.length){lbl.textContent='Todos';return;}
+  lbl.textContent=S.foFilter.length===1?S.foFilter[0]:S.foFilter.length+' fornecedores selecionados';
+}
+
 document.addEventListener('click',function(ev){
   const drop=document.getElementById('fStDrop'),btn=document.getElementById('fStBtn');
-  if(!drop||drop.style.display==='none')return;
-  if(drop.contains(ev.target)||(btn&&btn.contains(ev.target)))return;
-  drop.style.display='none';
+  if(drop&&drop.style.display!=='none'&&!drop.contains(ev.target)&&!(btn&&btn.contains(ev.target)))drop.style.display='none';
+  const fdrop=document.getElementById('fFoDrop'),fbtn=document.getElementById('fFoBtn');
+  if(fdrop&&fdrop.style.display!=='none'&&!fdrop.contains(ev.target)&&!(fbtn&&fbtn.contains(ev.target)))fdrop.style.display='none';
 });
 
 // ============================================================
