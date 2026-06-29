@@ -174,6 +174,9 @@ th:hover{background:#EAD9C8!important}
       <button onclick="openNF()" class="btn-primary" style="display:flex;align-items:center;gap:.5rem;background:#7A4F3A">
         <span style="font-size:.9rem">+</span> Nota Fiscal
       </button>
+      <button onclick="openPedido()" class="btn-primary" style="display:flex;align-items:center;gap:.5rem;background:#5C3D2E">
+        <span style="font-size:.9rem">🛒</span> Importar Pedido
+      </button>
       <button onclick="openAdd()" class="btn-accent" style="display:flex;align-items:center;gap:.5rem">
         <span>+</span> Nova Conta
       </button>
@@ -303,6 +306,8 @@ th:hover{background:#EAD9C8!important}
             <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
               <button class="btn-primary" onclick="qgOpenAdd()">+ Novo Lançamento</button>
               <button id="qgImportNFBtn" class="btn-accent" onclick="qgOpenNF()" style="display:none">📄 Importar NF</button>
+              <button id="qgImportBoletoBtn" class="btn-accent" onclick="qgOpenApBoleto()" style="display:none">📎 Importar Boleto</button>
+              <button id="qgImportPedidoBtn" class="btn-accent" onclick="qgOpenPedido()" style="display:none">🛒 Importar Pedido</button>
               <button class="btn-secondary" onclick="qgExportCSV()">⬇ Exportar CSV</button>
               <button class="btn-secondary" onclick="qgOpenExcluidos()">🗑 Excluídos</button>
               <span id="qgRecCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
@@ -598,6 +603,154 @@ th:hover{background:#EAD9C8!important}
   </div>
 </div>
 
+<!-- ===== MODAL: IMPORTAR BOLETO (A PAGAR — FRANQUIAS) ===== -->
+<div id="mQgApBoleto" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" id="mQgApBoletoBox" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810" id="qgApBoletoTtl">Importar Boleto</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de linha digitável ou PDF</p>
+      </div>
+      <button onclick="hideMagnifier();cm('mQgApBoleto')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Step 1 -->
+    <div id="qgApS1">
+      <div style="margin-bottom:1rem">
+        <label class="lbl">Linha digitável do boleto (47 ou 48 dígitos)</label>
+        <textarea id="qgApLi" rows="3" placeholder="Cole aqui: 00190.00009 01234.560007 23456.780008 9 94550000100000"
+          style="width:100%;border:1.5px solid var(--border);border-radius:3px;padding:.6rem .75rem;font-size:.8rem;font-family:monospace;resize:none;color:#2C1810;background:#fff"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;margin:.875rem 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:.7rem;color:#B8896A;font-weight:600;letter-spacing:.06em;text-transform:uppercase">ou envie o PDF</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <label for="qgApPDF" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s;display:block" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.25rem">📎</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF do boleto</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="qgApPDFNm">Nenhum arquivo selecionado</p>
+      </label>
+      <input type="file" id="qgApPDF" accept=".pdf" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px" onchange="document.getElementById('qgApPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+        <button onclick="hideMagnifier();cm('mQgApBoleto')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="qgParseApBoleto()" class="btn-primary" style="flex:2">Analisar Boleto →</button>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div id="qgApS2" style="display:none">
+      <div style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="qgApPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="qgApViewerMsg">Nenhum PDF carregado</p>
+          </div>
+        </div>
+        <!-- RIGHT: Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <p style="font-size:.7rem;color:#7A4F3A" id="qgApInf"></p>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div><label class="lbl">Categoria *</label><input type="text" id="qgApCat" class="inp" style="font-size:.8rem" list="qgApCatDl" /><datalist id="qgApCatDl"></datalist></div>
+              <div><label class="lbl">Despesa / Descrição</label><input type="text" id="qgApDesc" class="inp" style="font-size:.8rem" /></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Vencimento *</label><input type="date" id="qgApDv" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Valor a Pagar (R$) *</label><input type="number" step="0.01" id="qgApVa" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div>
+                  <label class="lbl">Status</label>
+                  <select id="qgApStatus" class="sel" style="font-size:.8rem">
+                    <option value="em aberto">Em aberto</option>
+                    <option value="vence hoje">Vence hoje</option>
+                    <option value="vencida">Vencida</option>
+                    <option value="pago">Pago</option>
+                  </select>
+                </div>
+                <div><label class="lbl">Data de Pagamento</label><input type="date" id="qgApDp" class="inp" style="font-size:.8rem" /></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="qgApGoStep(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="qgConfirmApBoleto()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamento</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: IMPORTAR PEDIDO (A RECEBER — FRANQUIAS) ===== -->
+<div id="mQgPedido" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" id="mQgPedidoBox" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Importar Pedido</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de Pedido de Venda (PDF) — A receber</p>
+      </div>
+      <button onclick="hideMagnifier();cm('mQgPedido')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Step 1 -->
+    <div id="qgPedS1">
+      <label for="qgPedPDF" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s;display:block" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.3rem">🛒</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF do Pedido</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="qgPedPDFNm">Nenhum arquivo selecionado</p>
+      </label>
+      <input type="file" id="qgPedPDF" accept=".pdf" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px" onchange="document.getElementById('qgPedPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button onclick="hideMagnifier();cm('mQgPedido')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="qgParsePedido()" class="btn-primary" style="flex:2">Analisar Pedido →</button>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div id="qgPedS2" style="display:none">
+      <div style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="qgPedPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="qgPedViewerMsg">Nenhum PDF carregado</p>
+          </div>
+        </div>
+        <!-- RIGHT: Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <p style="font-size:.7rem;color:#7A4F3A" id="qgPedInf"></p>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Loja *</label><select id="qgPedLoja" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Fornecedor *</label><select id="qgPedForn" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Tipo</label><select id="qgPedTipo" class="sel" style="font-size:.8rem"><option value="FRANQUIA">FRANQUIA</option><option value="LOJA PRÓPRIA">LOJA PRÓPRIA</option></select></div>
+                <div><label class="lbl">Nº do Pedido *</label><input type="text" id="qgPedNota" class="inp" style="font-size:.8rem" placeholder="PED 665" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Data do Pedido</label><input type="date" id="qgPedDE" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Valor do Pedido (R$) *</label><input type="number" step="0.01" id="qgPedValor" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <p style="font-size:.7rem;color:#9B6B50">Pedido não é NF — o valor único vai para "Valor da Nota" e "Total da Nota"; boletos marketing/franchising/brilhante ficam zerados.</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="qgPedSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="qgConfirmPedido()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamento</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: QG EXCLUÍDOS (Franquias) ===== -->
 <div id="mQgExcluidos" class="modal-overlay" style="display:none">
   <div class="modal-box fade" style="max-width:600px">
@@ -830,6 +983,87 @@ th:hover{background:#EAD9C8!important}
           <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
             <button onclick="nfSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
             <button onclick="confirmNF()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamentos</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: IMPORTAR PEDIDO (LOJAS PRÓPRIAS) ===== -->
+<div id="mPedido" class="modal-overlay" style="display:none">
+  <div class="modal-box fade" id="mPedidoBox" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Importar Pedido</h2>
+        <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de Pedido de Venda (PDF)</p>
+      </div>
+      <button onclick="hideMagnifier();cm('mPedido')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+    </div>
+    <!-- Step 1 -->
+    <div id="pedS1">
+      <label for="pedPDF" style="border:2px dashed var(--border);border-radius:3px;padding:1.5rem;text-align:center;cursor:pointer;background:#FAF7F4;transition:border-color .15s;display:block" onmouseover="this.style.borderColor='#9B6B50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:.9rem;color:#9B6B50;margin-bottom:.3rem">🛒</div>
+        <p style="font-size:.8rem;color:#7A4F3A;font-weight:600">Clique para selecionar o PDF do Pedido</p>
+        <p style="font-size:.7rem;color:#B8896A;margin-top:.2rem" id="pedPDFNm">Nenhum arquivo selecionado</p>
+      </label>
+      <input type="file" id="pedPDF" accept=".pdf" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px" onchange="document.getElementById('pedPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
+      <div style="text-align:center;font-size:.75rem;color:#B8896A;margin:.75rem 0">— ou preencha manualmente na próxima etapa —</div>
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button onclick="hideMagnifier();cm('mPedido')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="parsePedido()" class="btn-primary" style="flex:2">Analisar Pedido →</button>
+      </div>
+    </div>
+    <!-- Step 2 -->
+    <div id="pedS2" style="display:none">
+      <div style="display:flex;gap:1rem;height:calc(80vh - 100px);min-height:420px">
+        <!-- LEFT: PDF Viewer -->
+        <div style="flex:0 0 42%;display:flex;flex-direction:column;min-width:0">
+          <p style="font-size:.68rem;font-weight:700;color:#9B6B50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;flex-shrink:0">📄 Documento</p>
+          <div id="pedPDFViewer" style="flex:1;overflow-y:auto;background:#3a3a3a;border-radius:3px;padding:.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+            <p style="color:#999;font-size:.75rem;padding:2rem 0" id="pedViewerMsg">Nenhum PDF carregado</p>
+          </div>
+        </div>
+        <!-- RIGHT: Form -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
+            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <p style="font-size:.7rem;color:#7A4F3A" id="pedInf"></p>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:.15rem">
+            <div style="display:grid;gap:.6rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Loja *</label><select id="pedLO" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
+                <div><label class="lbl">Cliente</label><input type="text" id="pedFO" class="inp" style="font-size:.8rem" list="pedFODl" /><datalist id="pedFODl"></datalist></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Nº do Pedido *</label><input type="text" id="pedNN" class="inp" style="font-size:.8rem" placeholder="PED 665" /></div>
+                <div><label class="lbl">Data do Pedido</label><input type="date" id="pedDE" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Valor (R$) *</label><input type="number" step="0.01" id="pedVN" class="inp" style="font-size:.8rem" oninput="pedCalcValues()" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
+                <div><label class="lbl">MKT (R$)</label><input type="number" step="0.01" id="pedMK" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Produto (R$)</label><input type="number" step="0.01" id="pedPR" value="0" class="inp" style="font-size:.8rem" /></div>
+                <div><label class="lbl">Serviço (R$)</label><input type="number" step="0.01" id="pedSV" value="0" class="inp" style="font-size:.8rem" /></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div><label class="lbl">Data de Vencimento *</label><input type="date" id="pedDV" class="inp" style="font-size:.8rem" /></div>
+                <div>
+                  <label class="lbl">Status</label>
+                  <select id="pedST" class="sel" style="font-size:.8rem">
+                    <option value="em aberto">Em aberto</option>
+                    <option value="vence hoje">Vence hoje</option>
+                    <option value="vencida">Vencida</option>
+                    <option value="pago">Pago</option>
+                  </select>
+                </div>
+              </div>
+              <p style="font-size:.7rem;color:#9B6B50">Pedido não é boleto nem nota fiscal — MKT e Serviço ficam zerados por padrão; o valor único do pedido vai para "Produto".</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
+            <button onclick="pedSt(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
+            <button onclick="confirmPedido()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamento</button>
           </div>
         </div>
       </div>
@@ -1077,7 +1311,7 @@ function bldFilters(){
   updateFoLbl();
 }
 function bldSels(){
-  ['rf_lo','bf_lo','nfLO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
+  ['rf_lo','bf_lo','nfLO','pedLO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
   ['rf_fo','bf_fo','nfFO'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML='<option value="">Selecione</option>'+S.forns.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');});
 }
 
@@ -1834,6 +2068,9 @@ function extractBoletoData(txt,barcode){
     });
   }
   if(fo)prs.fo=fo;
+  // Texto bruto do beneficiário, mesmo sem bater com S.forns — usado em
+  // contextos (ex: Franquias) que não têm a lista fixa de fornecedores de lp_
+  if(foTxt)prs.foTxt=foTxt;
 
   // LOJA IDENTIFICATION — hardcoded city names + CEP
   console.log('[LOJA] txt len:',txt.length,'| sample:',txt.substring(0,150));
@@ -1856,6 +2093,42 @@ function extractBoletoData(txt,barcode){
 function extractFromPDF(txt){return extractBoletoData(txt,'');}
 function extractNF(txt){return extractBoletoData(txt,'').nn||'';}
 function extractValue(txt){return extractBoletoData(txt,'').vn||'';}
+
+// ------------------------------------------------------------
+// PEDIDO DE VENDA (Qaxa) — usado tanto em Lojas Próprias quanto em
+// Franquias > A receber. Documento de venda, não é boleto nem NF-e.
+// ------------------------------------------------------------
+function extractPedidoData(txt){
+  const prs={};
+  if(!txt)return prs;
+  // Número do pedido é muito extenso — usa só os 3 últimos dígitos
+  const mNum=txt.match(/N[ºo]\s*PED(\d+)/i);
+  if(mNum){prs.numPedFull=mNum[1];prs.numPed='PED '+mNum[1].slice(-3);}
+  // Cliente (seção "Dados do Cliente")
+  const mCli=txt.match(/Nome:\s*([^\n]+?)\s*CNPJ:/i);
+  if(mCli)prs.cliente=mCli[1].trim();
+  // Data do pedido
+  const mDt=txt.match(/Data:\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if(mDt)prs.data=br2iso(mDt[1]);
+  // Valor total do pedido
+  const mVal=txt.match(/Total\s+Geral:\s*R\$\s*([\d.,]+)/i);
+  if(mVal)prs.valor=tof(mVal[1]);
+  // Loja emitente — detecta pelo CEP/cidade da seção "Dados do Emitente"
+  // (texto ANTES de "Dados do Cliente", para não pegar o endereço do cliente)
+  const _cliIdx=txt.search(/Dados do Cliente/i);
+  const emitSec=_cliIdx>=0?txt.substring(0,_cliIdx):txt;
+  const cks=Object.keys(LOJA_CEP);
+  for(const ck of cks){
+    const cd=ck.slice(0,5)+'-'+ck.slice(5);
+    if(emitSec.indexOf(ck)>=0||emitSec.indexOf(cd)>=0){prs.loja=LOJA_CEP[ck];break;}
+  }
+  if(!prs.loja){
+    const txn=emitSec.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    const CIDADES_PED={'SHOPPING DA ILHA':'Shopping da Ilha','SOUSA LIMA':'Sousa Lima','NEW MARABA':'New Marabá','RIO ANIL':'Rio anil','ARAGUAINA':'Araguaína','FORTALEZA':'Fortaleza','IMPERIAL':'Imperial','MARABA':'Marabá','PALMAS':'Palmas','BALSAS':'Balsas','BELEM':'Belém'};
+    for(const ck2 in CIDADES_PED){if(txn.indexOf(ck2)>=0){prs.loja=CIDADES_PED[ck2];break;}}
+  }
+  return prs;
+}
 
 async function saveBol(){
   const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
@@ -2917,6 +3190,141 @@ async function confirmNF(){
   toast(n+' lançamento'+(n>1?'s':'')+' adicionado'+(n>1?'s':'')+' ✓'+(synced<n?' ('+synced+' de '+n+' sincronizados com o Sheets — verifique a conexão)':''),synced<n?'warn':'ok');
 }
 
+// ------------------------------------------------------------
+// PEDIDO DE VENDA (Qaxa) — Lojas Próprias
+// Não é boleto nem NF-e; usa extractPedidoData (helper compartilhado).
+// MKT e Serviço ficam zerados; o valor único do pedido vai para Produto.
+// ------------------------------------------------------------
+let pedPdfDoc=null,pedPdfTxt='';
+
+function openPedido(){
+  pedPdfTxt='';pedPdfDoc=null;
+  document.getElementById('pedPDF').value='';
+  document.getElementById('pedPDFNm').textContent='Nenhum arquivo selecionado';
+  document.getElementById('pedInf').textContent='';
+  ['pedFO','pedNN','pedDE','pedVN','pedDV'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pedMK').value='0';
+  document.getElementById('pedPR').value='0';
+  document.getElementById('pedSV').value='0';
+  document.getElementById('pedST').value='em aberto';
+  document.getElementById('pedFODl').innerHTML=S.forns.map(f=>'<option value="'+xe(f)+'"></option>').join('');
+  pedSt(1);
+  var m=document.getElementById('mPedido');document.body.appendChild(m);m.style.display='flex';
+}
+
+function pedSt(n){
+  document.getElementById('pedS1').style.display=n===1?'block':'none';
+  document.getElementById('pedS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mPedidoBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&pedPdfDoc)setTimeout(function(){renderPedidoPDF(pedPdfDoc).catch(function(){});},120);
+}
+
+async function renderPedidoPDF(pdfDoc){
+  var viewer=document.getElementById('pedPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('pedViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=Math.min(1080/nat.width,3.0);
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';canvas.style.display='block';
+    canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    canvas.dataset.page=String(i);
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
+}
+
+function pedCalcValues(){
+  const vn=parseFloat(document.getElementById('pedVN').value)||0;
+  document.getElementById('pedPR').value=vn.toFixed(2);
+}
+
+async function parsePedido(){
+  const file=document.getElementById('pedPDF').files[0];
+  if(file){
+    try{
+      toast('Lendo PDF...','info');
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      pedPdfDoc=doc;
+      let txt='';
+      for(let i=1;i<=doc.numPages;i++){
+        const pg=await doc.getPage(i);
+        const tc=await pg.getTextContent();
+        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+      }
+      pedPdfTxt=txt;
+    }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
+  }
+
+  const prs=extractPedidoData(pedPdfTxt||'');
+
+  document.getElementById('pedNN').value=prs.numPed||'';
+  document.getElementById('pedDE').value=prs.data||'';
+  document.getElementById('pedDV').value=prs.data||'';
+  document.getElementById('pedVN').value=prs.valor!=null?prs.valor:'';
+  document.getElementById('pedPR').value=prs.valor!=null?prs.valor.toFixed(2):'0';
+  document.getElementById('pedMK').value='0';
+  document.getElementById('pedSV').value='0';
+  if(prs.cliente)document.getElementById('pedFO').value=prs.cliente;
+  if(prs.loja)document.getElementById('pedLO').value=prs.loja;
+
+  const parts=[];
+  if(prs.cliente)parts.push('Cliente: '+prs.cliente);
+  if(prs.data)parts.push('Data: '+fDt(prs.data));
+  if(prs.valor!=null)parts.push('Valor: '+fBRL(prs.valor));
+  document.getElementById('pedInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
+
+  pedSt(2);
+}
+
+async function confirmPedido(){
+  const lo=document.getElementById('pedLO').value;
+  const fo=document.getElementById('pedFO').value.trim();
+  const nn=document.getElementById('pedNN').value.trim();
+  const de=document.getElementById('pedDE').value;
+  const dv=document.getElementById('pedDV').value;
+  const vn=parseFloat(document.getElementById('pedVN').value)||0;
+  const mk=parseFloat(document.getElementById('pedMK').value)||0;
+  const pr=parseFloat(document.getElementById('pedPR').value)||0;
+  const sv=parseFloat(document.getElementById('pedSV').value)||0;
+  const st=document.getElementById('pedST').value;
+
+  if(!lo){toast('Selecione a Loja','warn');return;}
+  if(!dv){toast('Informe a Data de Vencimento','warn');return;}
+  if(!vn){toast('Informe o Valor','warn');return;}
+  if(!nn){toast('Informe o número do Pedido','warn');return;}
+
+  const rec={
+    _id:Date.now(),lo,fo,nn,de,dv,vn,mk,pr,sv,
+    st,dp:'',mv:dv?new Date(dv+'T12:00').getMonth()+1:0,url:''
+  };
+  S.recs.push(rec);
+  S.lastId=rec._id;
+  const ok=await push2Sheets(rec,null);
+  svData();applyF();
+  hideMagnifier();cm('mPedido');
+  toast('Pedido importado ✓'+(ok?' Google Sheets':(S.url?' (Sheets não sincronizado — verifique a conexão)':'')));
+}
+
 // ============================================================
 // QG VIEWS (Franquias) — "A pagar brilhante/marketing/franchising" e "A receber"
 // ============================================================
@@ -3074,6 +3482,11 @@ function qgSwitchTab(view){
   S.qg.pg=1;S.qg.sc='';S.qg.sd='asc';S.qg.selIds=new Set();S.qg.filters={};
   const nfBtn=document.getElementById('qgImportNFBtn');
   if(nfBtn)nfBtn.style.display=view==='areceber'?'':'none';
+  const pedBtn=document.getElementById('qgImportPedidoBtn');
+  if(pedBtn)pedBtn.style.display=view==='areceber'?'':'none';
+  const apViews=['brilhante','marketing','franchising'];
+  const boletoBtn=document.getElementById('qgImportBoletoBtn');
+  if(boletoBtn)boletoBtn.style.display=apViews.includes(view)?'':'none';
   qgRenderTabs();
   qgLoadData(view).then(()=>{
     qgBuildHeader();
@@ -4078,6 +4491,289 @@ function qgConfirmNF(){
   if(S.qg.view==='areceber')qgApplyF();
   toast('Nota fiscal importada ✓ Boletos e parcelas preenchidos automaticamente.');
   qgEditRec(rec._id);
+}
+
+// ------------------------------------------------------------
+// Importação de Boleto — abas "A pagar" (brilhante/marketing/franchising)
+// Reaproveita extractBoletoData (mesmo motor de Lojas Próprias), mapeado
+// para o esquema AP_FIELDS (categoria/mês/vencimento/despesa/valor/status)
+// ------------------------------------------------------------
+let qgApPdfDoc=null,qgApPdfTxt='';
+
+function qgApGoStep(n){
+  document.getElementById('qgApS1').style.display=n===1?'block':'none';
+  document.getElementById('qgApS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mQgApBoletoBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&qgApPdfDoc)setTimeout(function(){qgRenderApPDF(qgApPdfDoc).catch(function(){});},120);
+}
+
+async function qgRenderApPDF(pdfDoc){
+  var viewer=document.getElementById('qgApPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('qgApViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=Math.min(1080/nat.width,3.0);
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';canvas.style.display='block';
+    canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    canvas.dataset.page=String(i);
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
+}
+
+function qgOpenApBoleto(){
+  qgApPdfTxt='';qgApPdfDoc=null;
+  document.getElementById('qgApPDF').value='';
+  document.getElementById('qgApPDFNm').textContent='Nenhum arquivo selecionado';
+  document.getElementById('qgApLi').value='';
+  document.getElementById('qgApInf').textContent='';
+  ['qgApCat','qgApDesc','qgApDv','qgApVa','qgApDp'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('qgApStatus').value='em aberto';
+  document.getElementById('qgApBoletoTtl').textContent='Importar Boleto — '+QG_VIEWS[S.qg.view].label;
+  var dl=document.getElementById('qgApCatDl');
+  dl.innerHTML=qgDistinct(S.qg.recs[S.qg.view]||[],'cat').map(function(o){return '<option value="'+xe(o)+'"></option>';}).join('');
+  qgApGoStep(1);
+  var m=document.getElementById('mQgApBoleto');document.body.appendChild(m);m.style.display='flex';
+}
+
+async function qgParseApBoleto(){
+  const linha=document.getElementById('qgApLi').value.trim();
+  const file=document.getElementById('qgApPDF').files[0];
+  if(file){
+    try{
+      toast('Lendo PDF...','info');
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      qgApPdfDoc=doc;
+      let txt='';
+      for(let i=1;i<=doc.numPages;i++){
+        const pg=await doc.getPage(i);
+        const tc=await pg.getTextContent();
+        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+      }
+      qgApPdfTxt=txt;
+    }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
+  }
+  const prs=extractBoletoData(qgApPdfTxt||'',linha);
+
+  document.getElementById('qgApDv').value=prs.dv||'';
+  document.getElementById('qgApVa').value=prs.vn||'';
+  document.getElementById('qgApDesc').value=prs.foTxt||prs.fo||prs.banco||'';
+
+  const parts=[];
+  if(prs.banco)parts.push('Banco: '+prs.banco);
+  if(prs.dv)parts.push('Venc.: '+fDt(prs.dv));
+  if(prs.vn)parts.push('Valor: '+fBRL(parseFloat(prs.vn)));
+  document.getElementById('qgApInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
+
+  qgApGoStep(2);
+}
+
+async function qgConfirmApBoleto(){
+  const viewKey=S.qg.view;
+  const view=QG_VIEWS[viewKey];
+  const cat=document.getElementById('qgApCat').value.trim();
+  const desc=document.getElementById('qgApDesc').value.trim();
+  const dv=document.getElementById('qgApDv').value;
+  const va=parseFloat(document.getElementById('qgApVa').value)||0;
+  const st=document.getElementById('qgApStatus').value;
+  const dp=document.getElementById('qgApDp').value;
+
+  if(!cat){toast('Informe a Categoria','warn');return;}
+  if(!dv){toast('Informe o Vencimento','warn');return;}
+  if(!va){toast('Informe o Valor a Pagar','warn');return;}
+
+  const recs=S.qg.recs[viewKey];
+  const rec={
+    _id:Math.max(0,...recs.map(function(x){return x._id;}))+1,
+    cat:cat,mes:dv?(new Date(dv+'T00:00:00').getMonth()+1):0,dv:dv,desc:desc,
+    va:va,vp:0,st:st,dp:dp,
+  };
+  if(view.fields.some(function(f){return f.key==='ano';}))rec.ano=dv?new Date(dv+'T00:00:00').getFullYear():0;
+  recs.push(rec);
+  qgSaveData(viewKey);
+  hideMagnifier();cm('mQgApBoleto');
+  qgApplyF();
+  let ok=false;
+  if(!view.noSync){ok=await qgPush2Sheets(viewKey,rec,null);qgSaveData(viewKey);}
+  toast('Boleto importado ✓'+(ok?' Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
+  qgApplyF();
+}
+
+// ------------------------------------------------------------
+// PEDIDO DE VENDA (Qaxa) — "A receber" (Franquias)
+// Não é NF — só o valor único do pedido (vNota=totalNota); boletos
+// marketing/franchising/brilhante ficam zerados.
+// ------------------------------------------------------------
+let qgPedPdfDoc=null,qgPedPdfTxt='';
+
+function qgOpenPedido(){
+  qgPedPdfTxt='';qgPedPdfDoc=null;
+  document.getElementById('qgPedPDF').value='';
+  document.getElementById('qgPedPDFNm').textContent='Nenhum arquivo selecionado';
+  document.getElementById('qgPedInf').textContent='';
+  ['qgPedNota','qgPedDE','qgPedValor'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('qgPedTipo').value='FRANQUIA';
+  const lojaSel=document.getElementById('qgPedLoja');
+  const lojas=(S.qg.recs.lojas||[]).filter(function(l){return !l.kind||l.kind==='Loja';});
+  lojaSel.innerHTML='<option value="">Selecione</option>'+lojas.map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
+  const fornSel=document.getElementById('qgPedForn');
+  fornSel.innerHTML='<option value="">Selecione</option>'+AR_FORNS.map(function(f){return '<option value="'+xe(f)+'">'+xe(f)+'</option>';}).join('');
+  fornSel.value='FRANCHISING';
+  qgLoadData('lojas').then(function(){
+    lojaSel.innerHTML='<option value="">Selecione</option>'+(S.qg.recs.lojas||[]).filter(function(l){return !l.kind||l.kind==='Loja';}).map(function(l){return '<option value="'+xe(l.loja)+'">'+xe(l.loja)+'</option>';}).join('');
+  });
+  qgPedSt(1);
+  var m=document.getElementById('mQgPedido');document.body.appendChild(m);m.style.display='flex';
+}
+
+function qgPedSt(n){
+  document.getElementById('qgPedS1').style.display=n===1?'block':'none';
+  document.getElementById('qgPedS2').style.display=n===2?'block':'none';
+  var box=document.getElementById('mQgPedidoBox');
+  if(box){box.style.maxWidth=n===2?'min(96vw,1150px)':'640px';box.style.overflowY=n===2?'hidden':'auto';}
+  if(n===2&&qgPedPdfDoc)setTimeout(function(){qgRenderPedidoPDF(qgPedPdfDoc).catch(function(){});},120);
+}
+
+async function qgRenderPedidoPDF(pdfDoc){
+  var viewer=document.getElementById('qgPedPDFViewer');
+  if(!viewer||!pdfDoc)return;
+  Array.from(viewer.querySelectorAll('canvas')).forEach(function(c){c.remove();});
+  var msgEl=document.getElementById('qgPedViewerMsg');
+  if(msgEl)msgEl.style.display='none';
+  for(var i=1;i<=pdfDoc.numPages;i++){
+    var pg=await pdfDoc.getPage(i);
+    var nat=pg.getViewport({scale:1});
+    var sc=Math.min(1080/nat.width,3.0);
+    var vp=pg.getViewport({scale:sc});
+    var canvas=document.createElement('canvas');
+    canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+    canvas.style.width='100%';canvas.style.display='block';
+    canvas.style.borderRadius='3px';canvas.style.marginBottom='6px';canvas.style.background='#fff';
+    canvas.dataset.page=String(i);
+    await pg.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    viewer.appendChild(canvas);
+  }
+  viewer.style.cursor='crosshair';
+  viewer.onmousemove=function(ev){
+    var tgt=ev.target;
+    if(tgt&&tgt.tagName==='CANVAS'&&tgt.dataset&&tgt.dataset.page){
+      moveMagnifier(tgt,ev);
+    }else if(bMagCanvas&&bMagCanvas.style.display==='block'){
+      bMagCanvas.style.left=(ev.clientX-130)+'px';
+      bMagCanvas.style.top=(ev.clientY-130)+'px';
+    }
+  };
+  viewer.onmouseleave=hideMagnifier;
+}
+
+async function qgParsePedido(){
+  const file=document.getElementById('qgPedPDF').files[0];
+  if(file){
+    try{
+      toast('Lendo PDF...','info');
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      qgPedPdfDoc=doc;
+      let txt='';
+      for(let i=1;i<=doc.numPages;i++){
+        const pg=await doc.getPage(i);
+        const tc=await pg.getTextContent();
+        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+      }
+      qgPedPdfTxt=txt;
+    }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
+  }
+
+  const prs=extractPedidoData(qgPedPdfTxt||'');
+
+  document.getElementById('qgPedNota').value=prs.numPed||'';
+  document.getElementById('qgPedDE').value=prs.data||'';
+  document.getElementById('qgPedValor').value=prs.valor!=null?prs.valor:'';
+
+  // Loja — tenta achar o cliente do pedido no Cadastro; senão usa o texto bruto
+  if(prs.cliente){
+    const lojaSel=document.getElementById('qgPedLoja');
+    const lojas=(S.qg.recs.lojas||[]).filter(function(l){return !l.kind||l.kind==='Loja';});
+    const match=lojas.find(function(l){return norm(l.loja).includes(norm(prs.cliente))||norm(prs.cliente).includes(norm(l.loja));});
+    if(match){
+      lojaSel.value=match.loja;
+      document.getElementById('qgPedTipo').value=match.tipo||'FRANQUIA';
+    }else if(!Array.from(lojaSel.options).some(function(o){return o.value===prs.cliente;})){
+      lojaSel.insertAdjacentHTML('beforeend','<option value="'+xe(prs.cliente)+'">'+xe(prs.cliente)+'</option>');
+      lojaSel.value=prs.cliente;
+    }else{
+      lojaSel.value=prs.cliente;
+    }
+  }
+
+  const parts=[];
+  if(prs.cliente)parts.push('Cliente: '+prs.cliente);
+  if(prs.data)parts.push('Data: '+fDt(prs.data));
+  if(prs.valor!=null)parts.push('Valor: '+fBRL(prs.valor));
+  document.getElementById('qgPedInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
+
+  qgPedSt(2);
+}
+
+async function qgConfirmPedido(){
+  const tipo=document.getElementById('qgPedTipo').value||'FRANQUIA';
+  const loja=document.getElementById('qgPedLoja').value.trim();
+  const forn=document.getElementById('qgPedForn').value.trim();
+  const nota=document.getElementById('qgPedNota').value.trim();
+  const de=document.getElementById('qgPedDE').value;
+  const valor=parseFloat(document.getElementById('qgPedValor').value)||0;
+
+  if(!loja){toast('Selecione a Loja','warn');return;}
+  if(!forn){toast('Selecione o Fornecedor','warn');return;}
+  if(!nota){toast('Informe o número do Pedido','warn');return;}
+  if(!valor){toast('Informe o Valor do Pedido','warn');return;}
+
+  const _t=new Date();_t.setHours(0,0,0,0);
+  function _st(dv){
+    if(!dv)return'em aberto';
+    const d=new Date(dv+'T00:00:00');
+    if(d.getTime()===_t.getTime())return'vence hoje';
+    if(d<_t)return'vencida';
+    return'em aberto';
+  }
+
+  const recs=S.qg.recs.areceber;
+  const rec={
+    _id:Math.max(1,...recs.map(function(x){return x._id;}),0)+1,
+    tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
+    vNota:valor,totalNota:valor,
+    boletoMkt:0,boletoFran:0,
+    dv1:de,boletoBri1:0,dp1:'',st1:_st(de),
+    dv2:'',boletoBri2:0,dp2:'',st2:'em aberto',
+  };
+  recs.push(rec);
+  qgSaveData('areceber');
+  hideMagnifier();cm('mQgPedido');
+  if(S.qg.view==='areceber')qgApplyF();
+  let ok=false;
+  if(S.url){ok=await qgPush2Sheets('areceber',rec,null);qgSaveData('areceber');}
+  toast('Pedido importado ✓'+(ok?' Google Sheets':(S.url?' (Sheets não sincronizado — verifique a conexão)':'')));
+  if(S.qg.view==='areceber')qgApplyF();
 }
 
 // ============================================================
