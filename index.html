@@ -868,7 +868,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],foFilter:[],selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],foFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // Estado das abas "QG" (Franquias) — aditivo, não interfere em S acima
 S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
@@ -917,7 +917,7 @@ function doLogout(){
   localStorage.removeItem(lsk('r_ok'));
   localStorage.removeItem('r_mode');
   MODO='';
-  S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
+  S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.lastFiltSig=null;S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
   S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
   document.getElementById('qgTabs').style.display='none';
   document.getElementById('qgView').style.display='none';
@@ -1100,6 +1100,13 @@ function applyF(){
   // Permite buscar várias notas/termos de uma vez, separados por vírgula ou ponto-e-vírgula
   // (ex: "ped702, 9271") — registro entra se bater com QUALQUER um dos termos.
   const sqTerms=fsq.split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
+  // Se algum filtro mudou desde a última chamada, desmarca a seleção anterior
+  // para não somar notas de filtros diferentes no cálculo de totais selecionados
+  const filtSig=JSON.stringify([flo,S.foFilter,S.stFilter,sqTerms,fde,fate]);
+  if(S.lastFiltSig!==null&&S.lastFiltSig!==filtSig){
+    S.selIds.clear();
+  }
+  S.lastFiltSig=filtSig;
   S.filt=S.recs.filter(r=>{
     if(flo&&r.lo!==flo)return false;
     // Permite selecionar vários fornecedores ao mesmo tempo (filtro tipo "Status")
