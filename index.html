@@ -73,6 +73,13 @@ th:hover{background:#EAD9C8!important}
 #loadBar{position:fixed;top:0;left:0;width:100%;height:3px;background:rgba(155,107,80,.15);z-index:99999;display:none;overflow:hidden}
 #loadBar div{position:absolute;top:0;left:0;height:100%;width:40%;background:#9B6B50;animation:loadSlide 1.1s infinite ease-in-out}
 @keyframes loadSlide{0%{left:-40%}50%{left:60%}100%{left:100%}}
+
+/* SPINNER DE CARREGAMENTO — visível durante toda a duração real da
+   operação (sincronização, upload, etc.), não some por tempo fixo
+   como o toast */
+#loadSpin{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:100000;background:#2C1810;color:#FAF7F4;padding:.5rem 1.15rem;border-radius:0 0 10px 10px;box-shadow:0 6px 18px rgba(44,24,16,.35);align-items:center;gap:.55rem;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:.78rem}
+#loadSpin .spinIco{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spinRot .7s linear infinite;flex-shrink:0}
+@keyframes spinRot{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -838,6 +845,9 @@ th:hover{background:#EAD9C8!important}
 <!-- BARRA DE CARREGAMENTO (operações com Sheets/GitHub) -->
 <div id="loadBar"><div></div></div>
 
+<!-- SPINNER DE CARREGAMENTO (mesma duração real da operação) -->
+<div id="loadSpin"><span class="spinIco"></span><span id="loadSpinTxt">Carregando...</span></div>
+
 <script>
 // ============================================================
 // CONSTANTS
@@ -959,7 +969,7 @@ async function ldData(){
   if(raw){S.recs=JSON.parse(raw);return;}
   // data.json é exclusivo do modo Lojas Próprias (dados históricos)
   if(MODO!=='lp_'){S.recs=[];return;}
-  showLoading();
+  showLoading('Carregando dados...');
   try{
     var res=await fetch('data.json');
     if(!res.ok)throw new Error();
@@ -978,7 +988,7 @@ function svData(){localStorage.setItem(lsk('r_data'),JSON.stringify(S.recs));}
 // ============================================================
 async function syncSheets(){
   if(!S.url){toast('Configure a URL do Apps Script.','warn');return;}
-  showLoading();
+  showLoading('Sincronizando com o Sheets...');
   try{
     toast('Sincronizando...','info');
     const res=await fetch(S.url+'?action=getData');
@@ -1011,7 +1021,7 @@ async function syncSheets(){
 }
 async function push2Sheets(rec,rowIdx){
   if(!S.url)return false;
-  showLoading();
+  showLoading('Salvando no Sheets...');
   try{
     const row=[rec.lo,rec.fo,rec.nn,i2br(rec.de),i2br(rec.dv),rec.vn,fBRL(rec.vn),rec.mk,rec.pr,rec.sv,rec.st,i2br(rec.dp),rec.mv,rec.url||''];
     const fd=S.fornData[rec.fo]||{};
@@ -1343,7 +1353,7 @@ async function bulkDeleteSelected(){
   const sel=S.recs.filter(r=>S.selIds.has(r._id));
   if(!sel.length)return;
   confirmDel('Excluir '+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+'?',async()=>{
-    showLoading();
+    showLoading('Excluindo...');
     try{
       // Arquiva do maior rowIndex para o menor: ao excluir uma linha do Sheets,
       // as linhas abaixo dela mudam de número, então processar de baixo pra cima
@@ -1417,7 +1427,7 @@ function delRec(id){
   confirmDel('Excluir este registro?',async()=>{
     S.recs=S.recs.filter(x=>x._id!==id);S.selIds.delete(id);svData();applyF();
     if(S.url&&rec._id&&(rec._synced||rec._id<1000000)){
-      showLoading();
+      showLoading('Arquivando no Sheets...');
       try{
         const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',rowIndex:rec._id})});
         const j=await res.json();
@@ -2049,8 +2059,19 @@ function tof(v){
 // Contador para suportar operações simultâneas/encadeadas sem esconder
 // a barra antes da hora (ex: confirmNF chamando push2Sheets várias vezes)
 let _loadN=0;
-function showLoading(){_loadN++;document.getElementById('loadBar').style.display='block';}
-function hideLoading(){_loadN=Math.max(0,_loadN-1);if(_loadN===0)document.getElementById('loadBar').style.display='none';}
+function showLoading(msg){
+  _loadN++;
+  document.getElementById('loadBar').style.display='block';
+  document.getElementById('loadSpinTxt').textContent=msg||'Carregando...';
+  document.getElementById('loadSpin').style.display='flex';
+}
+function hideLoading(){
+  _loadN=Math.max(0,_loadN-1);
+  if(_loadN===0){
+    document.getElementById('loadBar').style.display='none';
+    document.getElementById('loadSpin').style.display='none';
+  }
+}
 
 function toast(msg,type='ok'){
   const el=document.getElementById('tst'),mc=document.getElementById('tstMsg');
@@ -2534,7 +2555,7 @@ async function _uploadPDFToGitHub(file,folder,rec){
   if(!repo){toast('Configure o Repositório GitHub em ⚙ Config','warn');return '';}
   if(!repo.includes('/')){toast('Repositório inválido. Use o formato: usuario/repositorio','warn');return '';}
   if(!file){console.log('[GH] nenhum arquivo para upload');return '';}
-  showLoading();
+  showLoading('Enviando PDF para o GitHub...');
   try{
     toast('Enviando PDF...','info');
     var dv=rec.dv||new Date().toISOString().substring(0,10);
@@ -2598,7 +2619,7 @@ async function deletePDFFromGitHub(rawUrl){
   var filePath=m[1];
   var apiUrl='https://api.github.com/repos/'+repo+'/contents/'+filePath;
   var hdrs={'Authorization':'token '+token,'Content-Type':'application/json'};
-  showLoading();
+  showLoading('Removendo PDF do GitHub...');
   try{
     // Get current SHA
     var ck=await fetch(apiUrl,{headers:hdrs});
@@ -3094,7 +3115,7 @@ async function qgSyncSheets(view){
   view=view||S.qg.view;
   if(QG_VIEWS[view].noSync){toast('Esta aba não sincroniza com o Sheets.','warn');return;}
   if(!S.url){toast('Configure a URL do Apps Script.','warn');return;}
-  showLoading();
+  showLoading('Sincronizando com o Sheets...');
   try{
     toast('Sincronizando...','info');
     const res=await fetch(S.url+'?action=getData&view='+view);
@@ -3122,7 +3143,7 @@ async function qgSyncSheets(view){
 
 async function qgPush2Sheets(view,rec,rowIdx){
   if(!S.url)return false;
-  showLoading();
+  showLoading('Salvando no Sheets...');
   try{
     const fields=QG_VIEWS[view].fields;
     const data={};
@@ -3141,7 +3162,7 @@ async function qgOpenExcluidos(){
   if(!S.url){toast('Configure a URL do Apps Script para usar os Excluídos.','warn');return;}
   var _m=document.getElementById('mQgExcluidos');document.body.appendChild(_m);_m.style.display='flex';
   document.getElementById('qgExcluidosList').innerHTML='<p style="padding:1rem;color:#9B6B50;font-size:.8rem">Carregando...</p>';
-  showLoading();
+  showLoading('Carregando Excluídos...');
   try{
     const res=await fetch(S.url+'?action=getDeleted');
     const j=await res.json();
@@ -3161,7 +3182,7 @@ async function qgOpenExcluidos(){
 }
 
 async function qgRestoreRec(deletedRowIndex){
-  showLoading();
+  showLoading('Restaurando...');
   try{
     const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'restore',deletedRowIndex:deletedRowIndex})});
     const j=await res.json();
@@ -3483,7 +3504,7 @@ function qgBulkMarkPaid(stKey,dpKey){
   const pend=sel.filter(function(r){return r[stKey]!=='pago';});
   if(!pend.length){toast('Os lançamentos selecionados já estão pagos.','warn');return;}
   confirmDel('Marcar '+pend.length+' lançamento'+(pend.length!==1?'s':'')+' como pago(s)?',async function(){
-    showLoading();
+    showLoading('Marcando como pago...');
     try{
       const today=toISO(new Date());
       let synced=0;
@@ -3511,7 +3532,7 @@ function qgBulkDelete(){
   const sel=recs.filter(function(r){return S.qg.selIds.has(r._id);});
   if(!sel.length)return;
   confirmDel('Excluir '+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+'?',async function(){
-    showLoading();
+    showLoading('Excluindo...');
     try{
       let archived=0;
       if(canSync){
@@ -3658,7 +3679,7 @@ function qgDelRec(id){
   const canSync=S.url&&!view.noSync;
   confirmDel('Excluir este registro?',async function(){
     if(canSync&&rec._synced){
-      showLoading();
+      showLoading('Arquivando no Sheets...');
       try{
         const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',view:viewKey,rowIndex:rec._id})});
         const j=await res.json();
