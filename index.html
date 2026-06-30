@@ -4507,7 +4507,7 @@ function qgConfirmNF(){
 // Reaproveita extractBoletoData (mesmo motor de Lojas Próprias), mapeado
 // para o esquema AP_FIELDS (categoria/mês/vencimento/despesa/valor/status)
 // ------------------------------------------------------------
-let qgApPdfDoc=null,qgApPdfTxt='';
+let qgApPdfDoc=null,qgApPdfTxt='',qgApBenefNome='';
 
 function qgApGoStep(n){
   document.getElementById('qgApS1').style.display=n===1?'block':'none';
@@ -4550,7 +4550,7 @@ async function qgRenderApPDF(pdfDoc){
 }
 
 function qgOpenApBoleto(){
-  qgApPdfTxt='';qgApPdfDoc=null;
+  qgApPdfTxt='';qgApPdfDoc=null;qgApBenefNome='';
   document.getElementById('qgApPDF').value='';
   document.getElementById('qgApPDFNm').textContent='Nenhum arquivo selecionado';
   document.getElementById('qgApLi').value='';
@@ -4578,6 +4578,25 @@ async function qgParseApBoleto(){
         const pg=await doc.getPage(i);
         const tc=await pg.getTextContent();
         txt+=tc.items.map(it=>it.str).join(' ')+'\n';
+        // Extração por coordenadas: encontra o texto fisicamente abaixo do label
+        // "Beneficiário" na página, ignorando a ordem de renderização do pdfjs.
+        if(i===1&&!qgApBenefNome){
+          const itms=tc.items.map(it=>({s:it.str.trim(),x:it.transform[4],y:it.transform[5]})).filter(it=>it.s.length>0);
+          const bls=itms.filter(it=>/[Bb]enefici[aá]rio/i.test(it.s));
+          if(bls.length){
+            // Pega o label de menor Y+leftmost X (Ficha de Caixa, coluna esquerda)
+            bls.sort((a,b)=>a.y-b.y||a.x-b.x);
+            const bl=bls[0];
+            // Itens até 25pt abaixo (menor Y) e na mesma faixa horizontal
+            const vals=itms.filter(it=>
+              it.y<=bl.y+2&&it.y>=bl.y-25&&
+              it.x>=bl.x-5&&
+              it.s.length>=5&&/[A-Z]{4}/.test(it.s)&&
+              !/[Bb]enefici/i.test(it.s)
+            ).sort((a,b)=>b.y-a.y||a.x-b.x);
+            if(vals.length)qgApBenefNome=vals[0].s.split(/\s+/)[0];
+          }
+        }
       }
       qgApPdfTxt=txt;
       // Auto-preenche linha digitável se o usuário não digitou (igual ao fluxo LP)
@@ -4594,22 +4613,10 @@ async function qgParseApBoleto(){
   document.getElementById('qgApVa').value=prs.vn||'';
   // Desc = "PRIMEIRNOME - NUMDOC"
   (function(){
-    // 1. Primeiro nome: busca entre os labels "BENEFICIARIO" e "ENDERECO"
-    //    (duas linhas consecutivas da coluna esquerda do boleto).
-    //    O CNPJ não serve de âncora pois o endereço do beneficiário fica entre
-    //    o nome e o CNPJ na ordem de extração do pdfjs (colunas da esquerda primeiro).
-    var primNome='';
-    var nt=norm(qgApPdfTxt||'');
-    var LABEL_BOLETO=new Set(['NOSSO','NUMERO','AGENCIA','CODIGO','CARTEIRA','ESPECIE','ACEITE',
-      'BENEFICIARIO','PAGAVEL','SICREDI','COOPERATIVAS','CREDITO','PREFERENCIALMENTE',
-      'FICHA','CAIXA','LOCAL','BANCO','VENCIMENTO','DOCUMENTO','RECIBO','PAGADOR',
-      'INSTRUCOES','SACADO','CEDENTE','MORA','DESCONTO','JUROS','MULTA','PORTADOR']);
-    // Busca entre "BENEFICIARIO" e "ENDERECO" (até 300 chars)
-    var mSec=nt.match(/BENEFICIARIO([\s\S]{0,300}?)(?:ENDERECO|$)/);
-    if(mSec){
-      var words=mSec[1].match(/[A-Z]{5,}/g)||[];
-      for(var w of words){if(!LABEL_BOLETO.has(w)){primNome=w;break;}}
-    }
+    // 1. Primeiro nome: usa coordenadas Y do pdfjs para pegar o texto
+    //    que está fisicamente abaixo do label "Beneficiário" na página.
+    //    Isso é imune à ordem de renderização do PDF.
+    var primNome=qgApBenefNome||'';
     // Fallback: primeira palavra do campo Beneficiário já extraído
     if(!primNome)primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
     // 2. Número do documento: prs.nn (outros bancos) OU padrão "NNNNNNLetra" do Sicredi
