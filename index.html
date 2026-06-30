@@ -4592,14 +4592,21 @@ async function qgParseApBoleto(){
 
   document.getElementById('qgApDv').value=prs.dv||'';
   document.getElementById('qgApVa').value=prs.vn||'';
-  // Desc = "PRIMEIRNOME - NUMDOC" onde letra final do numDoc vira "-N" (A=-1, B=-2, C=-3...)
+  // Desc = "PRIMEIRNOME - NUMDOC"
   (function(){
-    const foFull=prs.foTxt||prs.fo||'';
-    const primNome=(foFull.split(/\s+/)[0]||'').toUpperCase();
-    const rawDoc=String(prs.nn||'');
-    const mLet=rawDoc.match(/^(.*?)([A-Za-z])$/);
-    const numDoc=mLet?mLet[1]+'-'+(mLet[2].toUpperCase().charCodeAt(0)-64):rawDoc;
-    const desc=primNome&&numDoc?primNome+' - '+numDoc:(primNome||numDoc||foFull);
+    // 1. Primeiro nome: busca empresa ALL-CAPS diretamente antes do CNPJ do beneficiário
+    //    (evita capturar "Nosso Número" que pdfjs coloca adjacente a "Beneficiário")
+    var primNome='';
+    var mBenef=(qgApPdfTxt||'').match(/([A-Z]{2,}(?:\s+[A-Z]{2,}){0,6})\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+    if(mBenef)primNome=mBenef[1].trim().split(/\s+/)[0];
+    else primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
+    // 2. Número do documento: prs.nn (outros bancos) OU padrão "NNNNNNLetra" do Sicredi
+    var rawDoc=String(prs.nn||'');
+    if(!rawDoc){var mDoc=(qgApPdfTxt||'').match(/\b(\d{5,8}[A-Z])\b/);if(mDoc)rawDoc=mDoc[1];}
+    // 3. Letra final → número (A=1, B=2, C=3...)
+    var mLet=rawDoc.match(/^(.*?)([A-Za-z])$/);
+    var numDoc=mLet?mLet[1]+'-'+(mLet[2].toUpperCase().charCodeAt(0)-64):rawDoc;
+    var desc=primNome&&numDoc?primNome+' - '+numDoc:(primNome||numDoc||prs.foTxt||'');
     document.getElementById('qgApDesc').value=desc;
   })();
 
