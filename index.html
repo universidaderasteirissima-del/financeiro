@@ -1034,7 +1034,7 @@ th:hover{background:#EAD9C8!important}
             <div style="display:grid;gap:.6rem">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Loja *</label><select id="pedLO" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
-                <div><label class="lbl">Cliente</label><input type="text" id="pedFO" class="inp" style="font-size:.8rem" list="pedFODl" /><datalist id="pedFODl"></datalist></div>
+                <div><label class="lbl">Fornecedor</label><select id="pedFO" class="sel" style="font-size:.8rem"><option value="">Selecione</option></select></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem">
                 <div><label class="lbl">Nº do Pedido *</label><input type="text" id="pedNN" class="inp" style="font-size:.8rem" placeholder="PED 665" /></div>
@@ -3216,7 +3216,7 @@ function openPedido(){
   document.getElementById('pedPR').value='0';
   document.getElementById('pedSV').value='0';
   document.getElementById('pedST').value='em aberto';
-  document.getElementById('pedFODl').innerHTML=S.forns.map(f=>'<option value="'+xe(f)+'"></option>').join('');
+  document.getElementById('pedFO').innerHTML='<option value="">Selecione</option>'+S.forns.map(f=>'<option value="'+xe(f)+'">'+xe(f)+'</option>').join('');
   pedSt(1);
   var m=document.getElementById('mPedido');document.body.appendChild(m);m.style.display='flex';
 }
@@ -3293,11 +3293,15 @@ async function parsePedido(){
   document.getElementById('pedPR').value=prs.valor!=null?prs.valor.toFixed(2):'0';
   document.getElementById('pedMK').value='0';
   document.getElementById('pedSV').value='0';
-  if(prs.cliente)document.getElementById('pedFO').value=prs.cliente;
+  if(prs.cliente){
+    var nc=norm(prs.cliente);
+    var matchedFo=(S.forns||[]).find(function(f){var nf=norm(f);return nc.includes(nf)||nf.split(' ').filter(function(w){return w.length>3;}).every(function(w){return nc.includes(w);});});
+    if(matchedFo)document.getElementById('pedFO').value=matchedFo;
+  }
   if(prs.loja)document.getElementById('pedLO').value=prs.loja;
 
   const parts=[];
-  if(prs.cliente)parts.push('Cliente: '+prs.cliente);
+  if(prs.cliente)parts.push('Detectado: '+prs.cliente);
   if(prs.data)parts.push('Data: '+fDt(prs.data));
   if(prs.valor!=null)parts.push('Valor: '+fBRL(prs.valor));
   document.getElementById('pedInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
