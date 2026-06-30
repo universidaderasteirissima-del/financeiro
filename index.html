@@ -4592,7 +4592,16 @@ async function qgParseApBoleto(){
 
   document.getElementById('qgApDv').value=prs.dv||'';
   document.getElementById('qgApVa').value=prs.vn||'';
-  document.getElementById('qgApDesc').value=prs.foTxt||prs.fo||prs.banco||'';
+  // Desc = "PRIMEIRNOME - NUMDOC" onde letra final do numDoc vira "-N" (A=-1, B=-2, C=-3...)
+  (function(){
+    const foFull=prs.foTxt||prs.fo||'';
+    const primNome=(foFull.split(/\s+/)[0]||'').toUpperCase();
+    const rawDoc=String(prs.nn||'');
+    const mLet=rawDoc.match(/^(.*?)([A-Za-z])$/);
+    const numDoc=mLet?mLet[1]+'-'+(mLet[2].toUpperCase().charCodeAt(0)-64):rawDoc;
+    const desc=primNome&&numDoc?primNome+' - '+numDoc:(primNome||numDoc||foFull);
+    document.getElementById('qgApDesc').value=desc;
+  })();
 
   const parts=[];
   if(prs.banco)parts.push('Banco: '+prs.banco);
