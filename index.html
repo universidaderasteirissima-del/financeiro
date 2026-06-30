@@ -4594,14 +4594,24 @@ async function qgParseApBoleto(){
   document.getElementById('qgApVa').value=prs.vn||'';
   // Desc = "PRIMEIRNOME - NUMDOC"
   (function(){
-    // 1. Primeiro nome: ancora em "BENEFICIARIO" (label do campo) e busca
-    //    a primeira empresa com 2+ palavras seguida de CNPJ dentro de 400 chars.
-    //    Garante que pegamos o conteúdo da célula correta, não cidades/outros campos.
+    // 1. Primeiro nome: busca entre os labels "BENEFICIARIO" e "ENDERECO"
+    //    (duas linhas consecutivas da coluna esquerda do boleto).
+    //    O CNPJ não serve de âncora pois o endereço do beneficiário fica entre
+    //    o nome e o CNPJ na ordem de extração do pdfjs (colunas da esquerda primeiro).
     var primNome='';
     var nt=norm(qgApPdfTxt||'');
-    var mBenef=nt.match(/BENEFICIARIO[\s\S]{0,400}?([A-Z]{5,}(?:\s+[A-Z]{2,}){1,6})[\s\S]{0,25}?\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
-    if(mBenef)primNome=mBenef[1].trim().split(/\s+/)[0];
-    else primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
+    var LABEL_BOLETO=new Set(['NOSSO','NUMERO','AGENCIA','CODIGO','CARTEIRA','ESPECIE','ACEITE',
+      'BENEFICIARIO','PAGAVEL','SICREDI','COOPERATIVAS','CREDITO','PREFERENCIALMENTE',
+      'FICHA','CAIXA','LOCAL','BANCO','VENCIMENTO','DOCUMENTO','RECIBO','PAGADOR',
+      'INSTRUCOES','SACADO','CEDENTE','MORA','DESCONTO','JUROS','MULTA','PORTADOR']);
+    // Busca entre "BENEFICIARIO" e "ENDERECO" (até 300 chars)
+    var mSec=nt.match(/BENEFICIARIO([\s\S]{0,300}?)(?:ENDERECO|$)/);
+    if(mSec){
+      var words=mSec[1].match(/[A-Z]{5,}/g)||[];
+      for(var w of words){if(!LABEL_BOLETO.has(w)){primNome=w;break;}}
+    }
+    // Fallback: primeira palavra do campo Beneficiário já extraído
+    if(!primNome)primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
     // 2. Número do documento: prs.nn (outros bancos) OU padrão "NNNNNNLetra" do Sicredi
     var rawDoc=String(prs.nn||'');
     if(!rawDoc){var mDoc=(qgApPdfTxt||'').match(/\b(\d{5,8}[A-Z])\b/);if(mDoc)rawDoc=mDoc[1];}
