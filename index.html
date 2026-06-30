@@ -1997,9 +1997,15 @@ function extractBoletoData(txt,barcode){
     if(nfeBase)prs.nfeBase=nfeBase;
   }
 
-  // DUE DATE — padrões genéricos (usados se FATURA/DUPLICATA não for encontrada)
+  // DUE DATE — Sicredi: usa norm(txt) porque PDF tem "PAGÁVEL" (com acento) e o
+  // regex padrão sem /u não compara acentos corretamente
+  if(!prs.dv){
+    const nt=norm(txt); // remove acentos e converte para maiúsculas
+    const mSic=nt.match(/PAGAVEL\s+PREFERENCIALMENTE\s+NAS\s+COOPERATIVAS[\s\S]{0,250}?(\d{2}\/\d{2}\/\d{4})/);
+    if(mSic)prs.dv=br2iso(mSic[mSic.length-1]);
+  }
+  // DUE DATE — padrões genéricos (usados se FATURA/DUPLICATA ou Sicredi não encontraram)
   const dvPat=[
-    /PAGAVEL\s+PREFERENCIALMENTE\s+NAS\s+COOPERATIVAS[\s\S]{0,250}?(\d{2}\/\d{2}\/\d{4})/i, // Sicredi: date on same line as PAGAVEL
     /PAGAVEL\s+PREFERENCIALMENTE\s+NO\s+SICOOB[\s\S]{0,100}?(\d{2}\/\d{2}\/\d{4})/i, // Sicoob: date after PAGAVEL text
     /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date
     /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/,  // BB: Data de Vencimento
@@ -4574,9 +4580,15 @@ async function qgParseApBoleto(){
         txt+=tc.items.map(it=>it.str).join(' ')+'\n';
       }
       qgApPdfTxt=txt;
+      // Auto-preenche linha digitável se o usuário não digitou (igual ao fluxo LP)
+      if(!linha){
+        const detected=findLinhasDigitaveis(txt);
+        if(detected.length)document.getElementById('qgApLi').value=detected[0];
+      }
     }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
   }
-  const prs=extractBoletoData(qgApPdfTxt||'',linha);
+  const linhaFinal=document.getElementById('qgApLi').value.trim();
+  const prs=extractBoletoData(qgApPdfTxt||'',linhaFinal);
 
   document.getElementById('qgApDv').value=prs.dv||'';
   document.getElementById('qgApVa').value=prs.vn||'';
