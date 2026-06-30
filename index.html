@@ -4584,12 +4584,14 @@ async function qgParseApBoleto(){
           const itms=tc.items.map(it=>({s:it.str.trim(),x:it.transform[4],y:it.transform[5]})).filter(it=>it.s.length>0);
           const bls=itms.filter(it=>/[Bb]enefici[aá]rio/i.test(it.s));
           if(bls.length){
-            // Pega o label de menor Y+leftmost X (Ficha de Caixa, coluna esquerda)
-            bls.sort((a,b)=>a.y-b.y||a.x-b.x);
+            // Pega o label de maior Y (mais acima na página = seção principal),
+            // depois o leftmost X (coluna esquerda do formulário).
+            bls.sort((a,b)=>b.y-a.y||a.x-b.x);
             const bl=bls[0];
-            // Itens até 25pt abaixo (menor Y) e na mesma faixa horizontal
+            // Itens estritamente abaixo do label (Y < label.Y) dentro de 30pt,
+            // na mesma coluna horizontal.
             const vals=itms.filter(it=>
-              it.y<=bl.y+2&&it.y>=bl.y-25&&
+              it.y<bl.y&&bl.y-it.y<=30&&
               it.x>=bl.x-5&&
               it.s.length>=5&&/[A-Z]{4}/.test(it.s)&&
               !/[Bb]enefici/i.test(it.s)
