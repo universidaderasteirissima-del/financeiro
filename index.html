@@ -1975,6 +1975,7 @@ function extractBoletoData(txt,barcode){
     else if(t.includes('ITAU'))prs.banco='Itau';
     else if(t.includes('SANTANDER'))prs.banco='Santander';
     else if(t.includes('INTER'))prs.banco='Inter';
+    else if(t.includes('SICREDI'))prs.banco='Sicredi';
     else if(t.includes('CAIXA'))prs.banco='Caixa';
   }
   if(cl.length===47){const f5=cl.substring(33,47);const amt=parseFloat(f5.substring(4,14))/100;if(amt>0&&amt<999999)prs.vn=amt.toFixed(2);}
@@ -1998,6 +1999,7 @@ function extractBoletoData(txt,barcode){
 
   // DUE DATE — padrões genéricos (usados se FATURA/DUPLICATA não for encontrada)
   const dvPat=[
+    /PAGAVEL\s+PREFERENCIALMENTE\s+NAS\s+COOPERATIVAS[\s\S]{0,250}?(\d{2}\/\d{2}\/\d{4})/i, // Sicredi: date on same line as PAGAVEL
     /PAGAVEL\s+PREFERENCIALMENTE\s+NO\s+SICOOB[\s\S]{0,100}?(\d{2}\/\d{2}\/\d{4})/i, // Sicoob: date after PAGAVEL text
     /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\s+(\d{2}\/\d{2}\/\d{4})/,         // BB: CNPJ then date
     /[Dd]ata\s+de\s+[Vv]encimento[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})/,  // BB: Data de Vencimento
@@ -2021,9 +2023,10 @@ function extractBoletoData(txt,barcode){
   if(prs.de&&prs.dv&&prs.de>prs.dv){var tmp=prs.de;prs.de=prs.dv;prs.dv=tmp;}
 
   // VALUE — PDF overrides barcode; broad to handle Bradesco table layout
-  // Pulado se a FATURA/DUPLICATA já definiu o valor (evita pegar valores
-  // soltos no corpo do documento, ex: "Valor da Parcela Importada R$ 6,87")
-  if(!parcelas.length){
+  // Pulado se o código de barras ou FATURA/DUPLICATA já definiu o valor —
+  // evita sobrescrever valor correto do barcode com valores soltos no texto
+  // (ex: "Cobrar juros de R$ 16,27 por dia de atraso")
+  if(!parcelas.length && !prs.vn){
     const vnPat=[
       /[Vv]alor\s+do\s+[Dd]ocumento\s+(\d{1,3}(?:\.\d{3})*,\d{2})/,
       /[Vv]alor\s+do\s+[Dd]ocumento[\s\S]{0,300}?(\d{1,3}(?:\.\d{3})*,\d{2})/,
