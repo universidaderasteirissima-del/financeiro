@@ -4594,10 +4594,12 @@ async function qgParseApBoleto(){
   document.getElementById('qgApVa').value=prs.vn||'';
   // Desc = "PRIMEIRNOME - NUMDOC"
   (function(){
-    // 1. Primeiro nome: busca empresa ALL-CAPS diretamente antes do CNPJ do beneficiário
-    //    (evita capturar "Nosso Número" que pdfjs coloca adjacente a "Beneficiário")
+    // 1. Primeiro nome: ancora em "BENEFICIARIO" (label do campo) e busca
+    //    a primeira empresa com 2+ palavras seguida de CNPJ dentro de 400 chars.
+    //    Garante que pegamos o conteúdo da célula correta, não cidades/outros campos.
     var primNome='';
-    var mBenef=(qgApPdfTxt||'').match(/([A-Z]{5,}(?:\s+[A-Z]{2,}){1,6})[\s\S]{0,25}?\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+    var nt=norm(qgApPdfTxt||'');
+    var mBenef=nt.match(/BENEFICIARIO[\s\S]{0,400}?([A-Z]{5,}(?:\s+[A-Z]{2,}){1,6})[\s\S]{0,25}?\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
     if(mBenef)primNome=mBenef[1].trim().split(/\s+/)[0];
     else primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
     // 2. Número do documento: prs.nn (outros bancos) OU padrão "NNNNNNLetra" do Sicredi
