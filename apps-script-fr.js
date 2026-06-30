@@ -52,27 +52,11 @@ const HEADER_MAP = {
     vNota:'Total da Nota', totalNota:'Valor da nota',
     boletoMkt:'Boleto marketing', boletoFran:'Boleto franchising',
     dv1:'Data de vencimento 1° Parcela', dp1:'Data de pagamento 1° Parcela', st1:'Status 1° Parcela',
-    dv2:'Data de vencimento 2° Parcela', dp2:'Data de pagamento 2° Parcela', st2:'Status 2° Parcela'
-    // boletoBri1/boletoBri2 (valor R$) ainda não têm coluna própria confirmada
-    // na planilha — "Boleto brilhante / fábrica N° Parcela" é uma coluna de
-    // DATA (recebe a mesma data de dv1/dv2, ver applyBoletoBriDates abaixo)
+    dv2:'Data de vencimento 2° Parcela', dp2:'Data de pagamento 2° Parcela', st2:'Status 2° Parcela',
+    boletoBri1:'Boleto brilhante / fábrica 1° Parcela',
+    boletoBri2:'Boleto brilhante / fábrica 2° Parcela'
   }
 };
-
-// "Boleto brilhante / fábrica N° Parcela" — colunas de DATA (não valor),
-// recebem sempre a mesma data de dv1/dv2 da parcela correspondente
-const BOLETO_BRI_DATE_HEADERS = {
-  dv1: 'Boleto brilhante / fábrica 1° Parcela',
-  dv2: 'Boleto brilhante / fábrica 2° Parcela'
-};
-function applyBoletoBriDates(view, fields, headers, row) {
-  if (view !== 'areceber') return;
-  Object.keys(BOLETO_BRI_DATE_HEADERS).forEach(function (key) {
-    if (!fields[key]) return;
-    const idx = findHeaderIdx(headers, BOLETO_BRI_DATE_HEADERS[key]);
-    if (idx >= 0) row[idx] = isoToBr(fields[key]);
-  });
-}
 
 // Campos que são datas (DD/MM/AAAA na planilha, AAAA-MM-DD no sistema)
 const DATE_FIELDS = {
@@ -224,7 +208,6 @@ function addRow(view, fields) {
     if (dateKeys.indexOf(key) >= 0 && v) v = isoToBr(v);
     newRow[idx] = v;
   });
-  applyBoletoBriDates(view, fields || {}, headers, newRow);
   const range = sheet.getRange(rowIndex, 1, 1, newRow.length);
   range.setValues([newRow]);
   range.setBackground(COR_SISTEMA);
@@ -247,7 +230,6 @@ function updateRow(view, rowIndex, fields) {
     if (dateKeys.indexOf(key) >= 0 && v) v = isoToBr(v);
     existing[idx] = v;
   });
-  applyBoletoBriDates(view, fields || {}, headers, existing);
   const range = sheet.getRange(rowIndex, 1, 1, existing.length);
   range.setValues([existing]);
   range.setBackground(COR_SISTEMA);

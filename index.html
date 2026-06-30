@@ -4470,9 +4470,11 @@ function qgConfirmNF(){
   // boletoMkt e boletoFran calculados sobre o Valor da Nota (não o Total da Nota)
   const boletoMkt=Math.round(vNota*3/100*100)/100;
   const boletoFran=Math.round(vNota*10/100*100)/100;
-  // dv1/dv2 e boletoBri1/2 vêm da seção FATURA da NF; fallback: emissão +30/+60
+  // dv1/dv2 vêm da seção FATURA da NF; fallback: emissão +30/+60
   let dv1=_lastNFPrs.dv1||'',dv2=_lastNFPrs.dv2||'';
-  let boletoBri1=_lastNFPrs.boletoBri1||0,boletoBri2=_lastNFPrs.boletoBri2||boletoBri1;
+  // boletoBri1/2 = Total da Nota ÷ 2 (valor de cada parcela)
+  const boletoBri1=totalNota?Math.round(totalNota/2*100)/100:0;
+  const boletoBri2=boletoBri1;
   if(!dv1&&de){
     const _d=new Date(de+'T00:00:00');
     const _d1=new Date(_d);_d1.setDate(_d1.getDate()+30);
