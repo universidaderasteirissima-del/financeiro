@@ -3005,7 +3005,9 @@ function extractNFData(txt){
   if(m)prs.de=br2iso(m[1]);
 
   // Total value
-  m=txt.match(/VALOR TOTAL DA NOTA\s+([\d.,]+)/i)||txt.match(/Valor total[:\s]+([\d.,]+)/i)||txt.match(/VALOR TOTAL[:\s]+([\d.,]+)/i);
+  // Aceita "R$" opcional entre o rótulo e o número (alguns DANFEs imprimem
+  // "VALOR TOTAL DA NOTA R$ 2.358,60").
+  m=txt.match(/VALOR TOTAL DA NOTA\s+(?:R\$\s*)?([\d.,]+)/i)||txt.match(/Valor total[:\s]+(?:R\$\s*)?([\d.,]+)/i)||txt.match(/VALOR TOTAL[:\s]+(?:R\$\s*)?([\d.,]+)/i);
   if(m)prs.vn=tof(m[1]);
 
   // Fornecedor — compara com lista cadastrada
@@ -4215,12 +4217,14 @@ function extractARNFData(txt){
   if(m)prs.de=br2iso(m[1]);
 
   // Total da Nota ← "VALOR TOTAL DA NOTA" do documento (valor definitivo da NF)
-  m=txt.match(/VALOR\s+TOTAL\s+DA\s+NOTA\s+([\d.,]+)/i);
+  // Aceita "R$" opcional entre o rótulo e o número (alguns DANFEs imprimem
+  // "VALOR TOTAL DA NOTA R$ 2.358,60").
+  m=txt.match(/VALOR\s+TOTAL\s+DA\s+NOTA\s+(?:R\$\s*)?([\d.,]+)/i);
   if(m) prs.totalNota=tof(m[1]);
 
   // Valor dos Produtos (bruto da NF) — guardado para usar como fallback do vNota
   let _vNotaNF=null;
-  const _mProd=txt.match(/VALOR\s+TOTAL\s+DOS\s+PRODUTOS\s+([\d.,]+)/i);
+  const _mProd=txt.match(/VALOR\s+TOTAL\s+DOS\s+PRODUTOS\s+(?:R\$\s*)?([\d.,]+)/i);
   if(_mProd) _vNotaNF=tof(_mProd[1]);
 
   // Datas de vencimento — fallback: emissão + 30 / + 60 dias
