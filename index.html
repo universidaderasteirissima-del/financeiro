@@ -776,6 +776,12 @@ th:hover{background:#EAD9C8!important}
         <p style="font-size:.72rem;color:#7A4F3A;margin-bottom:.6rem">Cole a URL do Apps Script para sincronizar dados com a planilha.</p>
         <input type="url" id="cfUrl" placeholder="https://script.google.com/macros/s/.../exec" class="inp" style="font-size:.78rem" />
       </div>
+      <div id="cfInterSection" style="display:none;background:#F0F5FF;border:1px solid #B8C8E8;border-radius:3px;padding:1rem">
+        <p style="font-size:.8rem;font-weight:700;color:#1A3A6B;margin-bottom:.5rem">Banco Inter — Geração de Boletos</p>
+        <p style="font-size:.72rem;color:#2C4080;margin-bottom:.6rem">URL do servidor proxy que gera os boletos via API do Inter (inter-proxy).</p>
+        <input type="url" id="cfInterUrl" placeholder="https://meu-proxy.railway.app" class="inp" style="font-size:.78rem" />
+        <p style="font-size:.7rem;color:#5C6B8A;margin-top:.3rem">Deixe em branco até ter o servidor configurado. Veja a pasta <strong>inter-proxy/</strong> para instruções.</p>
+      </div>
       <div>
         <p style="font-size:.8rem;font-weight:700;color:#2C1810;margin-bottom:.6rem">Logo (URL de imagem)</p>
         <input type="text" id="cfLogo" placeholder="https://... (link direto para imagem PNG/JPG)" class="inp" style="font-size:.78rem" />
@@ -1112,7 +1118,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],foFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],foFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',interUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // Estado das abas "QG" (Franquias) — aditivo, não interfere em S acima
 S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
@@ -1193,10 +1199,10 @@ function ldCfg(){
   var defLo=MODO==='fr_'?[...DEF_LOJAS_FR]:[...DEF_LOJAS_LP];
   var defFo=MODO==='fr_'?[...DEF_FORNS_FR]:[...DEF_FORNS_LP];
   var r=localStorage.getItem(lsk('r_cfg'));
-  if(r){var c=JSON.parse(r);S.url=c.url||defUrl;S.logoUrl=c.logo||'';S.lojas=c.lo&&c.lo.length?c.lo:defLo;S.forns=c.fo&&c.fo.length?c.fo:defFo;}
-  else{S.url=defUrl;S.lojas=defLo;S.forns=defFo;}
+  if(r){var c=JSON.parse(r);S.url=c.url||defUrl;S.logoUrl=c.logo||'';S.lojas=c.lo&&c.lo.length?c.lo:defLo;S.forns=c.fo&&c.fo.length?c.fo:defFo;S.interUrl=c.interUrl||'';}
+  else{S.url=defUrl;S.lojas=defLo;S.forns=defFo;S.interUrl='';}
 }
-function svCfgStore(){localStorage.setItem(lsk('r_cfg'),JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns}));}
+function svCfgStore(){localStorage.setItem(lsk('r_cfg'),JSON.stringify({url:S.url,logo:S.logoUrl,lo:S.lojas,fo:S.forns,interUrl:S.interUrl}));}
 
 async function ldData(){
   var raw=localStorage.getItem(lsk('r_data'));
@@ -1281,6 +1287,11 @@ function openCfg(){
   document.getElementById('cfGhPdfRepo').value=localStorage.getItem(lsk('r_gh_pdf_repo'))||'';
   document.getElementById('cfLoList').textContent=S.lojas.join(' · ');
   document.getElementById('cfFoList').textContent=S.forns.join(' · ');
+  // seção Inter — só no modo Franquias
+  var interSec=document.getElementById('cfInterSection');
+  if(interSec){interSec.style.display=MODO==='fr_'?'block':'none';}
+  var interEl=document.getElementById('cfInterUrl');
+  if(interEl)interEl.value=S.interUrl||'';
   var m=document.getElementById('mCfg');document.body.appendChild(m);m.style.display='flex';
 }
 function saveCfg(){
@@ -1290,6 +1301,8 @@ function saveCfg(){
   var ghRepo=document.getElementById('cfGhPdfRepo').value.trim();
   if(ghTok)localStorage.setItem(lsk('r_gh_pdf_token'),ghTok);
   if(ghRepo)localStorage.setItem(lsk('r_gh_pdf_repo'),ghRepo);
+  var interEl=document.getElementById('cfInterUrl');
+  if(interEl)S.interUrl=interEl.value.trim();
   svCfgStore();cm('mCfg');
   applyLogo();
   if(S.url){document.getElementById('btnSync').style.display='inline-block';doSync();}
@@ -3375,14 +3388,28 @@ const AR_FIELDS=[
   {key:'boletoBri2',label:'Boleto Brilhante/Fábrica 2ª',type:'money',section:'Parcela 2'},
   {key:'dp2',label:'Dt. Pagto 2ª Parcela',type:'date',section:'Parcela 2'},
   {key:'st2',label:'Status 2ª Parcela',type:'status',dueKey:'dv2',payKey:'dp2',section:'Parcela 2'},
+  {key:'boletoUrl1',label:'PDF Boleto 1ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCod1',label:'Linha Digitável 1ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoUrl2',label:'PDF Boleto 2ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCod2',label:'Linha Digitável 2ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
 ];
 
 // LOJA_FIELDS: esquema do "Cadastro" (lojas + fornecedores externos)
 const LOJA_FIELDS=[
-  {key:'kind',label:'Tipo de Cadastro',type:'select',options:['Loja','Fornecedor Externo'],required:true},
-  {key:'loja',label:'Nome',type:'text',required:true,wide:true},
-  {key:'tipo',label:'Tipo (Loja)',type:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
-  {key:'pctNota',label:'% Valor da Nota',type:'percent'},
+  {key:'kind',label:'Tipo de Cadastro',type:'select',options:['Loja','Fornecedor Externo'],required:true,section:'Dados Gerais'},
+  {key:'loja',label:'Nome',type:'text',required:true,wide:true,section:'Dados Gerais'},
+  {key:'tipo',label:'Tipo (Loja)',type:'select',options:['FRANQUIA','LOJA PRÓPRIA'],section:'Dados Gerais'},
+  {key:'pctNota',label:'% Valor da Nota',type:'percent',section:'Dados Gerais'},
+  {key:'cnpjCpf',label:'CNPJ / CPF',type:'text',section:'Dados para Boleto'},
+  {key:'email',label:'E-mail',type:'text',section:'Dados para Boleto',hideInTable:true},
+  {key:'cep',label:'CEP',type:'text',section:'Dados para Boleto',hideInTable:true},
+  {key:'endereco',label:'Endereço',type:'text',wide:true,section:'Dados para Boleto',hideInTable:true},
+  {key:'numero',label:'Número',type:'text',section:'Dados para Boleto',hideInTable:true},
+  {key:'complemento',label:'Complemento',type:'text',section:'Dados para Boleto',hideInTable:true},
+  {key:'bairro',label:'Bairro',type:'text',section:'Dados para Boleto',hideInTable:true},
+  {key:'cidade',label:'Cidade',type:'text',section:'Dados para Boleto'},
+  {key:'uf',label:'UF',type:'text',section:'Dados para Boleto'},
+  {key:'telefone',label:'Telefone',type:'text',section:'Dados para Boleto',hideInTable:true},
 ];
 
 // AR_FORNS: fornecedores conhecidos da aba "A receber", usados na
@@ -3424,7 +3451,7 @@ const QG_VIEWS={
       {key:'_q',label:'Buscar',kind:'search'},
       {key:'dv1',label:'Período (Venc. 1ª Parc.)',kind:'period'},
     ]},
-  lojas:{label:'Cadastro',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja'],sumFields:[],statKind:'lojas',noSync:true,
+  lojas:{label:'Cadastro',file:'data_fr_lojas.json',fields:LOJA_FIELDS,dateField:'loja',statusFields:[],search:['loja','cnpjCpf','cidade'],sumFields:[],statKind:'lojas',noSync:true,
     filterFields:[
       {key:'kind',label:'Tipo de Cadastro',kind:'select',options:['Loja','Fornecedor Externo']},
       {key:'tipo',label:'Tipo (Loja)',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
@@ -3625,9 +3652,10 @@ async function qgRestoreRec(deletedRowIndex){
 // ------------------------------------------------------------
 function qgBuildHeader(){
   const view=QG_VIEWS[S.qg.view];
+  const cols=view.fields.filter(function(f){return !f.hideInTable;});
   let html='<tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">';
   html+='<th style="padding:.75rem .6rem;text-align:center;width:2.25rem;position:sticky;left:0;z-index:11;background:#F2EAE0;box-shadow:2px 0 4px -2px rgba(44,24,16,.25)"><input type="checkbox" id="qgSelAllChk" onchange="qgToggleSelAll(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50" title="Selecionar todos nesta página"/></th>';
-  view.fields.forEach(function(f){
+  cols.forEach(function(f){
     const align=qgAlign(f.type);
     html+='<th class="si" onclick="qgSortBy(\''+f.key+'\')" id="qgth-'+f.key+'" style="padding:.6rem .6rem;text-align:'+align+';font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">'+xe(f.label)+'</th>';
   });
@@ -3834,9 +3862,10 @@ function qgRenderStats(){
 // ------------------------------------------------------------
 function qgRenderTable(){
   const view=QG_VIEWS[S.qg.view];
+  const cols=view.fields.filter(function(f){return !f.hideInTable;});
   const st=(S.qg.pg-1)*S.qg.pp,rows=S.qg.filt.slice(st,st+S.qg.pp);
   document.getElementById('qgRecCnt').textContent=S.qg.filt.length+' registro'+(S.qg.filt.length!==1?'s':'');
-  const colspan=view.fields.length+2;
+  const colspan=cols.length+2;
   if(!rows.length){
     document.getElementById('qgTbody').innerHTML='<tr><td colspan="'+colspan+'" style="padding:3rem;text-align:center;color:#C8A882;font-size:.875rem">Nenhum registro encontrado</td></tr>';
     const allChk=document.getElementById('qgSelAllChk');if(allChk)allChk.checked=false;
@@ -3845,12 +3874,27 @@ function qgRenderTable(){
   document.getElementById('qgTbody').innerHTML=rows.map(function(r,i){
     const bg=i%2===0?'#fff':'#FAF7F4';
     let tds='<td style="padding:.625rem .6rem;text-align:center;position:sticky;left:0;z-index:1;background:'+bg+';box-shadow:2px 0 4px -2px rgba(44,24,16,.15)" onclick="event.stopPropagation()"><input type="checkbox" '+(S.qg.selIds.has(r._id)?'checked':'')+' onchange="qgToggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>';
-    view.fields.forEach(function(f){
+    cols.forEach(function(f){
       const align=qgAlign(f.type);
       const fw=(f.type==='money'||f.key===view.dateField)?'600':'400';
       tds+='<td style="padding:.625rem .6rem;font-size:.8rem;color:#2C1810;text-align:'+align+';white-space:nowrap;font-weight:'+fw+'">'+qgFmtVal(r,f)+'</td>';
     });
+    // Botões de boleto Inter (apenas na view A receber)
+    var boletosBtns='';
+    if(S.qg.view==='areceber'){
+      if(r.dv1){
+        boletosBtns+=r.boletoUrl1
+          ?'<a href="'+r.boletoUrl1+'" target="_blank" style="font-size:.72rem;color:#1A6B3A;font-weight:700;padding:.2rem .4rem;border-radius:2px;text-decoration:none" title="Ver PDF 1ª parcela">✅ 1ª</a>'
+          :'<button onclick="qgGerarBoleto('+r._id+',1)" style="font-size:.72rem;color:#1A3A6B;background:transparent;border:1px solid #B8C8E8;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#E8F0FF\'" onmouseout="this.style.background=\'transparent\'">📄 1ª</button>';
+      }
+      if(r.dv2){
+        boletosBtns+=r.boletoUrl2
+          ?'<a href="'+r.boletoUrl2+'" target="_blank" style="font-size:.72rem;color:#1A6B3A;font-weight:700;padding:.2rem .4rem;border-radius:2px;text-decoration:none" title="Ver PDF 2ª parcela">✅ 2ª</a>'
+          :'<button onclick="qgGerarBoleto('+r._id+',2)" style="font-size:.72rem;color:#1A3A6B;background:transparent;border:1px solid #B8C8E8;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#E8F0FF\'" onmouseout="this.style.background=\'transparent\'">📄 2ª</button>';
+      }
+    }
     tds+='<td style="padding:.625rem .6rem;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:1;background:'+bg+';box-shadow:-2px 0 4px -2px rgba(44,24,16,.15)">'+
+      boletosBtns+
       '<button onclick="qgEditRec('+r._id+')" style="font-size:.72rem;color:#7A4F3A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#EAD9C8\'" onmouseout="this.style.background=\'transparent\'">Editar</button>'+
       '<button onclick="qgDelRec('+r._id+')" style="font-size:.72rem;color:#8B1A1A;background:transparent;border:none;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .4rem;border-radius:2px" onmouseover="this.style.background=\'#FDF0F0\'" onmouseout="this.style.background=\'transparent\'">Excluir</button>'+
       '</td>';
@@ -4506,6 +4550,88 @@ function qgConfirmNF(){
   if(S.qg.view==='areceber')qgApplyF();
   toast('Nota fiscal importada ✓ Boletos e parcelas preenchidos automaticamente.');
   qgEditRec(rec._id);
+}
+
+// ------------------------------------------------------------
+// Geração de Boleto via API Banco Inter (somente A receber / Franquias)
+// Requer: servidor proxy inter-proxy/ rodando e URL configurada em S.interUrl
+// ------------------------------------------------------------
+async function qgGerarBoleto(id, parcela){
+  if(!S.interUrl){
+    toast('Configure a URL do servidor Inter em Configurações antes de gerar boletos.','warn');
+    return;
+  }
+  const recs=S.qg.recs.areceber;
+  const rec=recs.find(function(x){return x._id===id;});
+  if(!rec){toast('Registro não encontrado.','err');return;}
+
+  const dvKey='dv'+parcela;
+  const valKey='boletoBri'+parcela;
+  const urlKey='boletoUrl'+parcela;
+  const codKey='boletoCod'+parcela;
+
+  const vencimento=rec[dvKey];
+  const valor=rec[valKey]||0;
+
+  if(!vencimento){toast('Vencimento da '+parcela+'ª parcela não preenchido.','warn');return;}
+  if(!valor){toast('Valor do boleto '+parcela+'ª parcela é zero.','warn');return;}
+
+  // Busca dados do sacado no Cadastro de Lojas
+  const lojasCadastro=S.qg.recs.lojas||[];
+  const lojaRec=lojasCadastro.find(function(l){
+    return l.kind==='Loja'&&norm(l.loja)===norm(rec.loja);
+  });
+  if(!lojaRec||!lojaRec.cnpjCpf){
+    toast('Cadastre o CNPJ e endereço da loja "'+rec.loja+'" na aba Cadastro antes de gerar o boleto.','warn');
+    return;
+  }
+
+  const descricao=(rec.forn||'Rasteirissima')+' — Boleto '+parcela+'ª Parcela'+(rec.nota?' NF '+rec.nota:'');
+
+  if(!confirm('Gerar boleto '+parcela+'ª parcela para "'+rec.loja+'"?\nValor: '+fBRL(valor)+'  |  Venc.: '+fDt(vencimento)))return;
+
+  showLoading('Gerando boleto no Banco Inter...');
+  try{
+    const res=await fetch(S.interUrl.replace(/\/$/,'')+'/boleto',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sacado:{
+          cnpjCpf:lojaRec.cnpjCpf,
+          nome:lojaRec.loja,
+          email:lojaRec.email||'',
+          cep:lojaRec.cep||'',
+          endereco:lojaRec.endereco||'',
+          numero:lojaRec.numero||'S/N',
+          complemento:lojaRec.complemento||'',
+          bairro:lojaRec.bairro||'',
+          cidade:lojaRec.cidade||'',
+          uf:lojaRec.uf||'',
+          telefone:lojaRec.telefone||'',
+        },
+        valor:valor,
+        vencimento:vencimento,
+        descricao:descricao,
+      }),
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    // Salva URL e linha digitável no registro
+    rec[urlKey]=data.pdfLink||'';
+    rec[codKey]=data.linhaDigitavel||data.codigoBarras||'';
+    const i=recs.findIndex(function(x){return x._id===id;});
+    if(i>=0)recs[i]=rec;
+    qgSaveData('areceber');
+    if(S.url&&!QG_VIEWS.areceber.noSync)await qgPush2Sheets('areceber',rec,rec._id>1000000?null:rec._id);
+    qgApplyF();
+    if(data.pdfLink)window.open(data.pdfLink,'_blank');
+    if(data.linhaDigitavel)navigator.clipboard.writeText(data.linhaDigitavel).catch(function(){});
+    toast('Boleto '+parcela+'ª parcela gerado ✓'+(data.linhaDigitavel?' — linha digitável copiada!':''));
+  }catch(e){
+    toast('Erro ao gerar boleto: '+e.message,'err');
+  }finally{
+    hideLoading();
+  }
 }
 
 // ------------------------------------------------------------

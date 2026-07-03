@@ -1,0 +1,13 @@
+{
+  "name": "rasteirissima-inter-proxy",
+  "version": "1.0.0",
+  "description": "Proxy Node.js para a API de Cobranças do Banco Inter (mTLS)",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
