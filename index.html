@@ -3390,10 +3390,14 @@ const AR_FIELDS=[
   {key:'boletoBri2',label:'Boleto Brilhante/Fábrica 2ª',type:'money',section:'Parcela 2'},
   {key:'dp2',label:'Dt. Pagto 2ª Parcela',type:'date',section:'Parcela 2'},
   {key:'st2',label:'Status 2ª Parcela',type:'status',dueKey:'dv2',payKey:'dp2',section:'Parcela 2'},
-  {key:'boletoUrl1',label:'PDF Boleto 1ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
-  {key:'boletoCod1',label:'Linha Digitável 1ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
-  {key:'boletoUrl2',label:'PDF Boleto 2ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
-  {key:'boletoCod2',label:'Linha Digitável 2ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoUrlBri1',label:'PDF Brilhante/Fáb. 1ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCodBri1',label:'Linha Digit. Brilhante 1ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoUrlBri2',label:'PDF Brilhante/Fáb. 2ª',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCodBri2',label:'Linha Digit. Brilhante 2ª',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoUrlMkt',label:'PDF Marketing',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCodMkt',label:'Linha Digit. Marketing',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoUrlFran',label:'PDF Franchising',type:'text',section:'Boletos Emitidos',hideInTable:true},
+  {key:'boletoCodFran',label:'Linha Digit. Franchising',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
 ];
 
 // LOJA_FIELDS: esquema do "Cadastro" (lojas + fornecedores externos)
@@ -3882,18 +3886,24 @@ function qgRenderTable(){
       tds+='<td style="padding:.625rem .6rem;font-size:.8rem;color:#2C1810;text-align:'+align+';white-space:nowrap;font-weight:'+fw+'">'+qgFmtVal(r,f)+'</td>';
     });
     // Botões de boleto Inter (apenas na view A receber)
+    // 4 boletos por lançamento, cada um com conta Inter diferente:
+    // Bri1ª (boletoBri1/dv1), Bri2ª (boletoBri2/dv2), Mkt (boletoMkt/dv1), Fran (boletoFran/dv1)
     var boletosBtns='';
     if(S.qg.view==='areceber'){
-      if(r.dv1){
-        boletosBtns+=r.boletoUrl1
-          ?'<a href="'+r.boletoUrl1+'" target="_blank" style="font-size:.72rem;color:#1A6B3A;font-weight:700;padding:.2rem .4rem;border-radius:2px;text-decoration:none" title="Ver PDF 1ª parcela">✅ 1ª</a>'
-          :'<button onclick="qgGerarBoleto('+r._id+',1)" style="font-size:.72rem;color:#1A3A6B;background:transparent;border:1px solid #B8C8E8;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#E8F0FF\'" onmouseout="this.style.background=\'transparent\'">📄 1ª</button>';
-      }
-      if(r.dv2){
-        boletosBtns+=r.boletoUrl2
-          ?'<a href="'+r.boletoUrl2+'" target="_blank" style="font-size:.72rem;color:#1A6B3A;font-weight:700;padding:.2rem .4rem;border-radius:2px;text-decoration:none" title="Ver PDF 2ª parcela">✅ 2ª</a>'
-          :'<button onclick="qgGerarBoleto('+r._id+',2)" style="font-size:.72rem;color:#1A3A6B;background:transparent;border:1px solid #B8C8E8;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.2rem .5rem;border-radius:2px" onmouseover="this.style.background=\'#E8F0FF\'" onmouseout="this.style.background=\'transparent\'">📄 2ª</button>';
-      }
+      var _bDefs=[
+        {tipo:'bri1',label:'Bri1ª',valKey:'boletoBri1',urlKey:'boletoUrlBri1',codKey:'boletoCodBri1'},
+        {tipo:'bri2',label:'Bri2ª',valKey:'boletoBri2',urlKey:'boletoUrlBri2',codKey:'boletoCodBri2'},
+        {tipo:'mkt', label:'Mkt',  valKey:'boletoMkt',  urlKey:'boletoUrlMkt', codKey:'boletoCodMkt'},
+        {tipo:'fran',label:'Fran', valKey:'boletoFran', urlKey:'boletoUrlFran',codKey:'boletoCodFran'},
+      ];
+      _bDefs.forEach(function(b){
+        if(!(r[b.valKey]>0))return; // só mostra se valor > 0
+        if(r[b.urlKey]){
+          boletosBtns+='<a href="'+r[b.urlKey]+'" target="_blank" style="font-size:.7rem;color:#1A6B3A;font-weight:700;padding:.15rem .35rem;border-radius:2px;text-decoration:none;white-space:nowrap" title="Ver PDF '+b.label+'">✅ '+b.label+'</a>';
+        }else{
+          boletosBtns+='<button onclick="qgGerarBoleto('+r._id+',\''+b.tipo+'\')" style="font-size:.7rem;color:#1A3A6B;background:transparent;border:1px solid #B8C8E8;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;padding:.15rem .4rem;border-radius:2px;white-space:nowrap" onmouseover="this.style.background=\'#E8F0FF\'" onmouseout="this.style.background=\'transparent\'">📄 '+b.label+'</button>';
+        }
+      });
     }
     tds+='<td style="padding:.625rem .6rem;text-align:center;white-space:nowrap;position:sticky;right:0;z-index:1;background:'+bg+';box-shadow:-2px 0 4px -2px rgba(44,24,16,.15)">'+
       boletosBtns+
@@ -4559,26 +4569,31 @@ function qgConfirmNF(){
 // ------------------------------------------------------------
 // Geração de Boleto via API Banco Inter (somente A receber / Franquias)
 // Requer: servidor proxy inter-proxy/ rodando e URL configurada em S.interUrl
+// tipo: 'bri1' | 'bri2' | 'mkt' | 'fran'
 // ------------------------------------------------------------
-async function qgGerarBoleto(id, parcela){
+const _QG_BOLETO_TIPOS={
+  bri1:{label:'Brilhante/Fáb. 1ª',valKey:'boletoBri1',dvKey:'dv1',urlKey:'boletoUrlBri1',codKey:'boletoCodBri1',conta:'brilhante'},
+  bri2:{label:'Brilhante/Fáb. 2ª',valKey:'boletoBri2',dvKey:'dv2',urlKey:'boletoUrlBri2',codKey:'boletoCodBri2',conta:'brilhante'},
+  mkt: {label:'Marketing',        valKey:'boletoMkt',  dvKey:'dv1',urlKey:'boletoUrlMkt', codKey:'boletoCodMkt', conta:'marketing'},
+  fran:{label:'Franchising',      valKey:'boletoFran', dvKey:'dv1',urlKey:'boletoUrlFran',codKey:'boletoCodFran',conta:'franchising'},
+};
+
+async function qgGerarBoleto(id, tipo){
   if(!S.interUrl){
     toast('Configure a URL do servidor Inter em Configurações antes de gerar boletos.','warn');
     return;
   }
+  const cfg=_QG_BOLETO_TIPOS[tipo];
+  if(!cfg){toast('Tipo de boleto inválido.','err');return;}
+
   const recs=S.qg.recs.areceber;
   const rec=recs.find(function(x){return x._id===id;});
   if(!rec){toast('Registro não encontrado.','err');return;}
 
-  const dvKey='dv'+parcela;
-  const valKey='boletoBri'+parcela;
-  const urlKey='boletoUrl'+parcela;
-  const codKey='boletoCod'+parcela;
-
-  const vencimento=rec[dvKey];
-  const valor=rec[valKey]||0;
-
-  if(!vencimento){toast('Vencimento da '+parcela+'ª parcela não preenchido.','warn');return;}
-  if(!valor){toast('Valor do boleto '+parcela+'ª parcela é zero.','warn');return;}
+  const valor=rec[cfg.valKey]||0;
+  const vencimento=rec[cfg.dvKey]||'';
+  if(!valor){toast('Valor do boleto '+cfg.label+' é zero.','warn');return;}
+  if(!vencimento){toast('Vencimento não preenchido para '+cfg.label+'.','warn');return;}
 
   // Busca dados do sacado no Cadastro de Lojas
   const lojasCadastro=S.qg.recs.lojas||[];
@@ -4586,20 +4601,20 @@ async function qgGerarBoleto(id, parcela){
     return l.kind==='Loja'&&norm(l.loja)===norm(rec.loja);
   });
   if(!lojaRec||!lojaRec.cnpjCpf){
-    toast('Cadastre o CNPJ e endereço da loja "'+rec.loja+'" na aba Cadastro antes de gerar o boleto.','warn');
+    toast('Cadastre o CNPJ e endereço da loja "'+rec.loja+'" na aba Cadastro antes de gerar boletos.','warn');
     return;
   }
 
-  const descricao=(rec.forn||'Rasteirissima')+' — Boleto '+parcela+'ª Parcela'+(rec.nota?' NF '+rec.nota:'');
+  const descricao=cfg.label+(rec.nota?' — NF '+rec.nota:'')+(rec.loja?' — '+rec.loja:'');
+  if(!confirm('Gerar boleto '+cfg.label+' para "'+rec.loja+'"?\nValor: '+fBRL(valor)+'  |  Venc.: '+fDt(vencimento)))return;
 
-  if(!confirm('Gerar boleto '+parcela+'ª parcela para "'+rec.loja+'"?\nValor: '+fBRL(valor)+'  |  Venc.: '+fDt(vencimento)))return;
-
-  showLoading('Gerando boleto no Banco Inter...');
+  showLoading('Gerando boleto no Banco Inter ('+cfg.label+')...');
   try{
     const res=await fetch(S.interUrl.replace(/\/$/,'')+'/boleto',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        conta:cfg.conta,   // proxy usa isso para escolher as credenciais corretas
         sacado:{
           cnpjCpf:lojaRec.cnpjCpf,
           nome:lojaRec.loja,
@@ -4620,9 +4635,8 @@ async function qgGerarBoleto(id, parcela){
     });
     const data=await res.json();
     if(data.error)throw new Error(data.error);
-    // Salva URL e linha digitável no registro
-    rec[urlKey]=data.pdfLink||'';
-    rec[codKey]=data.linhaDigitavel||data.codigoBarras||'';
+    rec[cfg.urlKey]=data.pdfLink||'';
+    rec[cfg.codKey]=data.linhaDigitavel||data.codigoBarras||'';
     const i=recs.findIndex(function(x){return x._id===id;});
     if(i>=0)recs[i]=rec;
     qgSaveData('areceber');
@@ -4630,7 +4644,7 @@ async function qgGerarBoleto(id, parcela){
     qgApplyF();
     if(data.pdfLink)window.open(data.pdfLink,'_blank');
     if(data.linhaDigitavel)navigator.clipboard.writeText(data.linhaDigitavel).catch(function(){});
-    toast('Boleto '+parcela+'ª parcela gerado ✓'+(data.linhaDigitavel?' — linha digitável copiada!':''));
+    toast('Boleto '+cfg.label+' gerado ✓'+(data.linhaDigitavel?' — linha digitável copiada!':''));
   }catch(e){
     toast('Erro ao gerar boleto: '+e.message,'err');
   }finally{

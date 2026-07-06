@@ -1,102 +1,109 @@
 /**
  * Rasteirissima — Proxy Banco Inter Cobranças
  *
- * Intermediário entre o frontend (index.html) e a API do Banco Inter.
- * Necessário porque a API do Inter exige mTLS (certificado digital),
- * que não pode ser usado diretamente pelo navegador.
+ * Suporta 3 contas Inter distintas (brilhante, marketing, franchising).
+ * O frontend envia `conta: 'brilhante'|'marketing'|'franchising'` no body
+ * e o proxy usa as credenciais correspondentes.
  *
  * COMO USAR (desenvolvimento local):
- *   1. Copie cert.pem e key.pem (baixados do Inter Developers) para esta pasta
- *   2. Copie .env.example para .env e preencha as variáveis
- *   3. npm install
- *   4. node server.js
+ *   1. Copie .env.example para .env e preencha as 3 contas
+ *   2. npm install
+ *   3. node server.js
  *
  * DEPLOY (Railway ou Render — plano gratuito):
  *   - Suba esta pasta como repositório GitHub
- *   - Configure as variáveis de ambiente no painel do Railway/Render
- *   - O deploy é automático a cada push
+ *   - Configure todas as variáveis de ambiente (ver .env.example)
+ *   - Cole a URL gerada em Configurações → "URL servidor Inter" no sistema
  */
 
 const express = require('express');
 const https   = require('https');
-const fs      = require('fs');
 
-// ── Variáveis de ambiente ─────────────────────────────────────────────────────
 const {
-  INTER_CLIENT_ID,
-  INTER_CLIENT_SECRET,
-  INTER_CERT_PEM,        // conteúdo do cert.pem (string com \n)
-  INTER_KEY_PEM,         // conteúdo do key.pem (string com \n)
-  INTER_CONTA,           // número da conta Inter PJ (opcional, para alguns endpoints)
-  ALLOWED_ORIGIN,        // ex: https://seuusuario.github.io
+  ALLOWED_ORIGIN,
   PORT = 3000,
 } = process.env;
 
-// ── Validação mínima ──────────────────────────────────────────────────────────
-const missing = ['INTER_CLIENT_ID','INTER_CLIENT_SECRET','INTER_CERT_PEM','INTER_KEY_PEM','ALLOWED_ORIGIN']
-  .filter(k => !process.env[k]);
-if (missing.length) {
-  console.error('Variáveis de ambiente faltando:', missing.join(', '));
-  process.exit(1);
+// ── Configuração das 3 contas Inter ─────────────────────────────────────────
+// Cada conta precisa de: CLIENT_ID, CLIENT_SECRET, CERT_PEM, KEY_PEM
+// Os nomes das env vars seguem o padrão INTER_<CONTA>_<CAMPO>
+const CONTAS = {
+  brilhante:   buildContaCfg('BRI'),
+  marketing:   buildContaCfg('MKT'),
+  franchising: buildContaCfg('FRAN'),
+};
+
+function buildContaCfg(prefix) {
+  return {
+    clientId:     process.env[`INTER_${prefix}_CLIENT_ID`]     || '',
+    clientSecret: process.env[`INTER_${prefix}_CLIENT_SECRET`] || '',
+    certPem:      (process.env[`INTER_${prefix}_CERT_PEM`]     || '').replace(/\\n/g, '\n'),
+    keyPem:       (process.env[`INTER_${prefix}_KEY_PEM`]      || '').replace(/\\n/g, '\n'),
+    conta:        process.env[`INTER_${prefix}_CONTA`]         || '',
+    token:        null,
+    tokenExp:     0,
+  };
 }
 
-// ── Agente HTTPS com mTLS (certificado digital do Inter) ─────────────────────
-const interAgent = new https.Agent({
-  cert: INTER_CERT_PEM.replace(/\\n/g, '\n'),
-  key:  INTER_KEY_PEM.replace(/\\n/g, '\n'),
-});
+// Valida que pelo menos uma conta tem credenciais
+const contasValidas = Object.entries(CONTAS).filter(([, c]) => c.clientId && c.certPem);
+if (!contasValidas.length) {
+  console.error('Nenhuma conta Inter configurada. Defina INTER_BRI_CLIENT_ID, INTER_MKT_CLIENT_ID ou INTER_FRAN_CLIENT_ID nas variáveis de ambiente.');
+  process.exit(1);
+}
+if (!ALLOWED_ORIGIN) {
+  console.warn('ALLOWED_ORIGIN não definido — CORS aberto (não recomendado em produção)');
+}
 
 const INTER_BASE = 'https://cdpj.partners.bancointer.com.br';
 
-// ── Cache de token OAuth2 ─────────────────────────────────────────────────────
-let _token = null;
-let _tokenExp = 0;
+// ── OAuth2: token por conta com cache ────────────────────────────────────────
+async function getToken(cfg) {
+  if (cfg.token && Date.now() < cfg.tokenExp) return cfg.token;
 
-async function getToken() {
-  if (_token && Date.now() < _tokenExp) return _token;
+  const creds = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString('base64');
+  const body = 'grant_type=client_credentials&scope=boleto-cobranca.read+boleto-cobranca.write';
 
-  const creds = Buffer.from(`${INTER_CLIENT_ID}:${INTER_CLIENT_SECRET}`).toString('base64');
-  const res = await fetch(`${INTER_BASE}/oauth/v2/token`, {
+  const result = await interRequest('/oauth/v2/token', {
     method: 'POST',
+    cfg,
     headers: {
       'Authorization': `Basic ${creds}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: 'grant_type=client_credentials&scope=boleto-cobranca.read+boleto-cobranca.write',
-    // @ts-ignore — Node 18+ suporta o agent no fetch global via dispatcher,
-    // mas para compatibilidade usamos node-fetch se necessário
+    body,
   });
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Inter OAuth falhou (${res.status}): ${txt}`);
+  if (result.status !== 200) {
+    throw new Error(`Inter OAuth falhou (${result.status}): ${result.body}`);
   }
-  const json = await res.json();
-  _token = json.access_token;
-  _tokenExp = Date.now() + (json.expires_in - 60) * 1000; // margem de 60s
-  return _token;
+  const json = JSON.parse(result.body);
+  cfg.token = json.access_token;
+  cfg.tokenExp = Date.now() + (json.expires_in - 60) * 1000;
+  return cfg.token;
 }
 
-// Wrapper de fetch com mTLS — Node 18+ com fetch nativo não suporta agents diretamente.
-// Se precisar de versão anterior do Node, substituir por node-fetch ou axios.
-async function interFetch(path, options = {}) {
-  // Usa https.request manualmente para compatibilidade com mTLS
+// ── Requisição HTTPS com mTLS ─────────────────────────────────────────────────
+function interRequest(path, { method = 'GET', cfg, headers = {}, body = null, token }) {
   return new Promise((resolve, reject) => {
     const url = new URL(INTER_BASE + path);
-    const body = options.body ? Buffer.from(options.body, 'utf8') : null;
+    const buf = body ? Buffer.from(body, 'utf8') : null;
+
+    const reqHeaders = {
+      ...headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(buf ? { 'Content-Length': String(buf.length) } : {}),
+      ...(cfg.conta ? { 'x-conta-corrente': cfg.conta } : {}),
+    };
+
     const req = https.request(
       {
         hostname: url.hostname,
         path: url.pathname + url.search,
-        method: options.method || 'GET',
-        headers: {
-          'Authorization': `Bearer ${options.token}`,
-          'Content-Type': 'application/json',
-          ...(body ? { 'Content-Length': body.length } : {}),
-          ...(INTER_CONTA ? { 'x-conta-corrente': INTER_CONTA } : {}),
-        },
-        cert: INTER_CERT_PEM.replace(/\\n/g, '\n'),
-        key:  INTER_KEY_PEM.replace(/\\n/g, '\n'),
+        method,
+        headers: reqHeaders,
+        cert: cfg.certPem,
+        key:  cfg.keyPem,
       },
       (res) => {
         let data = '';
@@ -105,7 +112,7 @@ async function interFetch(path, options = {}) {
       }
     );
     req.on('error', reject);
-    if (body) req.write(body);
+    if (buf) req.write(buf);
     req.end();
   });
 }
@@ -114,11 +121,11 @@ async function interFetch(path, options = {}) {
 const app = express();
 app.use(express.json());
 
-// CORS restrito ao domínio do sistema
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin === ALLOWED_ORIGIN || !origin) {
-    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN || '*');
+  const allowed = ALLOWED_ORIGIN || '*';
+  if (!ALLOWED_ORIGIN || origin === ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', allowed);
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
@@ -126,97 +133,105 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── GET /ping — verifica se o servidor está no ar ─────────────────────────────
-app.get('/ping', (_req, res) => res.json({ ok: true }));
+// GET /ping — verifica saúde do servidor e quais contas estão configuradas
+app.get('/ping', (_req, res) => {
+  res.json({
+    ok: true,
+    contas: Object.entries(CONTAS)
+      .filter(([, c]) => c.clientId)
+      .map(([nome]) => nome),
+  });
+});
 
-// ── POST /boleto — cria cobrança (boleto híbrido Boleto + Pix) ───────────────
+// POST /boleto — cria cobrança (boleto híbrido Boleto + Pix)
 //
-// Body esperado do frontend:
+// Body esperado:
 // {
-//   sacado: {
-//     cnpjCpf, nome, email, cep, endereco, numero, complemento, bairro, cidade, uf, telefone
-//   },
-//   valor: 1234.56,           // número, em reais
-//   vencimento: "2025-08-30", // ISO AAAA-MM-DD
-//   descricao: "Boleto Marketing Jul/2025"  // texto livre (aparece no boleto)
-// }
-//
-// Resposta para o frontend:
-// {
-//   nossoNumero, linhaDigitavel, codigoBarras, pdfLink, txid
+//   conta: 'brilhante' | 'marketing' | 'franchising',
+//   sacado: { cnpjCpf, nome, email, cep, endereco, numero, complemento, bairro, cidade, uf, telefone },
+//   valor: 1234.56,
+//   vencimento: 'AAAA-MM-DD',
+//   descricao: 'Boleto Marketing — NF 123 — Loja XYZ'
 // }
 app.post('/boleto', async (req, res) => {
   try {
-    const { sacado, valor, vencimento, descricao } = req.body;
+    const { conta, sacado, valor, vencimento, descricao } = req.body;
 
+    if (!conta || !CONTAS[conta]) {
+      return res.status(400).json({ error: `Conta inválida: "${conta}". Use brilhante, marketing ou franchising.` });
+    }
     if (!sacado || !sacado.cnpjCpf || !valor || !vencimento) {
       return res.status(400).json({ error: 'Campos obrigatórios: sacado.cnpjCpf, valor, vencimento' });
     }
 
-    const token = await getToken();
+    const cfg = CONTAS[conta];
+    if (!cfg.clientId || !cfg.certPem) {
+      return res.status(503).json({ error: `Conta "${conta}" não está configurada neste servidor.` });
+    }
 
-    // Payload para a API do Inter (Boleto Híbrido v3)
-    // Documentação: https://developers.bancointer.com.br/reference/incluirboleto
+    const token = await getToken(cfg);
+
+    const cnpjCpfLimpo = sacado.cnpjCpf.replace(/\D/g, '');
     const payload = JSON.stringify({
       pagador: {
-        cpfCnpj:     sacado.cnpjCpf.replace(/\D/g, ''),
-        tipoPessoa:  sacado.cnpjCpf.replace(/\D/g, '').length === 11 ? 'FISICA' : 'juridica',
+        cpfCnpj:     cnpjCpfLimpo,
+        tipoPessoa:  cnpjCpfLimpo.length === 11 ? 'FISICA' : 'JURIDICA',
         nome:        sacado.nome,
-        email:       sacado.email || '',
+        email:       sacado.email     || '',
         telefone:    (sacado.telefone || '').replace(/\D/g, ''),
-        endereco:    sacado.endereco || '',
-        numero:      sacado.numero || 'S/N',
+        endereco:    sacado.endereco  || '',
+        numero:      sacado.numero    || 'S/N',
         complemento: sacado.complemento || '',
-        bairro:      sacado.bairro || '',
-        cidade:      sacado.cidade || '',
-        uf:          (sacado.uf || '').toUpperCase(),
+        bairro:      sacado.bairro    || '',
+        cidade:      sacado.cidade    || '',
+        uf:          (sacado.uf || '').toUpperCase().slice(0, 2),
         cep:         sacado.cep.replace(/\D/g, ''),
       },
-      valorNominal: Number(valor).toFixed(2),
-      dataVencimento: vencimento,   // AAAA-MM-DD
-      numDiasAgenda: 60,            // cancela automaticamente após 60 dias do vencimento
+      valorNominal:   Number(valor).toFixed(2),
+      dataVencimento: vencimento,
+      numDiasAgenda:  60,
       mensagem: {
-        linha1: (descricao || 'Rasteirissima Franchising').slice(0, 50),
+        linha1: (descricao || 'Rasteirissima').slice(0, 50),
       },
     });
 
-    const interRes = await interFetch('/cobranca/v3/boletos', {
+    const createRes = await interRequest('/cobranca/v3/boletos', {
       method: 'POST',
+      cfg,
       token,
+      headers: { 'Content-Type': 'application/json' },
       body: payload,
     });
 
-    if (interRes.status !== 200 && interRes.status !== 201) {
-      return res.status(502).json({ error: `Inter respondeu ${interRes.status}`, detail: interRes.body });
+    if (createRes.status !== 200 && createRes.status !== 201) {
+      return res.status(502).json({
+        error: `Inter respondeu ${createRes.status}`,
+        detail: createRes.body,
+      });
     }
 
-    const data = JSON.parse(interRes.body);
+    const data = JSON.parse(createRes.body);
 
-    // Busca PDF do boleto (GET /cobranca/v3/boletos/{nossoNumero}/pdf)
+    // Busca PDF do boleto (base64)
     let pdfLink = '';
     if (data.nossoNumero) {
-      const pdfRes = await interFetch(`/cobranca/v3/boletos/${data.nossoNumero}/pdf`, {
-        method: 'GET',
-        token,
+      const pdfRes = await interRequest(`/cobranca/v3/boletos/${data.nossoNumero}/pdf`, {
+        method: 'GET', cfg, token,
       });
       if (pdfRes.status === 200) {
-        // Inter retorna { pdf: "<base64>" }
         try {
           const pdfData = JSON.parse(pdfRes.body);
-          if (pdfData.pdf) {
-            // Devolve como data URI para o frontend abrir direto
-            pdfLink = `data:application/pdf;base64,${pdfData.pdf}`;
-          }
+          if (pdfData.pdf) pdfLink = `data:application/pdf;base64,${pdfData.pdf}`;
         } catch (_) {}
       }
     }
 
     res.json({
-      nossoNumero:   data.nossoNumero   || '',
+      nossoNumero:    data.nossoNumero    || '',
       linhaDigitavel: data.linhaDigitavel || '',
-      codigoBarras:  data.codigoBarras  || '',
+      codigoBarras:   data.codigoBarras   || '',
       pdfLink,
-      txid:          data.txid          || '',
+      txid:           data.txid           || '',
     });
   } catch (err) {
     console.error('Erro ao gerar boleto:', err);
@@ -224,4 +239,7 @@ app.post('/boleto', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Inter proxy rodando na porta ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Inter proxy na porta ${PORT}`);
+  console.log('Contas configuradas:', contasValidas.map(([n]) => n).join(', '));
+});
