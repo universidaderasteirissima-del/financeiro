@@ -646,10 +646,15 @@ th:hover{background:#EAD9C8!important}
             <p style="color:#999;font-size:.75rem;padding:2rem 0" id="qgApViewerMsg">Nenhum PDF carregado</p>
           </div>
         </div>
-        <!-- RIGHT: Form -->
+        <!-- RIGHT: Tabs + Form -->
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+          <!-- Abas de boletos (aparece só quando o PDF tem mais de 1 boleto) -->
+          <div id="qgApTabs" style="display:none;margin-bottom:.5rem;flex-shrink:0"></div>
           <div style="background:#F2EAE0;border:1px solid #D4B499;border-radius:3px;padding:.65rem .85rem;margin-bottom:.65rem;flex-shrink:0">
-            <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem">
+              <p style="font-size:.78rem;font-weight:700;color:#5C3D2E">✓ Dados extraídos — confira e complete</p>
+              <span id="qgApQueueBadge" style="display:none;font-size:.7rem;font-weight:700;background:#2C1810;color:#FAF7F4;padding:.15rem .6rem;border-radius:2px"></span>
+            </div>
             <p style="font-size:.7rem;color:#7A4F3A" id="qgApInf"></p>
           </div>
           <div style="flex:1;overflow-y:auto;padding-right:.15rem">
@@ -676,7 +681,7 @@ th:hover{background:#EAD9C8!important}
           </div>
           <div style="display:flex;gap:.5rem;margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);flex-shrink:0">
             <button onclick="qgApGoStep(1)" class="btn-secondary" style="padding:.5rem 1rem;font-size:.8rem">← Voltar</button>
-            <button onclick="qgConfirmApBoleto()" class="btn-primary" style="flex:1;font-size:.8rem">✓ Confirmar lançamento</button>
+            <button onclick="qgConfirmApBoleto()" class="btn-primary" style="flex:1;font-size:.8rem" id="qgApConfirmBtn">✓ Confirmar lançamento</button>
           </div>
         </div>
       </div>
@@ -4657,7 +4662,40 @@ async function qgGerarBoleto(id, tipo){
 // Reaproveita extractBoletoData (mesmo motor de Lojas Próprias), mapeado
 // para o esquema AP_FIELDS (categoria/mês/vencimento/despesa/valor/status)
 // ------------------------------------------------------------
-let qgApPdfDoc=null,qgApPdfTxt='',qgApBenefNome='';
+let qgApPdfDoc=null,qgApPdfTxt='',qgApPdfPages=[],qgApQueue=[],qgApQueueIdx=0;
+
+// Extração por coordenadas: encontra o texto fisicamente abaixo do label
+// "Beneficiário" numa página, ignorando a ordem de renderização do pdfjs.
+// Recebe os itens (com x/y) de UMA página já mapeados.
+function qgApBenefFromItems(itms){
+  const bls=itms.filter(it=>/[Bb]enefici[aá]rio/i.test(it.s));
+  if(!bls.length)return '';
+  // Pega o label de maior Y (mais acima na página = seção principal),
+  // depois o leftmost X (coluna esquerda do formulário).
+  bls.sort((a,b)=>b.y-a.y||a.x-b.x);
+  const bl=bls[0];
+  // Itens estritamente abaixo do label (Y < label.Y) dentro de 30pt,
+  // na mesma coluna horizontal.
+  const vals=itms.filter(it=>
+    it.y<bl.y&&bl.y-it.y<=30&&
+    it.x>=bl.x-5&&
+    it.s.length>=5&&/[A-Z]{4}/.test(it.s)&&
+    !/[Bb]enefici/i.test(it.s)
+  ).sort((a,b)=>b.y-a.y||a.x-b.x);
+  return vals.length?vals[0].s.split(/\s+/)[0]:'';
+}
+
+// Desc = "PRIMEIRONOME - NUMDOC", a partir dos dados de UM boleto (prs)
+// e do nome de beneficiário já extraído por coordenadas para a página dele.
+function qgBuildApDesc(prs,benefNome){
+  var primNome=benefNome||'';
+  if(!primNome)primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
+  var rawDoc=String(prs.nn||'');
+  if(!rawDoc){var mDoc=(prs._raw||'').match(/\b(\d{5,8}[A-Z])\b/);if(mDoc)rawDoc=mDoc[1];}
+  var mLet=rawDoc.match(/^(.*?)([A-Za-z])$/);
+  var numDoc=mLet?mLet[1]+'-'+(mLet[2].toUpperCase().charCodeAt(0)-64):rawDoc;
+  return primNome&&numDoc?primNome+' - '+numDoc:(primNome||numDoc||prs.foTxt||'');
+}
 
 function qgApGoStep(n){
   document.getElementById('qgApS1').style.display=n===1?'block':'none';
@@ -4700,7 +4738,7 @@ async function qgRenderApPDF(pdfDoc){
 }
 
 function qgOpenApBoleto(){
-  qgApPdfTxt='';qgApPdfDoc=null;qgApBenefNome='';
+  qgApPdfTxt='';qgApPdfDoc=null;qgApPdfPages=[];qgApQueue=[];qgApQueueIdx=0;
   document.getElementById('qgApPDF').value='';
   document.getElementById('qgApPDFNm').textContent='Nenhum arquivo selecionado';
   document.getElementById('qgApLi').value='';
@@ -4714,9 +4752,16 @@ function qgOpenApBoleto(){
   var m=document.getElementById('mQgApBoleto');document.body.appendChild(m);m.style.display='flex';
 }
 
+// Lê o PDF (que pode conter vários boletos, um por página) e monta uma
+// fila com um item por boleto detectado. Cada página é tratada como um
+// boleto candidato — mesmo critério usado em Mercadorias a Pagar — e só
+// entra na fila se houver evidência real (vencimento, nº de documento ou
+// linha digitável), evitando falsos positivos em páginas de rosto/anexo.
 async function qgParseApBoleto(){
   const linha=document.getElementById('qgApLi').value.trim();
   const file=document.getElementById('qgApPDF').files[0];
+  qgApPdfPages=[];
+  const benefPerPage=[];
   if(file){
     try{
       toast('Lendo PDF...','info');
@@ -4727,28 +4772,11 @@ async function qgParseApBoleto(){
       for(let i=1;i<=doc.numPages;i++){
         const pg=await doc.getPage(i);
         const tc=await pg.getTextContent();
-        txt+=tc.items.map(it=>it.str).join(' ')+'\n';
-        // Extração por coordenadas: encontra o texto fisicamente abaixo do label
-        // "Beneficiário" na página, ignorando a ordem de renderização do pdfjs.
-        if(i===1&&!qgApBenefNome){
-          const itms=tc.items.map(it=>({s:it.str.trim(),x:it.transform[4],y:it.transform[5]})).filter(it=>it.s.length>0);
-          const bls=itms.filter(it=>/[Bb]enefici[aá]rio/i.test(it.s));
-          if(bls.length){
-            // Pega o label de maior Y (mais acima na página = seção principal),
-            // depois o leftmost X (coluna esquerda do formulário).
-            bls.sort((a,b)=>b.y-a.y||a.x-b.x);
-            const bl=bls[0];
-            // Itens estritamente abaixo do label (Y < label.Y) dentro de 30pt,
-            // na mesma coluna horizontal.
-            const vals=itms.filter(it=>
-              it.y<bl.y&&bl.y-it.y<=30&&
-              it.x>=bl.x-5&&
-              it.s.length>=5&&/[A-Z]{4}/.test(it.s)&&
-              !/[Bb]enefici/i.test(it.s)
-            ).sort((a,b)=>b.y-a.y||a.x-b.x);
-            if(vals.length)qgApBenefNome=vals[0].s.split(/\s+/)[0];
-          }
-        }
+        const pageTxt=tc.items.map(it=>it.str).join(' ');
+        txt+=pageTxt+'\n';
+        qgApPdfPages.push(pageTxt);
+        const itms=tc.items.map(it=>({s:it.str.trim(),x:it.transform[4],y:it.transform[5]})).filter(it=>it.s.length>0);
+        benefPerPage.push(qgApBenefFromItems(itms));
       }
       qgApPdfTxt=txt;
       // Auto-preenche linha digitável se o usuário não digitou (igual ao fluxo LP)
@@ -4758,28 +4786,107 @@ async function qgParseApBoleto(){
       }
     }catch(e){toast('Erro ao ler PDF: '+e.message,'err');return;}
   }
-  const linhaFinal=document.getElementById('qgApLi').value.trim();
-  const prs=extractBoletoData(qgApPdfTxt||'',linhaFinal);
 
+  const manualLinha=document.getElementById('qgApLi').value.trim().replace(/[\s.]/g,'');
+  qgApQueue=[];
+  if(qgApPdfPages.length>1){
+    for(let p=0;p<qgApPdfPages.length;p++){
+      const pageTxt=qgApPdfPages[p];
+      const linhas=findLinhasDigitaveis(pageTxt);
+      const linhaP=linhas.length?linhas[0]:(p===0?manualLinha:'');
+      const prs=extractBoletoData(pageTxt,linhaP);
+      if(prs.dv||(prs.nn&&prs.nn.length>0)||linhas.length>0){
+        prs._page=p+1;
+        prs._raw=pageTxt;
+        prs._benef=benefPerPage[p]||'';
+        qgApQueue.push(prs);
+      }
+    }
+  }
+  if(qgApQueue.length===0){
+    // Fallback: um único boleto (texto completo do PDF ou linha manual)
+    const prs=extractBoletoData(qgApPdfTxt||'',manualLinha);
+    prs._page=1;
+    prs._raw=qgApPdfTxt||'';
+    prs._benef=benefPerPage[0]||'';
+    qgApQueue.push(prs);
+  }
+
+  qgApQueue.sort((a,b)=>(a.dv||'').localeCompare(b.dv||''));
+  qgApQueueIdx=0;
+  qgShowApQueueItem(0);
+}
+
+function qgApRenderTabs(){
+  const container=document.getElementById('qgApTabs');
+  if(!container)return;
+  const total=qgApQueue.length;
+  if(total<=1){container.style.display='none';return;}
+  container.style.display='flex';
+  container.style.gap='.3rem';
+  container.style.flexWrap='wrap';
+  container.innerHTML=qgApQueue.map(function(q,i){
+    const active=i===qgApQueueIdx;
+    const confirmed=q._confirmed;
+    const bg=confirmed?'#1E6B3A':active?'#2C1810':'#EAD9C8';
+    const col=confirmed||active?'#fff':'#5C3D2E';
+    const label='Boleto '+(i+1)+(confirmed?' ✓':'');
+    return '<button onclick="qgSwitchApTab('+i+')" style="padding:.3rem .75rem;border:none;border-radius:2px;background:'+bg+';color:'+col+';font-size:.72rem;font-weight:700;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;transition:background .15s">'
+      +xe(label)+'</button>';
+  }).join('');
+}
+
+// Salva o estado atual do formulário no item da fila antes de trocar de
+// aba ou confirmar — assim os dados editados manualmente não se perdem.
+function qgSaveApFormToQueue(){
+  const idx=qgApQueueIdx;
+  if(idx<0||idx>=qgApQueue.length)return;
+  const q=qgApQueue[idx];
+  q.cat=document.getElementById('qgApCat').value.trim();
+  q.desc=document.getElementById('qgApDesc').value.trim();
+  q.dv=document.getElementById('qgApDv').value;
+  q.vn=document.getElementById('qgApVa').value;
+  q.st=document.getElementById('qgApStatus').value;
+  q.dp=document.getElementById('qgApDp').value;
+}
+
+function qgSwitchApTab(idx){
+  qgSaveApFormToQueue();
+  qgApQueueIdx=idx;
+  qgShowApQueueItem(idx);
+}
+
+function qgHighlightApPage(pageNum){
+  document.querySelectorAll('#qgApPDFViewer canvas').forEach(function(c){
+    c.style.outline=c.dataset.page===String(pageNum)?'3px solid #9B6B50':'none';
+    c.style.boxShadow=c.dataset.page===String(pageNum)?'0 0 0 1px #9B6B50':'none';
+    if(c.dataset.page===String(pageNum))c.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
+
+function qgShowApQueueItem(idx){
+  const prs=qgApQueue[idx];
+  const total=qgApQueue.length;
+
+  qgApRenderTabs();
+  const badge=document.getElementById('qgApQueueBadge');
+  if(badge){
+    if(total>1){badge.style.display='inline-block';badge.textContent='Boleto '+(idx+1)+' de '+total;}
+    else badge.style.display='none';
+  }
+
+  if(qgApPdfPages.length>1)qgHighlightApPage(prs._page||(idx+1));
+  else qgHighlightApPage(1);
+
+  // Categoria: se este item da fila já foi visitado (q.cat definido), usa o
+  // valor salvo; senão mantém o que já está no campo — na prática carrega a
+  // categoria do boleto anterior, já que costuma se repetir no mesmo lote.
+  if(prs.cat!=null)document.getElementById('qgApCat').value=prs.cat;
   document.getElementById('qgApDv').value=prs.dv||'';
   document.getElementById('qgApVa').value=prs.vn||'';
-  // Desc = "PRIMEIRNOME - NUMDOC"
-  (function(){
-    // 1. Primeiro nome: usa coordenadas Y do pdfjs para pegar o texto
-    //    que está fisicamente abaixo do label "Beneficiário" na página.
-    //    Isso é imune à ordem de renderização do PDF.
-    var primNome=qgApBenefNome||'';
-    // Fallback: primeira palavra do campo Beneficiário já extraído
-    if(!primNome)primNome=((prs.foTxt||prs.fo||'').split(/\s+/)[0]||'').toUpperCase();
-    // 2. Número do documento: prs.nn (outros bancos) OU padrão "NNNNNNLetra" do Sicredi
-    var rawDoc=String(prs.nn||'');
-    if(!rawDoc){var mDoc=(qgApPdfTxt||'').match(/\b(\d{5,8}[A-Z])\b/);if(mDoc)rawDoc=mDoc[1];}
-    // 3. Letra final → número (A=1, B=2, C=3...)
-    var mLet=rawDoc.match(/^(.*?)([A-Za-z])$/);
-    var numDoc=mLet?mLet[1]+'-'+(mLet[2].toUpperCase().charCodeAt(0)-64):rawDoc;
-    var desc=primNome&&numDoc?primNome+' - '+numDoc:(primNome||numDoc||prs.foTxt||'');
-    document.getElementById('qgApDesc').value=desc;
-  })();
+  document.getElementById('qgApStatus').value=prs.st||'em aberto';
+  document.getElementById('qgApDp').value=prs.dp||'';
+  document.getElementById('qgApDesc').value=(prs.desc!=null)?prs.desc:qgBuildApDesc(prs,prs._benef);
 
   const parts=[];
   if(prs.banco)parts.push('Banco: '+prs.banco);
@@ -4788,37 +4895,59 @@ async function qgParseApBoleto(){
   document.getElementById('qgApInf').textContent=parts.length?parts.join(' | '):'Não foi possível identificar os dados automaticamente — confira e complete manualmente.';
 
   qgApGoStep(2);
+  setTimeout(function(){
+    var vw=document.getElementById('qgApPDFViewer');
+    if(qgApPdfDoc&&vw&&!vw.querySelector('canvas')){
+      qgRenderApPDF(qgApPdfDoc).catch(function(){});
+    }
+  },450);
 }
 
 async function qgConfirmApBoleto(){
+  qgSaveApFormToQueue();
+  const idx=qgApQueueIdx;
+  const q=qgApQueue[idx];
   const viewKey=S.qg.view;
   const view=QG_VIEWS[viewKey];
-  const cat=document.getElementById('qgApCat').value.trim();
-  const desc=document.getElementById('qgApDesc').value.trim();
-  const dv=document.getElementById('qgApDv').value;
-  const va=parseFloat(document.getElementById('qgApVa').value)||0;
-  const st=document.getElementById('qgApStatus').value;
-  const dp=document.getElementById('qgApDp').value;
 
-  if(!cat){toast('Informe a Categoria','warn');return;}
-  if(!dv){toast('Informe o Vencimento','warn');return;}
+  if(!q.cat){toast('Informe a Categoria','warn');return;}
+  if(!q.dv){toast('Informe o Vencimento','warn');return;}
+  const va=parseFloat(q.vn)||0;
   if(!va){toast('Informe o Valor a Pagar','warn');return;}
+
+  const btn=document.getElementById('qgApConfirmBtn');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
 
   const recs=S.qg.recs[viewKey];
   const rec={
     _id:Math.max(0,...recs.map(function(x){return x._id;}))+1,
-    cat:cat,mes:dv?(new Date(dv+'T00:00:00').getMonth()+1):0,dv:dv,desc:desc,
-    va:va,vp:0,st:st,dp:dp,
+    cat:q.cat,mes:q.dv?(new Date(q.dv+'T00:00:00').getMonth()+1):0,dv:q.dv,desc:q.desc||'',
+    va:va,vp:0,st:q.st||'em aberto',dp:q.dp||'',
   };
-  if(view.fields.some(function(f){return f.key==='ano';}))rec.ano=dv?new Date(dv+'T00:00:00').getFullYear():0;
+  if(view.fields.some(function(f){return f.key==='ano';}))rec.ano=q.dv?new Date(q.dv+'T00:00:00').getFullYear():0;
   recs.push(rec);
   qgSaveData(viewKey);
-  hideMagnifier();cm('mQgApBoleto');
-  qgApplyF();
   let ok=false;
   if(!view.noSync){ok=await qgPush2Sheets(viewKey,rec,null);qgSaveData(viewKey);}
-  toast('Boleto importado ✓'+(ok?' Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
   qgApplyF();
+
+  q._confirmed=true;
+  qgApRenderTabs();
+
+  // Pula para o próximo boleto ainda não confirmado dentro do mesmo PDF
+  const next=qgApQueue.findIndex(function(b){return !b._confirmed;});
+  if(btn){btn.disabled=false;btn.textContent='✓ Confirmar lançamento';}
+  if(next>=0){
+    qgApQueueIdx=next;
+    qgShowApQueueItem(next);
+    const confirmedN=qgApQueue.filter(function(b){return b._confirmed;}).length;
+    toast('Boleto '+confirmedN+'/'+qgApQueue.length+' importado'+(ok?' ✓':'')+'. Confira o próximo.');
+  }else{
+    hideMagnifier();cm('mQgApBoleto');
+    qgApplyF();
+    const totalN=qgApQueue.length;
+    toast((totalN>1?(totalN+' boletos importados'):'Boleto importado')+' ✓'+(ok?' Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
+  }
 }
 
 // ------------------------------------------------------------
