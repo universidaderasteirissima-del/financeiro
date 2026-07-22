@@ -80,6 +80,63 @@ th:hover{background:#EAD9C8!important}
 #loadSpin{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:100000;background:#2C1810;color:#FAF7F4;padding:.5rem 1.15rem;border-radius:0 0 10px 10px;box-shadow:0 6px 18px rgba(44,24,16,.35);align-items:center;gap:.55rem;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:.78rem}
 #loadSpin .spinIco{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spinRot .7s linear infinite;flex-shrink:0}
 @keyframes spinRot{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   TEMA AZUL PASTEL — módulo Lojas Próprias (body.theme-lp)
+   A classe é aplicada no <body> só quando MODO==='lp_' (ver doLogin
+   e o restauro de sessão no final do script). Franquias continua
+   com a paleta marrom padrão, pois nunca recebe essa classe.
+   Sobrescreve tanto as classes utilitárias (.btn-primary etc, que
+   ficam definidas aqui em cima) quanto cores inline espalhadas pelo
+   HTML/JS, casando pelo texto literal dentro do atributo style="" —
+   assim cobre também linhas de tabela e abas geradas via innerHTML,
+   sem precisar editar cada trecho individualmente.
+   ============================================================ */
+body.theme-lp{--border:#C9DFEB;background:#EEF5FA;color:#1B3A5C}
+body.theme-lp .btn-primary{background:#2F5E86}
+body.theme-lp .btn-primary:hover{background:#234A6E}
+body.theme-lp .btn-secondary{background:#F4F9FC;color:#2F5E86}
+body.theme-lp .btn-secondary:hover{background:#E4F0F7;border-color:#82AFCC}
+body.theme-lp .btn-accent{background:#5B8FB3}
+body.theme-lp .btn-accent:hover{background:#3F7299}
+body.theme-lp .lbl{color:#5B8FB3}
+body.theme-lp .inp:focus,body.theme-lp .sel:focus{border-color:#5B8FB3}
+body.theme-lp th:hover{background:#D3E6F0!important}
+body.theme-lp::-webkit-scrollbar-track{background:#E4F0F7}
+body.theme-lp::-webkit-scrollbar-thumb{background:#AFD0E3}
+body.theme-lp #loadBar{background:rgba(91,143,179,.15)}
+body.theme-lp #loadBar div{background:#5B8FB3}
+body.theme-lp #loadSpin{background:#1B3A5C;color:#F4F9FC}
+
+body.theme-lp [style*="background:#2C1810"]{background:#1B3A5C!important}
+body.theme-lp [style*="color:#2C1810"]{color:#1B3A5C!important}
+body.theme-lp [style*="border-bottom:2px solid #2C1810"]{border-bottom-color:#1B3A5C!important}
+body.theme-lp [style*="background:#3D2B1F"]{background:#234A6E!important}
+body.theme-lp [style*="background:#5C3D2E"]{background:#2F5E86!important}
+body.theme-lp [style*="color:#5C3D2E"]{color:#2F5E86!important}
+body.theme-lp [style*="border-bottom:2px solid #5C3D2E"]{border-bottom-color:#2F5E86!important}
+body.theme-lp [style*="background:#7A4F3A"]{background:#3F7299!important}
+body.theme-lp [style*="color:#7A4F3A"]{color:#3F7299!important}
+body.theme-lp [style*="background:#9B6B50"]{background:#5B8FB3!important}
+body.theme-lp [style*="color:#9B6B50"]{color:#5B8FB3!important}
+body.theme-lp [style*="border-color:#9B6B50"]{border-color:#5B8FB3!important}
+body.theme-lp [style*="accent-color:#9B6B50"]{accent-color:#5B8FB3!important}
+body.theme-lp [style*="border-left:3px solid #9B6B50"]{border-left-color:#5B8FB3!important}
+body.theme-lp [style*="border:3px solid #9B6B50"]{border-color:#5B8FB3!important}
+body.theme-lp [style*="0 0 0 1px #9B6B50"]{box-shadow:0 0 0 1px #5B8FB3!important}
+body.theme-lp [style*="color:#B8896A"]{color:#82AFCC!important}
+body.theme-lp [style*="border-color:#B8896A"]{border-color:#82AFCC!important}
+body.theme-lp [style*="background:#C8A882"]{background:#A9C8DD!important}
+body.theme-lp [style*="color:#C8A882"]{color:#A9C8DD!important}
+body.theme-lp [style*="background:#D4B499"]{background:#AFD0E3!important}
+body.theme-lp [style*="border:1px solid #D4B499"]{border-color:#AFD0E3!important}
+body.theme-lp [style*="background:#EAD9C8"]{background:#D3E6F0!important}
+body.theme-lp [style*="background:#F2EAE0"]{background:#E4F0F7!important}
+body.theme-lp [style*="border-bottom:1px solid #F2EAE0"]{border-bottom-color:#E4F0F7!important}
+body.theme-lp [style*="background:#F5EFE6"]{background:#EEF5FA!important}
+body.theme-lp [style*="background:#FAF7F4"]{background:#F4F9FC!important}
+body.theme-lp [style*="color:#FAF7F4"]{color:#F4F9FC!important}
+body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!important}
 </style>
 </head>
 <body>
@@ -142,7 +199,12 @@ th:hover{background:#EAD9C8!important}
     <div style="max-width:1600px;margin:0 auto;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:1rem">
         <div id="logoArea">
-          <div style="font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff;line-height:1">RASTEIRISSIMA</div>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <div id="logoImgSlot">
+              <div style="font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff;line-height:1">RASTEIRISSIMA</div>
+            </div>
+            <span id="logoFerramenta" style="display:none;font-size:.8rem;font-weight:800;letter-spacing:.14em;color:#A9C8DD;border-left:1.5px solid rgba(255,255,255,.25);padding-left:.6rem">FERRAMENTA</span>
+          </div>
           <div id="hdrSubtitle" style="font-size:.65rem;color:#C8A882;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;font-weight:500">Mercadorias a Pagar — Lojas Próprias</div>
         </div>
       </div>
@@ -182,16 +244,32 @@ th:hover{background:#EAD9C8!important}
       </button>
       <button onclick="openFornMgmt()" class="btn-secondary">🏭 Fornecedores</button>
       <button onclick="doCSV()" class="btn-secondary">⬇ Exportar CSV</button>
-      <span id="recCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:.75rem">
+        <span id="recCnt" style="font-size:.8rem;color:#9B6B50;font-weight:500"></span>
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:#9B6B50;font-weight:600">
+          Exibir
+          <select id="fPP" onchange="changePP(this.value)" class="sel" style="width:auto;padding:.3rem .55rem;font-size:.78rem">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+            <option value="999999">Todos</option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <!-- FILTERS -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:4px;padding:1.25rem;margin-bottom:1rem">
       <!-- Row 1: Loja, Fornecedor, Status, Buscar -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:.75rem">
-        <div>
+        <div style="position:relative">
           <label class="lbl">Loja</label>
-          <select id="fLo" onchange="applyF()" class="sel"></select>
+          <div id="fLoBtn" onclick="toggleLoDrop(event)" class="sel" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+            <span id="fLoLbl">Todas</span>
+            <span style="font-size:.65rem;color:#C8A882">▾</span>
+          </div>
+          <div id="fLoDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1.5px solid var(--border);border-radius:3px;box-shadow:0 6px 16px rgba(44,24,16,.12);margin-top:.25rem;padding:.4rem;max-height:260px;overflow-y:auto"></div>
         </div>
         <div style="position:relative">
           <label class="lbl">Fornecedor</label>
@@ -261,6 +339,7 @@ th:hover{background:#EAD9C8!important}
       </div>
       <div style="display:flex;gap:.5rem;align-items:center">
         <button onclick="bulkMarkPaid()" class="btn-accent" style="font-size:.78rem;padding:.45rem .9rem">✓ Dar baixa (marcar como pago)</button>
+        <button onclick="deselectPedidos()" class="btn-secondary" style="font-size:.78rem;padding:.45rem .9rem">✕ Tirar "Pedido" da seleção</button>
         <button onclick="bulkDeleteSelected()" style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#8B1A1A;border:none;border-radius:3px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">🗑 Excluir selecionados</button>
         <button onclick="clearSel()" style="font-size:.75rem;padding:.4rem .7rem;color:#6B5500;background:transparent;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-decoration:underline">✕ Limpar seleção</button>
       </div>
@@ -1123,7 +1202,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 // ============================================================
 // STATE
 // ============================================================
-const S={recs:[],filt:[],stFilter:[],foFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',interUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
+const S={recs:[],filt:[],stFilter:[],foFilter:[],loFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',interUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // Estado das abas "QG" (Franquias) — aditivo, não interfere em S acima
 S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
@@ -1141,6 +1220,13 @@ function selSistema(modo){
   document.getElementById('pgLogin').style.display='flex';
   document.getElementById('loginPwd').focus();
 }
+// Aplica o visual do módulo atual: tema azul pastel + rótulo "FERRAMENTA"
+// só em Lojas Próprias (MODO==='lp_'); Franquias mantém o tema marrom.
+function applyModoTheme(){
+  document.body.classList.toggle('theme-lp',MODO==='lp_');
+  var ferr=document.getElementById('logoFerramenta');
+  if(ferr)ferr.style.display=MODO==='lp_'?'inline':'none';
+}
 function doLogin(){
   var v=document.getElementById('loginPwd').value;
   var defPwd=MODO==='lp_'?DEF_PWD_LP:DEF_PWD_FR;
@@ -1154,6 +1240,7 @@ function doLogin(){
     document.getElementById('pgApp').style.display='flex';
     var hdrSub=document.getElementById('hdrSubtitle');
     if(hdrSub)hdrSub.textContent=MODO==='lp_'?'Mercadorias a Pagar — Lojas Próprias':'Franquias — Financeiro';
+    applyModoTheme();
     init();
     if(MODO==='fr_')qgInit();
   }else{
@@ -1172,7 +1259,8 @@ function doLogout(){
   localStorage.removeItem(lsk('r_ok'));
   localStorage.removeItem('r_mode');
   MODO='';
-  S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.lastFiltSig=null;S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
+  applyModoTheme();
+  S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.loFilter=[];S.lastFiltSig=null;S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
   S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
   document.getElementById('qgTabs').style.display='none';
   document.getElementById('qgView').style.display='none';
@@ -1193,7 +1281,7 @@ function applyLogo(){
   const src=S.logoUrl||'logo.png';
   const hdrImg='<img src="'+xe(src)+'" style="max-height:44px;max-width:200px;object-fit:contain" alt="Rasteirissima" onerror="this.parentNode.innerHTML=\'<span style=\\\'font-size:1.1rem;font-weight:800;letter-spacing:.18em;color:#fff\\\'>RASTEIRISSIMA</span>\'" />';
   const loginImg='<img src="'+xe(src)+'" style="max-height:80px;max-width:240px;object-fit:contain" alt="Rasteirissima" onerror="this.parentNode.innerHTML=\'<span style=\\\'font-size:2rem;font-weight:800;letter-spacing:.15em;color:#2C1810\\\'>RASTEIRISSIMA</span>\'" />';
-  const hdr=document.getElementById('logoArea');
+  const hdr=document.getElementById('logoImgSlot');
   if(hdr)hdr.innerHTML=hdrImg;
   const login=document.getElementById('loginLogo');
   if(login)login.innerHTML=loginImg;
@@ -1321,9 +1409,10 @@ function addForn(){const v=document.getElementById('cfNvFo').value.trim();if(!v|
 // FILTERS
 // ============================================================
 function bldFilters(){
-  const lo=document.getElementById('fLo'),cur=lo.value;
-  lo.innerHTML='<option value="">Todas as lojas</option>'+S.lojas.map(v=>'<option value="'+xe(v)+'"'+(v===cur?' selected':'')+'>'+xe(v)+'</option>').join('');
-  // Fornecedor é multi-seleção (checkboxes), igual ao filtro de Status
+  // Loja e Fornecedor são multi-seleção (checkboxes), igual ao filtro de Status
+  const ld=document.getElementById('fLoDrop');
+  ld.innerHTML=S.lojas.map(v=>'<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background=\'#FAF7F4\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" value="'+xe(v)+'"'+(S.loFilter.includes(v)?' checked':'')+' onchange="toggleLoFilter(this)" /> '+xe(v)+'</label>').join('');
+  updateLoLbl();
   const fd=document.getElementById('fFoDrop');
   fd.innerHTML=S.forns.map(v=>'<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;font-size:.8rem;color:#2C1810;cursor:pointer;border-radius:3px" onmouseover="this.style.background=\'#FAF7F4\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" value="'+xe(v)+'"'+(S.foFilter.includes(v)?' checked':'')+' onchange="toggleFoFilter(this)" /> '+xe(v)+'</label>').join('');
   updateFoLbl();
@@ -1357,21 +1446,21 @@ function setPeriod(preset){
 }
 
 function applyF(){
-  const flo=g('fLo'),fsq=g('fSq').toLowerCase();
+  const fsq=g('fSq').toLowerCase();
   const fde=g('fDe'),fate=g('fAte');
   // Permite buscar várias notas/termos de uma vez, separados por vírgula ou ponto-e-vírgula
   // (ex: "ped702, 9271") — registro entra se bater com QUALQUER um dos termos.
   const sqTerms=fsq.split(/[,;]+/).map(t=>t.trim()).filter(Boolean);
   // Se algum filtro mudou desde a última chamada, desmarca a seleção anterior
   // para não somar notas de filtros diferentes no cálculo de totais selecionados
-  const filtSig=JSON.stringify([flo,S.foFilter,S.stFilter,sqTerms,fde,fate]);
+  const filtSig=JSON.stringify([S.loFilter,S.foFilter,S.stFilter,sqTerms,fde,fate]);
   if(S.lastFiltSig!==null&&S.lastFiltSig!==filtSig){
     S.selIds.clear();
   }
   S.lastFiltSig=filtSig;
   S.filt=S.recs.filter(r=>{
-    if(flo&&r.lo!==flo)return false;
-    // Permite selecionar vários fornecedores ao mesmo tempo (filtro tipo "Status")
+    // Permite selecionar várias lojas/fornecedores ao mesmo tempo (filtro tipo "Status")
+    if(S.loFilter.length&&!S.loFilter.includes(r.lo))return false;
     if(S.foFilter.length&&!S.foFilter.includes(r.fo))return false;
     if(S.stFilter.length&&!S.stFilter.includes(r.st))return false;
     if(sqTerms.length){
@@ -1401,14 +1490,16 @@ function sBy(col){
 }
 
 function clearF(){
-  ['fLo','fDe','fAte'].forEach(id=>document.getElementById(id).value='');
+  ['fDe','fAte'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fSq').value='';
-  S.stFilter=[];S.foFilter=[];
+  S.stFilter=[];S.foFilter=[];S.loFilter=[];
   document.querySelectorAll('#fStDrop input[type=checkbox]').forEach(c=>c.checked=false);
   document.querySelectorAll('#fFoDrop input[type=checkbox]').forEach(c=>c.checked=false);
-  updateStLbl();updateFoLbl();
+  document.querySelectorAll('#fLoDrop input[type=checkbox]').forEach(c=>c.checked=false);
+  updateStLbl();updateFoLbl();updateLoLbl();
   const drop=document.getElementById('fStDrop');if(drop)drop.style.display='none';
   const fdrop=document.getElementById('fFoDrop');if(fdrop)fdrop.style.display='none';
+  const ldrop=document.getElementById('fLoDrop');if(ldrop)ldrop.style.display='none';
   applyF();
 }
 
@@ -1463,11 +1554,38 @@ function updateFoLbl(){
   lbl.textContent=S.foFilter.length===1?S.foFilter[0]:S.foFilter.length+' fornecedores selecionados';
 }
 
+function toggleLoDrop(ev){
+  if(ev)ev.stopPropagation();
+  const drop=document.getElementById('fLoDrop');
+  if(!drop)return;
+  drop.style.display=drop.style.display==='none'?'block':'none';
+}
+
+function toggleLoFilter(chk){
+  const v=chk.value;
+  if(chk.checked){
+    if(!S.loFilter.includes(v))S.loFilter.push(v);
+  }else{
+    S.loFilter=S.loFilter.filter(x=>x!==v);
+  }
+  updateLoLbl();
+  applyF();
+}
+
+function updateLoLbl(){
+  const lbl=document.getElementById('fLoLbl');
+  if(!lbl)return;
+  if(!S.loFilter.length){lbl.textContent='Todas';return;}
+  lbl.textContent=S.loFilter.length===1?S.loFilter[0]:S.loFilter.length+' lojas selecionadas';
+}
+
 document.addEventListener('click',function(ev){
   const drop=document.getElementById('fStDrop'),btn=document.getElementById('fStBtn');
   if(drop&&drop.style.display!=='none'&&!drop.contains(ev.target)&&!(btn&&btn.contains(ev.target)))drop.style.display='none';
   const fdrop=document.getElementById('fFoDrop'),fbtn=document.getElementById('fFoBtn');
   if(fdrop&&fdrop.style.display!=='none'&&!fdrop.contains(ev.target)&&!(fbtn&&fbtn.contains(ev.target)))fdrop.style.display='none';
+  const ldrop=document.getElementById('fLoDrop'),lbtn=document.getElementById('fLoBtn');
+  if(ldrop&&ldrop.style.display!=='none'&&!ldrop.contains(ev.target)&&!(lbtn&&lbtn.contains(ev.target)))ldrop.style.display='none';
 });
 
 // ============================================================
@@ -1544,6 +1662,14 @@ function rpg(){
 
 function goPg(p){S.pg=Math.max(1,Math.min(p,Math.ceil(S.filt.length/S.pp)));rtable();window.scrollTo({top:0,behavior:'smooth'});}
 
+// Quantidade de lançamentos exibidos por página — padrão 50, ajustável
+// (100/200/500/Todos) para quem precisa selecionar mais do que uma página.
+function changePP(v){
+  S.pp=parseInt(v,10)||50;
+  S.pg=1;
+  rtable();
+}
+
 // ============================================================
 // SELEÇÃO MÚLTIPLA — soma MKT/Produto/Serviço e baixa em lote
 // ============================================================
@@ -1564,6 +1690,22 @@ function toggleSelAll(checked){
 function clearSel(){
   S.selIds.clear();
   rtable();
+}
+
+// Remove da seleção atual qualquer lançamento cujo Nº da Nota contenha
+// "pedido" (case-insensitive) — útil para excluir pedidos importados de
+// uma seleção maior antes de dar baixa ou excluir em lote.
+function deselectPedidos(){
+  let removed=0;
+  S.recs.forEach(r=>{
+    if(S.selIds.has(r._id)&&/pedido/i.test(r.nn||'')){
+      S.selIds.delete(r._id);
+      removed++;
+    }
+  });
+  if(!removed){toast('Nenhum lançamento selecionado tem "pedido" no nº da nota.','warn');return;}
+  rtable();
+  toast(removed+' lançamento'+(removed!==1?'s':'')+' com "pedido" removido'+(removed!==1?'s':'')+' da seleção.');
 }
 
 function updateSelBar(){
@@ -5134,6 +5276,7 @@ async function qgConfirmPedido(){
     document.getElementById('pgApp').style.display='flex';
     var hdrSub=document.getElementById('hdrSubtitle');
     if(hdrSub)hdrSub.textContent=MODO==='lp_'?'Mercadorias a Pagar — Lojas Próprias':'Franquias — Financeiro';
+    applyModoTheme();
     init();
     if(MODO==='fr_')qgInit();
   }
