@@ -59,16 +59,15 @@ const INTER_BASE = 'https://cdpj.partners.bancointer.com.br';
 async function getToken(cfg) {
   if (cfg.token && Date.now() < cfg.tokenExp) return cfg.token;
 
-  const creds = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString('base64');
-  const body = 'grant_type=client_credentials&scope=boleto-cobranca.read+boleto-cobranca.write';
+  const body = `grant_type=client_credentials`
+    + `&client_id=${encodeURIComponent(cfg.clientId)}`
+    + `&client_secret=${encodeURIComponent(cfg.clientSecret)}`
+    + `&scope=boleto-cobranca.read%20boleto-cobranca.write`;
 
   const result = await interRequest('/oauth/v2/token', {
     method: 'POST',
     cfg,
-    headers: {
-      'Authorization': `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
 
