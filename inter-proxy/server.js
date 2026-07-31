@@ -1,5 +1,5 @@
 /**
- * Rasteirissima — Proxy Banco Inter Cobranças
+ * Rasteirissima — Proxy Banco Inter Cobranças (API V3)
  *
  * Suporta 3 contas Inter distintas (brilhante, marketing, franchising).
  * O frontend envia `conta: 'brilhante'|'marketing'|'franchising'` no body
@@ -25,13 +25,12 @@ const {
 } = process.env;
 
 // ── Configuração das 3 contas Inter ─────────────────────────────────────────
-// Cada conta precisa de: CLIENT_ID, CLIENT_SECRET, CERT_PEM, KEY_PEM
-// Os nomes das env vars seguem o padrão INTER_<CONTA>_<CAMPO>
 const CONTAS = {
   brilhante:   buildContaCfg('BRI'),
   marketing:   buildContaCfg('MKT'),
   franchising: buildContaCfg('FRAN'),
 };
+
 
 function buildContaCfg(prefix) {
   return {
@@ -45,10 +44,9 @@ function buildContaCfg(prefix) {
   };
 }
 
-// Valida que pelo menos uma conta tem credenciais
-const contasValidas = Object.entries(CONTAS).filter(([, c]) => c.clientId && c.certPem);
+const contasValidas = Object.entries(CONTAS).filter(([, c]) => c.clientId);
 if (!contasValidas.length) {
-  console.error('Nenhuma conta Inter configurada. Defina INTER_BRI_CLIENT_ID, INTER_MKT_CLIENT_ID ou INTER_FRAN_CLIENT_ID nas variáveis de ambiente.');
+  console.error('Nenhuma conta Inter configurada. Defina INTER_BRI_CLIENT_ID, INTER_MKT_CLIENT_ID ou INTER_FRAN_CLIENT_ID.');
   process.exit(1);
 }
 if (!ALLOWED_ORIGIN) {
@@ -57,7 +55,7 @@ if (!ALLOWED_ORIGIN) {
 
 const INTER_BASE = 'https://cdpj.partners.bancointer.com.br';
 
-// ── OAuth2: token por conta com cache ────────────────────────────────────────
+// ── OAuth2: token por conta com cache de 55 min ───────────────────────────────
 async function getToken(cfg) {
   if (cfg.token && Date.now() < cfg.tokenExp) return cfg.token;
 
@@ -96,14 +94,17 @@ function interRequest(path, { method = 'GET', cfg, headers = {}, body = null, to
       ...(cfg.conta ? { 'x-conta-corrente': cfg.conta } : {}),
     };
 
+    const tlsOpts = {};
+    if (cfg.certPem) tlsOpts.cert = cfg.certPem;
+    if (cfg.keyPem)  tlsOpts.key  = cfg.keyPem;
+
     const req = https.request(
       {
         hostname: url.hostname,
         path: url.pathname + url.search,
         method,
         headers: reqHeaders,
-        cert: cfg.certPem,
-        key:  cfg.keyPem,
+        ...tlsOpts,
       },
       (res) => {
         let data = '';
@@ -116,6 +117,9 @@ function interRequest(path, { method = 'GET', cfg, headers = {}, body = null, to
     req.end();
   });
 }
+
+// Aguarda N ms
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // ── Servidor Express ──────────────────────────────────────────────────────────
 const app = express();
@@ -133,7 +137,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// GET /ping — verifica saúde do servidor e quais contas estão configuradas
+// GET /ping
 app.get('/ping', (_req, res) => {
   res.json({
     ok: true,
@@ -143,7 +147,7 @@ app.get('/ping', (_req, res) => {
   });
 });
 
-// POST /boleto — cria cobrança (boleto híbrido Boleto + Pix)
+// POST /boleto — cria cobrança V3 (Boleto + Pix)
 //
 // Body esperado:
 // {
@@ -151,11 +155,12 @@ app.get('/ping', (_req, res) => {
 //   sacado: { cnpjCpf, nome, email, cep, endereco, numero, complemento, bairro, cidade, uf, telefone },
 //   valor: 1234.56,
 //   vencimento: 'AAAA-MM-DD',
-//   descricao: 'Boleto Marketing — NF 123 — Loja XYZ'
+//   descricao: 'Boleto Marketing — NF 123 — Loja XYZ',
+//   seuNumero: 'REF123' // opcional, max 15 chars; gerado automaticamente se omitido
 // }
 app.post('/boleto', async (req, res) => {
   try {
-    const { conta, sacado, valor, vencimento, descricao } = req.body;
+    const { conta, sacado, valor, vencimento, descricao, seuNumero } = req.body;
 
     if (!conta || !CONTAS[conta]) {
       return res.status(400).json({ error: `Conta inválida: "${conta}". Use brilhante, marketing ou franchising.` });
@@ -165,37 +170,43 @@ app.post('/boleto', async (req, res) => {
     }
 
     const cfg = CONTAS[conta];
-    if (!cfg.clientId || !cfg.certPem) {
+    if (!cfg.clientId) {
       return res.status(503).json({ error: `Conta "${conta}" não está configurada neste servidor.` });
     }
 
     const token = await getToken(cfg);
 
     const cnpjCpfLimpo = sacado.cnpjCpf.replace(/\D/g, '');
+
+    // seuNumero: referência interna, máx 15 chars
+    const refNum = (seuNumero || String(Date.now()).slice(-15)).slice(0, 15);
+
     const payload = JSON.stringify({
+      seuNumero:      refNum,
+      valorNominal:   Number(valor),
+      dataVencimento: vencimento,
+      numDiasAgenda:  60,
       pagador: {
         cpfCnpj:     cnpjCpfLimpo,
         tipoPessoa:  cnpjCpfLimpo.length === 11 ? 'FISICA' : 'JURIDICA',
         nome:        sacado.nome,
-        email:       sacado.email     || '',
-        telefone:    (sacado.telefone || '').replace(/\D/g, ''),
-        endereco:    sacado.endereco  || '',
-        numero:      sacado.numero    || 'S/N',
-        complemento: sacado.complemento || '',
-        bairro:      sacado.bairro    || '',
-        cidade:      sacado.cidade    || '',
+        email:       sacado.email        || '',
+        telefone:    (sacado.telefone    || '').replace(/\D/g, ''),
+        endereco:    sacado.endereco     || '',
+        numero:      sacado.numero       || 'S/N',
+        complemento: sacado.complemento  || '',
+        bairro:      sacado.bairro       || '',
+        cidade:      sacado.cidade       || '',
         uf:          (sacado.uf || '').toUpperCase().slice(0, 2),
         cep:         sacado.cep.replace(/\D/g, ''),
       },
-      valorNominal:   Number(valor).toFixed(2),
-      dataVencimento: vencimento,
-      numDiasAgenda:  60,
       mensagem: {
         linha1: (descricao || 'Rasteirissima').slice(0, 50),
       },
     });
 
-    const createRes = await interRequest('/cobranca/v3/boletos', {
+    // Passo 1: POST emite a cobrança (assíncrono — retorna codigoSolicitacao)
+    const createRes = await interRequest('/cobranca/v3/cobrancas', {
       method: 'POST',
       cfg,
       token,
@@ -203,36 +214,70 @@ app.post('/boleto', async (req, res) => {
       body: payload,
     });
 
-    if (createRes.status !== 200 && createRes.status !== 201) {
+    if (createRes.status !== 200 && createRes.status !== 201 && createRes.status !== 202) {
       return res.status(502).json({
         error: `Inter respondeu ${createRes.status}`,
         detail: createRes.body,
       });
     }
 
-    const data = JSON.parse(createRes.body);
+    const createData = JSON.parse(createRes.body);
+    const codigoSolicitacao = createData.codigoSolicitacao || createData.nossoNumero || '';
 
-    // Busca PDF do boleto (base64)
-    let pdfLink = '';
-    if (data.nossoNumero) {
-      const pdfRes = await interRequest(`/cobranca/v3/boletos/${data.nossoNumero}/pdf`, {
+    if (!codigoSolicitacao) {
+      return res.status(502).json({ error: 'Inter não retornou codigoSolicitacao', detail: createRes.body });
+    }
+
+    // Passo 2: polling — aguarda o boleto ficar disponível (até ~10s)
+    let cobranca = null;
+    for (let i = 0; i < 6; i++) {
+      await sleep(i === 0 ? 1500 : 1500);
+      const getRes = await interRequest(`/cobranca/v3/cobrancas/${codigoSolicitacao}`, {
         method: 'GET', cfg, token,
       });
-      if (pdfRes.status === 200) {
-        try {
-          const pdfData = JSON.parse(pdfRes.body);
-          if (pdfData.pdf) pdfLink = `data:application/pdf;base64,${pdfData.pdf}`;
-        } catch (_) {}
+      if (getRes.status === 200) {
+        const d = JSON.parse(getRes.body);
+        // Considera pronto quando tiver linhaDigitavel ou status diferente de processando
+        if (d.linhaDigitavel || (d.situacao && d.situacao !== 'EM_PROCESSAMENTO')) {
+          cobranca = d;
+          break;
+        }
       }
     }
 
-    res.json({
-      nossoNumero:    data.nossoNumero    || '',
-      linhaDigitavel: data.linhaDigitavel || '',
-      codigoBarras:   data.codigoBarras   || '',
-      pdfLink,
-      txid:           data.txid           || '',
+    if (!cobranca) {
+      // Retorna o codigoSolicitacao para que o frontend possa tentar depois
+      return res.json({
+        codigoSolicitacao,
+        linhaDigitavel: '',
+        codigoBarras:   '',
+        pdfLink:        '',
+        pendente:       true,
+      });
+    }
+
+    // Passo 3: busca PDF
+    let pdfLink = '';
+    const pdfRes = await interRequest(`/cobranca/v3/cobrancas/${codigoSolicitacao}/pdf`, {
+      method: 'GET', cfg, token,
     });
+    if (pdfRes.status === 200) {
+      try {
+        const pdfData = JSON.parse(pdfRes.body);
+        if (pdfData.pdf) pdfLink = `data:application/pdf;base64,${pdfData.pdf}`;
+      } catch (_) {}
+    }
+
+    res.json({
+      codigoSolicitacao,
+      nossoNumero:    cobranca.nossoNumero    || codigoSolicitacao,
+      linhaDigitavel: cobranca.linhaDigitavel || '',
+      codigoBarras:   cobranca.codigoBarras   || '',
+      pdfLink,
+      txid:           cobranca.txid           || '',
+      pendente:       false,
+    });
+
   } catch (err) {
     console.error('Erro ao gerar boleto:', err);
     res.status(500).json({ error: err.message });
@@ -240,6 +285,6 @@ app.post('/boleto', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Inter proxy na porta ${PORT}`);
+  console.log(`Inter proxy (API V3) na porta ${PORT}`);
   console.log('Contas configuradas:', contasValidas.map(([n]) => n).join(', '));
 });
