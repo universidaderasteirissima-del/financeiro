@@ -1369,21 +1369,15 @@ async function push2Sheets(rec,rowIdx,silent){
   finally{if(!silent)hideLoading();}
 }
 
-// Corrige status desatualizado (ex: "em aberto" cujo vencimento já
-// passou) tanto localmente quanto no Google Sheets. Roda em segundo
-// plano, sem o indicador "Salvando no Sheets...", após o carregamento
-// dos dados — a tela já mostra o status certo na hora via effStatus(),
-// isso aqui só persiste a correção para quem olha a planilha direto.
-async function reconcileOverdueStatus(){
-  const toFix=S.recs.filter(r=>effStatus(r.st,r.dv)!==r.st);
-  if(!toFix.length)return;
-  toFix.forEach(r=>{r.st=effStatus(r.st,r.dv);});
-  svData();applyF();
-  if(!S.url)return;
-  for(const r of toFix){
-    await push2Sheets(r,r._id,true);
-  }
-}
+// O status "vencida"/"vence hoje"/"pago" é sempre calculado na hora a
+// partir da data (ver effStatus()) — não há mais gravação automática
+// em segundo plano no Google Sheets. Gravar sozinho usando o número de
+// linha guardado no cache local é arriscado: se alguma linha foi
+// excluída (o que desloca as linhas seguintes) desde a última
+// sincronização, o cache fica com o número de linha errado e a
+// gravação automática acaba sobrescrevendo um lançamento diferente do
+// pretendido. Por isso essa correção fica só na tela.
+async function reconcileOverdueStatus(){}
 
 // ============================================================
 // SETTINGS
@@ -1478,7 +1472,7 @@ function applyF(){
     // Permite selecionar várias lojas/fornecedores ao mesmo tempo (filtro tipo "Status")
     if(S.loFilter.length&&!S.loFilter.includes(r.lo))return false;
     if(S.foFilter.length&&!S.foFilter.includes(r.fo))return false;
-    if(S.stFilter.length&&!S.stFilter.includes(effStatus(r.st,r.dv)))return false;
+    if(S.stFilter.length&&!S.stFilter.includes(effStatus(r.st,r.dv,r.dp)))return false;
     if(sqTerms.length){
       const hay=(r.fo+' '+r.nn+' '+r.lo+' '+r.st).toLowerCase();
       if(!sqTerms.some(t=>hay.includes(t)))return false;
@@ -1608,8 +1602,8 @@ document.addEventListener('click',function(ev){
 // vencimento sempre que o lançamento não estiver pago — assim a tela
 // sempre mostra o status correto na hora, mesmo antes da reconciliação
 // (mais abaixo) terminar de gravar a correção no Google Sheets.
-function effStatus(st,dv){
-  if(st==='pago')return 'pago';
+function effStatus(st,dv,dp){
+  if(st==='pago'||dp)return 'pago';
   if(!dv)return st||'em aberto';
   const today=toISO(new Date());
   if(dv<today)return 'vencida';
@@ -1622,16 +1616,17 @@ function effStatus(st,dv){
 // ============================================================
 function rstats(){
   const rs=S.recs;
-  const vAb=rs.filter(r=>{const e=effStatus(r.st,r.dv);return e==='em aberto'||e==='vence hoje';}).reduce((s,r)=>s+r.vn,0);
-  const vVe=rs.filter(r=>effStatus(r.st,r.dv)==='vencida').reduce((s,r)=>s+r.vn,0);
-  const vPg=rs.filter(r=>r.st==='pago').reduce((s,r)=>s+r.vn,0);
-  const nHj=rs.filter(r=>effStatus(r.st,r.dv)==='vence hoje').length;
-  const nVe=rs.filter(r=>effStatus(r.st,r.dv)==='vencida').length;
-  const nAb=rs.filter(r=>{const e=effStatus(r.st,r.dv);return e==='em aberto'||e==='vence hoje';}).length;
+  const vAb=rs.filter(r=>{const e=effStatus(r.st,r.dv,r.dp);return e==='em aberto'||e==='vence hoje';}).reduce((s,r)=>s+r.vn,0);
+  const vVe=rs.filter(r=>effStatus(r.st,r.dv,r.dp)==='vencida').reduce((s,r)=>s+r.vn,0);
+  const vPg=rs.filter(r=>effStatus(r.st,r.dv,r.dp)==='pago').reduce((s,r)=>s+r.vn,0);
+  const nHj=rs.filter(r=>effStatus(r.st,r.dv,r.dp)==='vence hoje').length;
+  const nVe=rs.filter(r=>effStatus(r.st,r.dv,r.dp)==='vencida').length;
+  const nAb=rs.filter(r=>{const e=effStatus(r.st,r.dv,r.dp);return e==='em aberto'||e==='vence hoje';}).length;
+  const nPg=rs.filter(r=>effStatus(r.st,r.dv,r.dp)==='pago').length;
   document.getElementById('statsRow').innerHTML=
     scrd('A PAGAR',fBRL(vAb),nAb+' conta'+(nAb!==1?'s':''),'#6B5500','#E8D880','#FDFBF0')+
     scrd('VENCIDO',fBRL(vVe),nVe+' conta'+(nVe!==1?'s':''),'#8B1A1A','#F0C0C0','#FDF0F0')+
-    scrd('PAGO',fBRL(vPg),rs.filter(r=>r.st==='pago').length+' contas','#1E6B3A','#B8DFC8','#EEF7F0')+
+    scrd('PAGO',fBRL(vPg),nPg+' contas','#1E6B3A','#B8DFC8','#EEF7F0')+
     scrd('VENCE HOJE',nHj,'conta'+(nHj!==1?'s':''),'#7A3300','#F0C898','#FDF5EE');
 }
 
@@ -1653,7 +1648,7 @@ function rtable(){
     const isNew=r._id===S.lastId;
     const bg=isNew?'#FFF8E8':i%2===0?'#fff':'#FAF7F4';
     const borderLeft=isNew?'border-left:3px solid #9B6B50;':''
-    const effSt=effStatus(r.st,r.dv);
+    const effSt=effStatus(r.st,r.dv,r.dp);
     const sc=stC[effSt]||'sa',sl=stL[effSt]||effSt;
     return '<tr title="'+(isNew?'Último lançamento':'')+'" style="border-bottom:1px solid #F2EAE0;background:'+bg+';'+borderLeft+'" onmouseover="this.style.background=\'#F5EFE6\'" onmouseout="this.style.background=\''+bg+'\'">'+
       '<td style="padding:.625rem .6rem;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" '+(S.selIds.has(r._id)?'checked':'')+' onchange="toggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>'+
@@ -3654,8 +3649,8 @@ function qgAlign(type){
 // vencimento sempre que o lançamento não estiver pago — garante que a
 // tela mostre o status correto mesmo antes da reconciliação (abaixo)
 // terminar de gravar no Sheets.
-function qgEffStatus(st,dv){
-  if(st==='pago')return 'pago';
+function qgEffStatus(st,dv,dp){
+  if(st==='pago'||dp)return 'pago';
   if(!dv)return st||'em aberto';
   const today=toISO(new Date());
   if(dv<today)return 'vencida';
@@ -3674,7 +3669,7 @@ function qgFmtVal(rec,f){
     case 'money':return fBRL(v);
     case 'date':return fDt(v);
     case 'month':return MESES[v]||'';
-    case 'status':return qgStatusBadge(qgEffStatus(v,f.dueKey?rec[f.dueKey]:null));
+    case 'status':return qgStatusBadge(qgEffStatus(v,f.dueKey?rec[f.dueKey]:null,f.payKey?rec[f.payKey]:null));
     case 'number':return (v||v===0)?String(v):'';
     case 'percent':return (v||v===0)?(String(v)+'%'):'';
     default:return xe(v);
@@ -3803,35 +3798,15 @@ async function qgPush2Sheets(view,rec,rowIdx,silent){
   finally{if(!silent)hideLoading();}
 }
 
-// Corrige status desatualizado (ex: "em aberto" cujo vencimento já
-// passou) tanto localmente quanto no Google Sheets, em segundo plano
-// e sem o indicador "Salvando no Sheets...". A tela já mostra o status
-// certo na hora via qgEffStatus(); isso aqui só persiste a correção
-// para quem olha a planilha direto. Abas sem sincronização (Cadastro)
-// ou sem campo de status (statusFields vazio) são ignoradas.
-async function qgReconcileOverdueStatus(view){
-  const cfg=QG_VIEWS[view];
-  const rs=S.qg.recs[view];
-  if(!cfg||!rs||!cfg.statusFields||!cfg.statusFields.length)return;
-  const toFix=[];
-  rs.forEach(function(r){
-    let changed=false;
-    cfg.statusFields.forEach(function(key){
-      const fd=cfg.fields.find(function(f){return f.key===key;});
-      const dueKey=fd&&fd.dueKey;
-      const newSt=qgEffStatus(r[key],dueKey?r[dueKey]:null);
-      if(newSt!==r[key]){r[key]=newSt;changed=true;}
-    });
-    if(changed)toFix.push(r);
-  });
-  if(!toFix.length)return;
-  qgSaveData(view);
-  if(S.qg.view===view)qgApplyF();
-  if(!S.url||cfg.noSync)return;
-  for(const r of toFix){
-    await qgPush2Sheets(view,r,r._id,true);
-  }
-}
+// O status "vencida"/"vence hoje"/"pago" é sempre calculado na hora a
+// partir da data (ver qgEffStatus()) — não há mais gravação automática
+// em segundo plano no Google Sheets. Gravar sozinho usando o número de
+// linha guardado no cache local é arriscado: se alguma linha foi
+// excluída (o que desloca as linhas seguintes) desde a última
+// sincronização, o cache fica com o número de linha errado e a
+// gravação automática acaba sobrescrevendo um lançamento diferente do
+// pretendido. Por isso essa correção fica só na tela.
+async function qgReconcileOverdueStatus(view){}
 
 async function qgOpenExcluidos(){
   if(!S.url){toast('Configure a URL do Apps Script para usar os Excluídos.','warn');return;}
@@ -4013,7 +3988,7 @@ function qgApplyF(){
       if(Array.isArray(val)){
         const fd=view.fields.find(function(x){return x.key===key;});
         if(fd&&fd.type==='status'){
-          const eff=qgEffStatus(r[key],fd.dueKey?r[fd.dueKey]:null);
+          const eff=qgEffStatus(r[key],fd.dueKey?r[fd.dueKey]:null,fd.payKey?r[fd.payKey]:null);
           if(!val.includes(eff))return false;
         }else{
           if(!val.includes(String(r[key]==null?'':r[key])))return false;
@@ -4049,10 +4024,10 @@ function qgRenderStats(){
   const rs=S.qg.recs[S.qg.view]||[];
   let html='';
   if(view.statKind==='ap'){
-    const eff=function(r){return qgEffStatus(r.st,r.dv);};
+    const eff=function(r){return qgEffStatus(r.st,r.dv,r.dp);};
     const open=rs.filter(function(r){const e=eff(r);return e==='em aberto'||e==='vence hoje';});
     const venc=rs.filter(function(r){return eff(r)==='vencida';});
-    const pago=rs.filter(function(r){return r.st==='pago';});
+    const pago=rs.filter(function(r){return eff(r)==='pago';});
     const hoje=rs.filter(function(r){return eff(r)==='vence hoje';});
     html=scrd('A PAGAR',fBRL(open.reduce(function(s,r){return s+(r.va||0);},0)),open.length+' conta'+(open.length!==1?'s':''),'#6B5500','#E8D880','#FDFBF0')+
       scrd('VENCIDO',fBRL(venc.reduce(function(s,r){return s+(r.va||0);},0)),venc.length+' conta'+(venc.length!==1?'s':''),'#8B1A1A','#F0C0C0','#FDF0F0')+
@@ -4069,8 +4044,8 @@ function qgRenderStats(){
   }else{
     const totalNota=rs.reduce(function(s,r){return s+(r.totalNota||0);},0);
     const vNotaSum=rs.reduce(function(s,r){return s+(r.vNota||0);},0);
-    const pend1=rs.filter(function(r){return qgEffStatus(r.st1,r.dv1)!=='pago';});
-    const pend2=rs.filter(function(r){return qgEffStatus(r.st2,r.dv2)!=='pago';});
+    const pend1=rs.filter(function(r){return qgEffStatus(r.st1,r.dv1,r.dp1)!=='pago';});
+    const pend2=rs.filter(function(r){return qgEffStatus(r.st2,r.dv2,r.dp2)!=='pago';});
     html=scrd('TOTAL NOTAS',fBRL(totalNota),rs.length+' registro'+(rs.length!==1?'s':''),'#6B5500','#E8D880','#FDFBF0')+
       scrd('VALOR DA NOTA',fBRL(vNotaSum),'','#1E6B3A','#B8DFC8','#EEF7F0')+
       scrd('PENDENTES 1ª PARC.',pend1.length,'de '+rs.length,'#8B1A1A','#F0C0C0','#FDF0F0')+
@@ -4405,7 +4380,7 @@ function qgExportCSV(){
       const v=r[f.key];
       if(f.type==='date')return fDt(v);
       if(f.type==='month')return MESES[v]||'';
-      if(f.type==='status')return qgEffStatus(v,f.dueKey?r[f.dueKey]:null);
+      if(f.type==='status')return qgEffStatus(v,f.dueKey?r[f.dueKey]:null,f.payKey?r[f.payKey]:null);
       return v;
     });
   });
