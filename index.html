@@ -4069,7 +4069,12 @@ function qgRenderTable(){
     qgRenderPg();qgUpdateSelBar();return;
   }
   document.getElementById('qgTbody').innerHTML=rows.map(function(r,i){
-    const bg=i%2===0?'#fff':'#FAF7F4';
+    // Verifica se todos os campos de status estão "pago" → linha verde clara
+    const _allPago=view.statusFields&&view.statusFields.length&&view.statusFields.every(function(sk){
+      const sf=view.fields.find(function(fld){return fld.key===sk;});
+      return qgEffStatus(r[sk],sf&&sf.dueKey?r[sf.dueKey]:null,sf&&sf.payKey?r[sf.payKey]:null)==='pago';
+    });
+    const bg=_allPago?'#E8F5E9':(i%2===0?'#fff':'#FAF7F4');
     let tds='<td style="padding:.625rem .6rem;text-align:center;position:sticky;left:0;z-index:1;background:'+bg+';box-shadow:2px 0 4px -2px rgba(44,24,16,.15)" onclick="event.stopPropagation()"><input type="checkbox" '+(S.qg.selIds.has(r._id)?'checked':'')+' onchange="qgToggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>';
     cols.forEach(function(f){
       const align=qgAlign(f.type);
@@ -4326,20 +4331,33 @@ async function qgSaveRec(){
   });
   if(missing.length){toast('Preencha: '+missing.join(', ')+'.','warn');return;}
   let rowIdx=null;
-  const editId=S.qg.editId;
+  // Fallback: se S.qg.editId for null/undefined, tenta ler do campo oculto do formulário
+  const _formIdEl=document.getElementById('qgf_id');
+  const _formId=_formIdEl&&_formIdEl.value!==''?+_formIdEl.value:null;
+  const editId=S.qg.editId!=null?S.qg.editId:_formId;
   if(editId!=null){
-    const i=recs.findIndex(function(x){return x._id===editId;});
+    // Usa == (igualdade solta) para tolerar _id string vs number após JSON round-trip
+    const i=recs.findIndex(function(x){return x._id==editId;});
     if(i<0){toast('Erro: registro não encontrado.','err');return;}
-    rowIdx=recs[i]._id;rec._id=editId;
+    rowIdx=recs[i]._synced?recs[i]._id:null; // só manda rowIdx ao Sheets se o rec já estava lá
+    rec._id=recs[i]._id;
     recs[i]=Object.assign({},recs[i],rec);
   }else{
-    rec._id=Math.max(0,...recs.map(function(x){return x._id;}))+1;
+    rec._id=Math.max(0,...recs.map(function(x){return x._id||0;}))+1;
     recs.push(rec);
   }
   qgSaveData(viewKey);
   cm('mQg');qgApplyF();
   let ok=false;
-  if(!view.noSync){ok=await qgPush2Sheets(viewKey,rec,rowIdx);qgSaveData(viewKey);}
+  if(!view.noSync){
+    ok=await qgPush2Sheets(viewKey,rec,rowIdx);
+    if(ok){
+      // Propaga _id (pode ter mudado p/ rowIndex do Sheets) e _synced de volta ao array
+      const updIdx=recs.findIndex(function(x){return x._id==rec._id||x._id==editId;});
+      if(updIdx>=0){if(rec._id)recs[updIdx]._id=rec._id;recs[updIdx]._synced=true;}
+    }
+    qgSaveData(viewKey);
+  }
   toast((editId!=null?'Lançamento atualizado!':'Lançamento adicionado!')+(ok?' ✓ Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
 }
 
