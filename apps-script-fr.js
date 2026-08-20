@@ -31,15 +31,18 @@ const VIEW_SHEETS = {
 const HEADER_MAP = {
   brilhante: {
     cat:'Categoria', mes:'mês', dv:'Data de vencimento', desc:'Despesa-descrição',
-    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento', ano:'Ano'
+    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento', ano:'Ano',
+    criadoEm:'Criado em'
   },
   marketing: {
     cat:'Categoria', mes:'mês', dv:'Data de vencimento', desc:'Despesa-descrição',
-    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento'
+    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento',
+    criadoEm:'Criado em'
   },
   franchising: {
     cat:'Categoria', mes:'mês', dv:'Data de vencimento', desc:'Despesa-descrição',
-    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento'
+    va:'Valor a pagar', vp:'Valor pago', st:'Status', dp:'Data do pagamento',
+    criadoEm:'Criado em'
   },
   areceber: {
     // OBS: no sistema, "totalNota" é o valor direto da NF (menor) e "vNota" é
@@ -54,7 +57,8 @@ const HEADER_MAP = {
     dv1:'Data de vencimento 1° Parcela', dp1:'Data de pagamento 1° Parcela', st1:'Status 1° Parcela',
     dv2:'Data de vencimento 2° Parcela', dp2:'Data de pagamento 2° Parcela', st2:'Status 2° Parcela',
     boletoBri1:'Boleto brilhante / fábrica 1° Parcela',
-    boletoBri2:'Boleto brilhante / fábrica 2° Parcela'
+    boletoBri2:'Boleto brilhante / fábrica 2° Parcela',
+    criadoEm:'Criado em'
   }
 };
 
@@ -64,6 +68,16 @@ const DATE_FIELDS = {
   marketing: ['dv','dp'],
   franchising: ['dv','dp'],
   areceber: ['de','dv1','dp1','dv2','dp2']
+};
+
+// "Criado em": guarda data+hora (AAAA-MM-DDTHH:MM:SS), não só data — por
+// isso não entra em DATE_FIELDS (que é só DD/MM/AAAA). O sistema grava
+// como texto puro; se a coluna não estiver formatada como "Texto simples"
+// e o Sheets converter sozinho pra um valor de data/hora nativo, getData()
+// abaixo reconverte pro mesmo formato ISO com hora, pra não perder a hora
+// nem quebrar a leitura no app.
+const DATETIME_FIELDS = {
+  brilhante: ['criadoEm'], marketing: ['criadoEm'], franchising: ['criadoEm'], areceber: ['criadoEm']
 };
 
 const COR_SISTEMA = '#FFF5E0';
@@ -164,6 +178,7 @@ function getData(view) {
   const sheet = getSheet(view);
   const map = HEADER_MAP[view];
   const dateKeys = DATE_FIELDS[view] || [];
+  const datetimeKeys = DATETIME_FIELDS[view] || [];
   const headers = getHeaders(sheet);
   const colIdx = {};
   Object.keys(map).forEach(function (key) {
@@ -179,6 +194,12 @@ function getData(view) {
     const obj = { _rowIndex: i + 1 };
     Object.keys(colIdx).forEach(function (key) {
       let val = row[colIdx[key]];
+      if (datetimeKeys.indexOf(key) >= 0) {
+        // Preserva a hora (fmtDateOut sozinho perderia, só formata dd/MM/aaaa)
+        if (val instanceof Date) val = Utilities.formatDate(val, 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ss");
+        obj[key] = (val !== null && val !== undefined) ? val : '';
+        return;
+      }
       val = fmtDateOut(val);
       if (dateKeys.indexOf(key) >= 0) val = brToIso(val);
       obj[key] = (val !== null && val !== undefined) ? val : '';

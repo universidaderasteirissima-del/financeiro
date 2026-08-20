@@ -389,6 +389,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
               <button id="qgImportPedidoBtn" class="btn-accent" onclick="qgOpenPedido()" style="display:none">🛒 Importar Pedido</button>
               <button class="btn-secondary" onclick="qgExportCSV()">⬇ Exportar CSV</button>
               <button class="btn-secondary" onclick="qgOpenExcluidos()">🗑 Excluídos</button>
+              <button id="qgDupBtn" class="btn-secondary" onclick="qgToggleDupFilter()" title="Procura lançamentos com pelo menos 80% dos dados de identidade iguais (categoria/vencimento/descrição/valor etc. — ignora status e valor pago)" style="display:none">🔁 Duplicatas</button>
               <span id="qgRecCnt" style="margin-left:auto;font-size:.8rem;color:#9B6B50;font-weight:500"></span>
             </div>
 
@@ -1205,7 +1206,7 @@ if(localStorage.getItem('r_ver')!==APP_VER){
 const S={recs:[],filt:[],stFilter:[],foFilter:[],loFilter:[],lastFiltSig:null,selIds:new Set(),lojas:[],forns:[],fornData:{},pg:1,pp:50,sc:'dv',sd:'asc',url:'',logoUrl:'',interUrl:'',editId:null,pdfTxt:null,pdfPages:[],pdfDoc:null,boletoQueue:[],boletoQueueIdx:0,lastId:null,fileQueue:[],fileQueueIdx:0,totalConfirmed:0};
 
 // Estado das abas "QG" (Franquias) — aditivo, não interfere em S acima
-S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
+S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null,dupCache:{},dupOnly:false};
 
 // ============================================================
 // AUTH
@@ -1261,7 +1262,7 @@ function doLogout(){
   MODO='';
   applyModoTheme();
   S.recs=[];S.filt=[];S.stFilter=[];S.foFilter=[];S.loFilter=[];S.lastFiltSig=null;S.selIds=new Set();S.lojas=[];S.forns=[];S.fornData={};S.pg=1;
-  S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null};
+  S.qg={view:'brilhante',recs:{},filt:[],pg:1,pp:50,sc:'',sd:'asc',selIds:new Set(),filters:{},editId:null,dupCache:{},dupOnly:false};
   document.getElementById('qgTabs').style.display='none';
   document.getElementById('qgView').style.display='none';
   document.getElementById('mercView').style.display='block';
@@ -1818,7 +1819,7 @@ function editRec(id){
   document.getElementById('rf_de').value=r.de;document.getElementById('rf_dv').value=r.dv;
   document.getElementById('rf_vn').value=r.vn;document.getElementById('rf_mk').value=r.mk||0;
   document.getElementById('rf_pr').value=r.pr||0;document.getElementById('rf_sv').value=r.sv||0;
-  document.getElementById('rf_st').value=r.st;document.getElementById('rf_dp').value=r.dp||'';
+  document.getElementById('rf_dp').value=r.dp||'';document.getElementById('rf_st').value=effStatus(r.st,r.dv,r.dp);
   var _mr=document.getElementById('mRec');document.body.appendChild(_mr);_mr.style.display='flex';
 }
 async function saveRec(){
@@ -1871,6 +1872,12 @@ function setToday(dpId,stId){
 }
 function autoStatusOnPay(dpId,stId){
   if(document.getElementById(dpId).value&&stId)document.getElementById(stId).value='pago';
+}
+// Mesma ideia do autoStatusOnPay acima, só que pros formulários dinâmicos
+// de Franquias (qgBuildForm) — ver qgFieldInputHtml.
+function qgAutoStatusOnPay(dpId,stId){
+  const dpEl=document.getElementById(dpId),stEl=document.getElementById(stId);
+  if(dpEl&&dpEl.value&&stEl)stEl.value='pago';
 }
 
 // ============================================================
@@ -3539,6 +3546,7 @@ const AP_FIELDS_BASE=[
   {key:'vp',label:'Valor Pago',type:'money'},
   {key:'st',label:'Status',type:'status',dueKey:'dv',payKey:'dp'},
   {key:'dp',label:'Dt. Pagamento',type:'date'},
+  {key:'criadoEm',label:'Lançado em',type:'datetime',readonly:true,section:'Sistema'},
 ];
 // AP_FIELDS_ANO: "A pagar brilhante" tem coluna extra "Ano"
 const AP_FIELDS_ANO=[...AP_FIELDS_BASE,{key:'ano',label:'Ano',type:'number'}];
@@ -3570,6 +3578,7 @@ const AR_FIELDS=[
   {key:'boletoCodMkt',label:'Linha Digit. Marketing',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
   {key:'boletoUrlFran',label:'PDF Franchising',type:'text',section:'Boletos Emitidos',hideInTable:true},
   {key:'boletoCodFran',label:'Linha Digit. Franchising',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
+  {key:'criadoEm',label:'Lançado em',type:'datetime',readonly:true,section:'Sistema'},
 ];
 
 // LOJA_FIELDS: esquema do "Cadastro" (lojas + fornecedores externos)
@@ -3596,6 +3605,7 @@ const AR_FORNS=['BRILHANTE','FÁBRICA','FRANCHISING'];
 
 const QG_VIEWS={
   brilhante:{label:'A pagar brilhante',file:'data_fr_brilhante.json',fields:AP_FIELDS_ANO,dateField:'dv',statusFields:['st'],search:['cat','desc'],sumFields:['va','vp'],statKind:'ap',
+    dupFields:['cat','mes','dv','desc','va'],dupBucket:'dv',
     filterFields:[
       {key:'cat',label:'Categoria',kind:'select'},
       {key:'mes',label:'Mês',kind:'select',options:[1,2,3,4,5,6,7,8,9,10,11,12]},
@@ -3604,6 +3614,7 @@ const QG_VIEWS={
       {key:'dv',label:'Período (Vencimento)',kind:'period'},
     ]},
   marketing:{label:'A pagar marketing',file:'data_fr_marketing.json',fields:AP_FIELDS_BASE,dateField:'dv',statusFields:['st'],search:['cat','desc'],sumFields:['va','vp'],statKind:'ap',
+    dupFields:['cat','mes','dv','desc','va'],dupBucket:'dv',
     filterFields:[
       {key:'cat',label:'Categoria',kind:'select'},
       {key:'mes',label:'Mês',kind:'select',options:[1,2,3,4,5,6,7,8,9,10,11,12]},
@@ -3612,6 +3623,7 @@ const QG_VIEWS={
       {key:'dv',label:'Período (Vencimento)',kind:'period'},
     ]},
   franchising:{label:'A pagar franchising',file:'data_fr_franchising.json',fields:AP_FIELDS_BASE,dateField:'dv',statusFields:['st'],search:['cat','desc'],sumFields:['va','vp'],statKind:'ap',
+    dupFields:['cat','mes','dv','desc','va'],dupBucket:'dv',
     filterFields:[
       {key:'cat',label:'Categoria',kind:'select'},
       {key:'mes',label:'Mês',kind:'select',options:[1,2,3,4,5,6,7,8,9,10,11,12]},
@@ -3620,6 +3632,7 @@ const QG_VIEWS={
       {key:'dv',label:'Período (Vencimento)',kind:'period'},
     ]},
   areceber:{label:'A receber',file:'data_fr_areceber.json',fields:AR_FIELDS,dateField:'dv1',statusFields:['st1','st2'],search:['loja','forn','nota'],sumFields:['vNota','totalNota'],statKind:'ar',
+    dupFields:['tipo','loja','forn','de','nota','vNota','totalNota','dv1','dv2'],dupBucket:'nota',
     filterFields:[
       {key:'tipo',label:'Tipo',kind:'select',options:['FRANQUIA','LOJA PRÓPRIA']},
       {key:'loja',label:'Loja',kind:'select'},
@@ -3644,6 +3657,180 @@ function qgAlign(type){
   if(type==='money'||type==='number'||type==='percent')return 'right';
   if(type==='status')return 'center';
   return 'left';
+}
+// Data/hora em que o lançamento foi criado (campo "Lançado em", só
+// leitura) — grava no formato AAAA-MM-DDTHH:MM:SS e exibe DD/MM/AAAA HH:MM.
+// Ajuda a distinguir lançamento feito por uma pessoa de uma duplicata
+// criada por algum bug da ferramenta (mesmo horário de outro registro).
+function qgNowStr(){
+  const d=new Date(),p=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function qgFmtDatetime(v){
+  if(!v)return '';
+  const parts=String(v).split('T');
+  if(parts.length<2)return v; // valor antigo/sem hora — mostra como veio
+  const dp=parts[0].split('-');
+  if(dp.length<3)return v;
+  return dp[2]+'/'+dp[1]+'/'+dp[0]+' '+parts[1].slice(0,5);
+}
+
+// ------------------------------------------------------------
+// DETECÇÃO DE POSSÍVEIS DUPLICATAS
+//
+// Compara só os campos de "identidade" do lançamento (view.dupFields —
+// ex: categoria/mês/vencimento/descrição/valor a pagar), nunca os campos
+// de "resultado" (status, valor pago, data de pagamento) — são
+// justamente esses que costumam diferir entre o lançamento original e
+// a duplicata (ex: um com valor pago zerado/status "em aberto" e o
+// outro, logo abaixo, já como "pago"). Usa tolerância pra número
+// (diferenças de centavos de arredondamento) e ignora maiúsc./espaços
+// em texto.
+// ------------------------------------------------------------
+const QG_DUP_THRESHOLD=0.8;
+
+function qgFieldsEqual(type,a,b){
+  const ea=(a===undefined||a===null||a===''),eb=(b===undefined||b===null||b==='');
+  if(ea&&eb)return true;
+  if(ea!==eb)return false;
+  if(type==='money'||type==='number'||type==='percent'){
+    return Math.abs((parseFloat(a)||0)-(parseFloat(b)||0))<0.05;
+  }
+  return String(a).trim().toLowerCase()===String(b).trim().toLowerCase();
+}
+// fieldTypes: {chave:tipo} já resolvido (ver qgFieldTypeMap) — evita
+// procurar em view.fields a cada comparação, é o que mais pesa quando
+// há muitos pares pra comparar.
+function qgFieldTypeMap(fieldDefs,keys){
+  const m={};
+  keys.forEach(function(k){
+    const f=fieldDefs.find(function(x){return x.key===k;});
+    m[k]=f?f.type:'text';
+  });
+  return m;
+}
+function qgSimilarity(r1,r2,keys,fieldTypes){
+  if(!keys||!keys.length)return 0;
+  let match=0;
+  for(let i=0;i<keys.length;i++){
+    const k=keys[i];
+    if(qgFieldsEqual(fieldTypes[k],r1[k],r2[k]))match++;
+  }
+  return match/keys.length;
+}
+// Melhor candidato a duplicata de `rec` dentre `recs` (usado ao salvar
+// um lançamento novo, antes de gravar — ver qgSaveRec/qgConfirmNF).
+function qgFindBestMatch(rec,recs,view){
+  const fieldTypes=qgFieldTypeMap(view.fields,view.dupFields);
+  let best=null;
+  (recs||[]).forEach(function(other){
+    if(other._id===rec._id)return;
+    const score=qgSimilarity(rec,other,view.dupFields,fieldTypes);
+    if(!best||score>best.score)best={rec:other,score:score};
+  });
+  return best;
+}
+// Mapa _id -> {otherId,score} com todo par de linhas da view atual que
+// bate em pelo menos QG_DUP_THRESHOLD dos campos de identidade.
+// Comparar todo par com todo par (n²) fica lento em views grandes (a
+// "A receber" já passou de 2000 linhas), então agrupa primeiro pelo
+// campo mais discriminante da view (dupBucket — vencimento nas abas "A
+// pagar", número da nota em "A receber") e só compara dentro de cada
+// grupo: duas linhas que nem isso têm em comum não são duplicata uma
+// da outra. Ainda assim só roda sob demanda — ver qgGetDupMap.
+function qgComputeDupMap(view){
+  const cfg=QG_VIEWS[view];
+  const keys=cfg.dupFields;
+  const recs=S.qg.recs[view]||[];
+  const map=new Map();
+  if(!keys||!keys.length||recs.length<2)return map;
+  const fieldTypes=qgFieldTypeMap(cfg.fields,keys);
+  const buckets=new Map();
+  recs.forEach(function(r){
+    const bk=cfg.dupBucket?String(r[cfg.dupBucket]||''):'';
+    if(!buckets.has(bk))buckets.set(bk,[]);
+    buckets.get(bk).push(r);
+  });
+  buckets.forEach(function(arr){
+    for(let i=0;i<arr.length;i++){
+      for(let j=i+1;j<arr.length;j++){
+        const score=qgSimilarity(arr[i],arr[j],keys,fieldTypes);
+        if(score<QG_DUP_THRESHOLD)continue;
+        const a=arr[i]._id,b=arr[j]._id;
+        const curA=map.get(a),curB=map.get(b);
+        if(!curA||score>curA.score)map.set(a,{otherId:b,score:score});
+        if(!curB||score>curB.score)map.set(b,{otherId:a,score:score});
+      }
+    }
+  });
+  return map;
+}
+// Cache por view — só recalcula quando os dados mudam (S.qg.dupCache[view]
+// é zerado em qgSaveRec/qgDelRec/qgBulkDelete/qgSyncSheets/qgConfirmNF).
+function qgGetDupMap(view){
+  if(!S.qg.dupCache[view])S.qg.dupCache[view]=qgComputeDupMap(view);
+  return S.qg.dupCache[view];
+}
+function qgToggleDupFilter(){
+  const view=S.qg.view;
+  if(S.qg.dupOnly){
+    S.qg.dupOnly=false;
+    qgUpdateDupBtn();qgApplyF();
+    return;
+  }
+  showLoading('Procurando duplicatas...');
+  // setTimeout deixa o "Procurando..." aparecer antes de travar a thread
+  // com a comparação (view grande = alguns milhões de comparações).
+  setTimeout(function(){
+    qgGetDupMap(view);
+    S.qg.dupOnly=true;
+    hideLoading();
+    qgUpdateDupBtn();qgApplyF();
+  },30);
+}
+function qgUpdateDupBtn(){
+  const btn=document.getElementById('qgDupBtn');
+  if(!btn)return;
+  const view=QG_VIEWS[S.qg.view];
+  if(!view||!view.dupFields||!view.dupFields.length){btn.style.display='none';return;}
+  btn.style.display='inline-block';
+  const cached=S.qg.dupCache[S.qg.view];
+  const n=cached?cached.size:0;
+  btn.textContent=(S.qg.dupOnly?'✕ ':'🔁 ')+'Duplicatas'+(cached?' ('+n+')':'');
+  btn.style.background=S.qg.dupOnly?'#8B1A1A':'';
+  btn.style.color=S.qg.dupOnly?'#fff':'';
+  btn.style.borderColor=S.qg.dupOnly?'#8B1A1A':'';
+}
+// Resumo em texto dos campos de identidade de um registro, usado no
+// aviso de possível duplicata (mostra o lançamento já existente).
+function qgSummarizeRec(rec,view){
+  return (view.dupFields||[]).map(function(k){
+    const f=view.fields.find(function(x){return x.key===k;})||{label:k,type:'text'};
+    const val=qgFmtVal(rec,f)||'<span style="color:#C8A882">(vazio)</span>';
+    return '<strong>'+xe(f.label)+':</strong> '+val;
+  }).join('<br>');
+}
+// Mostra o modal de confirmação (reaproveita confirmDel) e devolve uma
+// Promise<boolean>: true = usuário confirmou "lançar mesmo assim",
+// false = cancelou.
+function qgConfirmDupSave(match,view){
+  return new Promise(function(resolve){
+    const cancelBtn=document.querySelector('#mConfDel .btn-secondary');
+    const origCancel=cancelBtn?cancelBtn.onclick:null;
+    let done=false;
+    function finish(v){
+      if(done)return;done=true;
+      if(cancelBtn)cancelBtn.onclick=origCancel;
+      resolve(v);
+    }
+    if(cancelBtn)cancelBtn.onclick=function(){cm('mConfDel');finish(false);};
+    confirmDel(
+      'Já existe um lançamento parecido ('+Math.round(match.score*100)+'% dos dados batem).',
+      function(){finish(true);},
+      'Lançamento existente:<br>'+qgSummarizeRec(match.rec,view)+'<br><br>Confirma que quer lançar mesmo assim?',
+      {icon:'⚠️',title:'Possível duplicata',btnText:'Lançar mesmo assim',btnColor:'#7A3300'}
+    );
+  });
 }
 // Status "efetivo": deriva vencida/vence hoje a partir da data de
 // vencimento sempre que o lançamento não estiver pago — garante que a
@@ -3672,6 +3859,7 @@ function qgFmtVal(rec,f){
     case 'status':return qgStatusBadge(qgEffStatus(v,f.dueKey?rec[f.dueKey]:null,f.payKey?rec[f.payKey]:null));
     case 'number':return (v||v===0)?String(v):'';
     case 'percent':return (v||v===0)?(String(v)+'%'):'';
+    case 'datetime':return '<span style="color:#B8896A;font-size:.72rem">'+xe(qgFmtDatetime(v))+'</span>';
     default:return xe(v);
   }
 }
@@ -3704,7 +3892,7 @@ function qgRenderTabs(){
 
 function qgSwitchTab(view){
   S.qg.view=view;
-  S.qg.pg=1;S.qg.sc='';S.qg.sd='asc';S.qg.selIds=new Set();S.qg.filters={};
+  S.qg.pg=1;S.qg.sc='';S.qg.sd='asc';S.qg.selIds=new Set();S.qg.filters={};S.qg.dupOnly=false;
   const nfBtn=document.getElementById('qgImportNFBtn');
   if(nfBtn)nfBtn.style.display=view==='areceber'?'':'none';
   const pedBtn=document.getElementById('qgImportPedidoBtn');
@@ -3774,6 +3962,7 @@ async function qgSyncSheets(view){
       return rec;
     });
     qgSaveData(view);
+    S.qg.dupCache[view]=null;
     if(S.qg.view===view)qgApplyF();
     toast('Sincronizado! '+S.qg.recs[view].length+' registros.');
     qgReconcileOverdueStatus(view);
@@ -3852,6 +4041,7 @@ function qgBuildHeader(){
   const cols=view.fields.filter(function(f){return !f.hideInTable;});
   let html='<tr style="background:#F2EAE0;border-bottom:1.5px solid var(--border)">';
   html+='<th style="padding:.75rem .6rem;text-align:center;width:2.25rem;position:sticky;left:0;z-index:11;background:#F2EAE0;box-shadow:2px 0 4px -2px rgba(44,24,16,.25)"><input type="checkbox" id="qgSelAllChk" onchange="qgToggleSelAll(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50" title="Selecionar todos nesta página"/></th>';
+  html+='<th style="padding:.6rem .3rem;text-align:center;width:1.8rem;font-size:.7rem" title="Possível duplicata">⚠️</th>';
   cols.forEach(function(f){
     const align=qgAlign(f.type);
     html+='<th class="si" onclick="qgSortBy(\''+f.key+'\')" id="qgth-'+f.key+'" style="padding:.6rem .6rem;text-align:'+align+';font-size:.7rem;font-weight:700;color:#7A4F3A;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">'+xe(f.label)+'</th>';
@@ -4006,6 +4196,10 @@ function qgApplyF(){
     if(f._ate&&r[view.dateField]&&r[view.dateField]>f._ate)return false;
     return true;
   });
+  if(S.qg.dupOnly){
+    const dupMap=qgGetDupMap(S.qg.view);
+    S.qg.filt=S.qg.filt.filter(function(r){return dupMap.has(r._id);});
+  }
   S.qg.filt.sort(function(a,b){
     const sc=S.qg.sc||view.dateField;
     let av=a[sc],bv=b[sc];
@@ -4062,7 +4256,9 @@ function qgRenderTable(){
   const cols=view.fields.filter(function(f){return !f.hideInTable;});
   const st=(S.qg.pg-1)*S.qg.pp,rows=S.qg.filt.slice(st,st+S.qg.pp);
   document.getElementById('qgRecCnt').textContent=S.qg.filt.length+' registro'+(S.qg.filt.length!==1?'s':'');
-  const colspan=cols.length+2;
+  qgUpdateDupBtn();
+  const dupMap=S.qg.dupCache[S.qg.view]||new Map(); // usa o que já foi calculado; não força o cálculo aqui
+  const colspan=cols.length+3;
   if(!rows.length){
     document.getElementById('qgTbody').innerHTML='<tr><td colspan="'+colspan+'" style="padding:3rem;text-align:center;color:#C8A882;font-size:.875rem">Nenhum registro encontrado</td></tr>';
     const allChk=document.getElementById('qgSelAllChk');if(allChk)allChk.checked=false;
@@ -4075,7 +4271,9 @@ function qgRenderTable(){
       return qgEffStatus(r[sk],sf&&sf.dueKey?r[sf.dueKey]:null,sf&&sf.payKey?r[sf.payKey]:null)==='pago';
     });
     const bg=_allPago?'#E8F5E9':(i%2===0?'#fff':'#FAF7F4');
+    const dupInfo=dupMap.get(r._id);
     let tds='<td style="padding:.625rem .6rem;text-align:center;position:sticky;left:0;z-index:1;background:'+bg+';box-shadow:2px 0 4px -2px rgba(44,24,16,.15)" onclick="event.stopPropagation()"><input type="checkbox" '+(S.qg.selIds.has(r._id)?'checked':'')+' onchange="qgToggleSelRow('+r._id+',this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:#9B6B50"/></td>';
+    tds+='<td style="padding:.625rem .3rem;text-align:center">'+(dupInfo?'<span style="cursor:help" title="Possível duplicata da linha '+dupInfo.otherId+' ('+Math.round(dupInfo.score*100)+'% dos dados de identidade iguais)">⚠️</span>':'')+'</td>';
     cols.forEach(function(f){
       const align=qgAlign(f.type);
       const fw=(f.type==='money'||f.key===view.dateField)?'600':'400';
@@ -4229,6 +4427,7 @@ function qgBulkDelete(){
       const ids=new Set(sel.map(function(r){return r._id;}));
       S.qg.recs[viewKey]=recs.filter(function(r){return !ids.has(r._id);});
       S.qg.selIds.clear();
+      S.qg.dupCache[viewKey]=null;
       qgSaveData(viewKey);qgApplyF();
       toast(sel.length+' lançamento'+(sel.length!==1?'s':'')+' excluído'+(sel.length!==1?'s':'')+(canSync?' ('+archived+' arquivado'+(archived!==1?'s':'')+' no Sheets)':'')+' ✓');
     }finally{hideLoading();}
@@ -4238,16 +4437,28 @@ function qgBulkDelete(){
 // ------------------------------------------------------------
 // CRUD (modal #mQg)
 // ------------------------------------------------------------
-function qgFieldInputHtml(f,val){
+function qgFieldInputHtml(f,val,allFields){
   val=(val===undefined||val===null)?'':val;
   const id='qgf_'+f.key;
+  if(f.readonly){
+    // Campo gerado pelo sistema (ex: "Lançado em") — mostra só leitura,
+    // sem <input>: qgSaveRec() nem tenta ler o DOM pra esses campos.
+    return '<div class="inp" style="background:#FAF7F4;color:#9B6B50;cursor:default;display:flex;align-items:center">'+
+      (f.type==='datetime'?xe(qgFmtDatetime(val))||'<span style="color:#C8A882">— será preenchido ao salvar —</span>':xe(val))+'</div>';
+  }
   switch(f.type){
     case 'money':
     case 'number':
     case 'percent':
       return '<input type="number" step="'+(f.type==='number'?'1':'0.01')+'" id="'+id+'" class="inp" value="'+xe(val)+'"/>';
-    case 'date':
-      return '<input type="date" id="'+id+'" class="inp" value="'+xe(val)+'"/>';
+    case 'date':{
+      // Se este campo de data é o "pagamento" de algum campo de status
+      // (payKey), muda o status pra "pago" ao preencher — igual ao rf_dp
+      // de Lojas Próprias — pra não ficar diferente do que a tabela mostra.
+      const stF=(allFields||[]).find(function(x){return x.type==='status'&&x.payKey===f.key;});
+      const onchange=stF?' onchange="qgAutoStatusOnPay(\''+id+'\',\'qgf_'+stF.key+'\')"':'';
+      return '<input type="date" id="'+id+'" class="inp"'+onchange+' value="'+xe(val)+'"/>';
+    }
     case 'month':
       return '<select id="'+id+'" class="sel">'+
         MESES.map(function(m,i){return i===0?'':'<option value="'+i+'"'+(String(val)===String(i)?' selected':'')+'>'+m+'</option>';}).join('')+
@@ -4288,7 +4499,13 @@ function qgBuildForm(rec){
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">';
     grp.fields.forEach(function(f){
       const span=f.wide?'grid-column:1 / -1':'';
-      html+='<div style="'+span+'"><label class="lbl">'+xe(f.label)+(f.required?' *':'')+'</label>'+qgFieldInputHtml(f,rec[f.key])+'</div>';
+      // Campo de status: pré-preenche com o status efetivo (mesmo cálculo
+      // usado na tabela), não com o valor bruto salvo — senão o formulário
+      // de edição mostra "vencida"/"em aberto" num lançamento que a tabela
+      // já mostra como "pago" por causa da data de pagamento.
+      let v=rec[f.key];
+      if(f.type==='status')v=qgEffStatus(v,f.dueKey?rec[f.dueKey]:null,f.payKey?rec[f.payKey]:null);
+      html+='<div style="'+span+'"><label class="lbl">'+xe(f.label)+(f.required?' *':'')+'</label>'+qgFieldInputHtml(f,v,view.fields)+'</div>';
     });
     html+='</div>';
   });
@@ -4320,6 +4537,7 @@ async function qgSaveRec(){
   const rec={};
   const missing=[];
   view.fields.forEach(function(f){
+    if(f.readonly)return; // campo gerado pelo sistema (ex: Lançado em) — não lê do DOM
     const el=document.getElementById('qgf_'+f.key);
     if(!el)return;
     let v=el.value;
@@ -4335,6 +4553,17 @@ async function qgSaveRec(){
   const _formIdEl=document.getElementById('qgf_id');
   const _formId=_formIdEl&&_formIdEl.value!==''?+_formIdEl.value:null;
   const editId=S.qg.editId!=null?S.qg.editId:_formId;
+  // Aviso de possível duplicata: só ao criar um lançamento novo (edição
+  // não entra aqui). Compara com os já existentes ignorando status/valor
+  // pago/data de pagamento — são justamente os campos que costumam diferir
+  // numa duplicata (ver dupFields de cada view).
+  if(editId==null&&view.dupFields&&view.dupFields.length){
+    const match=qgFindBestMatch(rec,recs,view);
+    if(match&&match.score>=QG_DUP_THRESHOLD){
+      const proceed=await qgConfirmDupSave(match,view);
+      if(!proceed)return;
+    }
+  }
   if(editId!=null){
     // Usa == (igualdade solta) para tolerar _id string vs number após JSON round-trip
     const i=recs.findIndex(function(x){return x._id==editId;});
@@ -4344,10 +4573,12 @@ async function qgSaveRec(){
     recs[i]=Object.assign({},recs[i],rec);
   }else{
     rec._id=Math.max(0,...recs.map(function(x){return x._id||0;}))+1;
+    if(view.fields.some(function(f){return f.key==='criadoEm';}))rec.criadoEm=qgNowStr();
     recs.push(rec);
   }
   qgSaveData(viewKey);
   cm('mQg');qgApplyF();
+  S.qg.dupCache[viewKey]=null; // dados mudaram — invalida o cache de duplicatas
   let ok=false;
   if(!view.noSync){
     ok=await qgPush2Sheets(viewKey,rec,rowIdx);
@@ -4383,6 +4614,7 @@ function qgDelRec(id){
     }
     S.qg.recs[viewKey]=S.qg.recs[viewKey].filter(function(x){return x._id!==id;});
     S.qg.selIds.delete(id);
+    S.qg.dupCache[viewKey]=null;
     qgSaveData(viewKey);qgApplyF();
   },canSync?'O registro será movido para a aba "Excluídos" no Google Sheets.':'Esta ação não pode ser desfeita.');
 }
@@ -4721,7 +4953,7 @@ async function qgParseNF(){
   qgNfSt(2);
 }
 
-function qgConfirmNF(){
+async function qgConfirmNF(){
   const tipo=document.getElementById('qgnfTipo').value||'FRANQUIA';
   const loja=document.getElementById('qgnfLoja').value.trim();
   const forn=document.getElementById('qgnfForn').value.trim();
@@ -4766,9 +4998,21 @@ function qgConfirmNF(){
     boletoMkt:boletoMkt,boletoFran:boletoFran,
     dv1:dv1,boletoBri1:boletoBri1,dp1:'',st1:_st(dv1),
     dv2:dv2,boletoBri2:boletoBri2,dp2:'',st2:_st(dv2),
+    criadoEm:qgNowStr(),
   };
+  // Mesmo aviso de possível duplicata do lançamento manual (qgSaveRec) —
+  // NF importada tem seu próprio fluxo de gravação, então checa aqui também.
+  const view=QG_VIEWS.areceber;
+  if(view.dupFields&&view.dupFields.length){
+    const match=qgFindBestMatch(rec,recs,view);
+    if(match&&match.score>=QG_DUP_THRESHOLD){
+      const proceed=await qgConfirmDupSave(match,view);
+      if(!proceed)return;
+    }
+  }
   recs.push(rec);
   qgSaveData('areceber');
+  S.qg.dupCache.areceber=null;
   hideMagnifier();cm('mQgNF');
   if(S.qg.view==='areceber')qgApplyF();
   toast('Nota fiscal importada ✓ Boletos e parcelas preenchidos automaticamente.');
