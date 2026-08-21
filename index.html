@@ -1200,6 +1200,17 @@ if(localStorage.getItem('r_ver')!==APP_VER){
   localStorage.setItem('r_ver',APP_VER);
 }
 
+// Um _id só é "confiável" como número de linha real do Sheets se não foi
+// gerado como palpite local. Palpites locais usam Date.now() (sempre um
+// número de 13 dígitos, bem acima de 1 milhão — nenhuma planilha chega
+// perto disso em linhas), então qualquer _id pequeno é uma linha real,
+// mesmo em registros carregados dos jsons históricos ou de um cache
+// antigo que nunca passou por um Sincronizar nesta sessão (esses nunca
+// têm _synced=true, mas o _id continua sendo real). Usar só _synced pra
+// decidir "add" vs "update" tratava esses registros legítimos como
+// novos e duplicava a linha ao editar.
+function isRealRowId(id){return !!id&&id<1000000;}
+
 // ============================================================
 // STATE
 // ============================================================
@@ -1841,15 +1852,18 @@ async function saveRec(){
     if(editId){
       const i=S.recs.findIndex(x=>parseInt(x._id)===editId);
       if(i<0){toast('Erro: registro não encontrado.','err');return;}
-      // Só manda rowIndex (update) se esse registro já foi confirmado no
-      // Sheets alguma vez -- um rascunho cujo _id é só um palpite local
-      // (ex: add anterior que falhou) tem que ir como "add", senão
-      // sobrescreve uma linha real de outro lançamento.
-      rowIdx=S.recs[i]._synced?S.recs[i]._id:null;
+      // Só manda rowIndex (update) se o _id for uma linha real do Sheets.
+      // Um rascunho cujo _id é só um palpite local (ex: add anterior que
+      // falhou) tem que ir como "add", senão sobrescreve uma linha real
+      // de outro lançamento -- ver isRealRowId().
+      rowIdx=(S.recs[i]._synced||isRealRowId(S.recs[i]._id))?S.recs[i]._id:null;
       rec._id=S.recs[i]._id;
       S.recs[i]={...S.recs[i],...rec};
     }else{
-      rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
+      // Date.now() (não Math.max local+1): garante que, se essa gravação
+      // falhar e o registro for editado de novo depois, isRealRowId()
+      // reconhece o _id como palpite (não uma linha real) -- ver acima.
+      rec._id=Date.now();
       S.recs.push(rec);
       S.lastId=rec._id;
     }
@@ -2370,7 +2384,7 @@ async function saveBol(){
     vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,
     st:g('bf_st'),dp:g('bf_dp'),
     mv:dv?new Date(dv+'T12:00').getMonth()+1:0,
-    _id:Math.max(0,...S.recs.map(x=>x._id))+1
+    _id:Date.now() // ver isRealRowId() -- palpite local, não linha real
   };
   S.recs.push(rec);svData();
   S.lastId=rec._id;
@@ -2458,7 +2472,7 @@ function extractValue(txt){return extractFromPDF(txt).vn||'';}
 async function saveBol(){
   const lo=g('bf_lo'),fo=g('bf_fo'),dv=g('bf_dv'),vn=g('bf_vn');
   if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
-  const rec={lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,st:g('bf_st'),dp:g('bf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
+  const rec={lo,fo,nn:g('bf_nn'),de:g('bf_de'),dv,vn:+vn||0,mk:+g('bf_mk')||0,pr:+g('bf_pr')||0,sv:+g('bf_sv')||0,st:g('bf_st'),dp:g('bf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0,_id:Date.now()};
   S.recs.push(rec);svData();
   const ok=await push2Sheets(rec,null);
   S.lastId=rec._id;
@@ -2856,7 +2870,7 @@ async function confirmBoleto(){
   try{pdfUrl=await uploadBoletoToGitHub({...q,nn});}
   catch(e){console.warn('PDF upload skipped:',e);}
   const rec={lo:q.lo,fo:q.fo,nn,de:q.de,dv:q.dv,vn:q.vn,mk:q.mk,pr:q.pr,sv:q.sv,
-    st:q.st,dp:q.dp,mv:q.mv,url:pdfUrl,_id:Math.max(0,...S.recs.map(x=>x._id))+1};
+    st:q.st,dp:q.dp,mv:q.mv,url:pdfUrl,_id:Date.now()};
   S.recs.push(rec);svData();S.lastId=rec._id;
   const ok=await push2Sheets(rec,null);
 
@@ -3908,6 +3922,7 @@ function qgFmtVal(rec,f){
     default:return xe(v);
   }
 }
+
 function qgDistinct(recs,key){
   const set=new Set();
   recs.forEach(r=>{if(r[key]!==undefined&&r[key]!==null&&r[key]!=='')set.add(r[key]);});
@@ -4434,7 +4449,7 @@ function qgBulkMarkPaid(stKey,dpKey){
         if(i<0)continue;
         const upd={};upd[stKey]='pago';upd[dpKey]=today;
         recs[i]=Object.assign({},recs[i],upd);
-        if(canSync&&recs[i]._synced){
+        if(canSync&&(recs[i]._synced||isRealRowId(recs[i]._id))){
           if(await qgPush2Sheets(viewKey,recs[i],recs[i]._id))synced++;
         }
       }
@@ -4461,7 +4476,7 @@ function qgBulkDelete(){
         // da mesma planilha (cada delete desloca as linhas abaixo dela)
         const ordered=[...sel].sort(function(a,b){return b._id-a._id;});
         for(const rec of ordered){
-          if(!rec._synced)continue;
+          if(!(rec._synced||isRealRowId(rec._id)))continue;
           try{
             const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',view:viewKey,rowIndex:rec._id})});
             const j=await res.json();
@@ -4623,11 +4638,20 @@ async function qgSaveRec(){
       // Usa == (igualdade solta) para tolerar _id string vs number após JSON round-trip
       const i=recs.findIndex(function(x){return x._id==editId;});
       if(i<0){toast('Erro: registro não encontrado.','err');return;}
-      rowIdx=recs[i]._synced?recs[i]._id:null; // só manda rowIdx ao Sheets se o rec já estava lá
+      // Só manda rowIndex (update) se o _id for uma linha real do Sheets
+      // -- ver isRealRowId(). Sem isso, editar um registro carregado do
+      // json histórico ou de um cache antigo (nunca passou por um
+      // Sincronizar nesta sessão, então _synced nunca virou true, mas o
+      // _id continua sendo uma linha real) era enviado como "add" e
+      // duplicava a linha.
+      rowIdx=(recs[i]._synced||isRealRowId(recs[i]._id))?recs[i]._id:null;
       rec._id=recs[i]._id;
       recs[i]=Object.assign({},recs[i],rec);
     }else{
-      rec._id=Math.max(0,...recs.map(function(x){return x._id||0;}))+1;
+      // Date.now() (não Math.max local+1): garante que, se essa gravação
+      // falhar e o registro for editado de novo depois, isRealRowId()
+      // reconhece o _id como palpite (não uma linha real).
+      rec._id=Date.now();
       if(view.fields.some(function(f){return f.key==='criadoEm';}))rec.criadoEm=qgNowStr();
       recs.push(rec);
     }
@@ -4659,7 +4683,7 @@ function qgDelRec(id){
   if(!rec)return;
   const canSync=S.url&&!view.noSync;
   confirmDel('Excluir este registro?',async function(){
-    if(canSync&&rec._synced){
+    if(canSync&&(rec._synced||isRealRowId(rec._id))){
       showLoading('Arquivando no Sheets...');
       try{
         const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'archive',view:viewKey,rowIndex:rec._id})});
@@ -5051,7 +5075,11 @@ async function qgConfirmNF(){
 
   const recs=S.qg.recs.areceber;
   const rec={
-    _id:Math.max(1,...recs.map(function(x){return x._id;}))+1,
+    // Date.now(), não Math.max local+1: esse rascunho ainda não foi
+    // salvo no Sheets (só abre a tela de edição a seguir) -- qgSaveRec()
+    // usa isRealRowId() pra saber se pode tratar como "update" ou se
+    // precisa mandar como "add" na primeira gravação.
+    _id:Date.now(),
     tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
     vNota:vNota,totalNota:totalNota,
     boletoMkt:boletoMkt,boletoFran:boletoFran,
@@ -5427,7 +5455,7 @@ async function qgConfirmApBoleto(){
 
   const recs=S.qg.recs[viewKey];
   const rec={
-    _id:Math.max(0,...recs.map(function(x){return x._id;}))+1,
+    _id:Date.now(), // ver isRealRowId() -- palpite local, não linha real
     cat:q.cat,mes:q.dv?(new Date(q.dv+'T00:00:00').getMonth()+1):0,dv:q.dv,desc:q.desc||'',
     va:va,vp:0,st:q.st||'em aberto',dp:q.dp||'',
   };
@@ -5622,7 +5650,10 @@ async function qgConfirmPedido(){
 
   const recs=S.qg.recs.areceber;
   const rec={
-    _id:Math.max(1,...recs.map(function(x){return x._id;}),0)+1,
+    // Date.now(): mesmo motivo do qgConfirmNF() -- se o push abaixo
+    // falhar, uma edição futura desse registro precisa reconhecer o _id
+    // como palpite local (ver isRealRowId()), não como linha real.
+    _id:Date.now(),
     tipo:tipo,loja:loja,forn:forn,de:de,nota:nota,
     vNota:valor,totalNota:valor,
     boletoMkt:0,boletoFran:0,
