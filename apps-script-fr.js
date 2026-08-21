@@ -15,7 +15,7 @@
 // 8. Colar essa URL em Configurações, estando logado como Franquias
 // ============================================================
 
-const SPREADSHEET_ID = '1DD9FBRZ2WlOR-W_NHKzoa5B5rR4cp7becPj_zfWRm28';
+const SPREADSHEET_ID = '1023jag9C3galUDYPUA6fOCcxwbD3PFEbYM1RX_0mAF8';
 
 // Nome das abas na planilha, por view do sistema
 const VIEW_SHEETS = {
