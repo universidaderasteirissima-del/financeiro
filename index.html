@@ -433,7 +433,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
         <h2 style="font-size:1rem;font-weight:700;color:#2C1810">Adicionar Boleto</h2>
         <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de linha digitável ou PDF</p>
       </div>
-      <button onclick="cm('mBoleto')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+      <button onclick="closeBoletoModal()" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
     <!-- Step 1 -->
     <div id="bS1">
@@ -457,7 +457,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
       </div>
       <input type="file" id="bPDF" accept=".pdf" multiple style="display:none" onchange="handleFileInput(this)" />
       <div style="display:flex;gap:.75rem;margin-top:1.5rem">
-        <button onclick="cm('mBoleto')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="closeBoletoModal()" class="btn-secondary" style="flex:1">Cancelar</button>
         <button onclick="parseBol()" class="btn-primary" style="flex:2">Analisar Boleto →</button>
       </div>
     </div>
@@ -587,7 +587,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
     </div>
     <div style="display:flex;gap:.75rem;margin-top:1.5rem">
       <button onclick="cm('mRec')" class="btn-secondary" style="flex:1">Cancelar</button>
-      <button onclick="saveRec()" class="btn-accent" style="flex:1">Salvar</button>
+      <button onclick="saveRec()" class="btn-accent" style="flex:1" id="btnSaveRec">Salvar</button>
     </div>
   </div>
 </div>
@@ -603,7 +603,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
     <div id="qgFormFields" style="display:grid;gap:.75rem"></div>
     <div style="display:flex;gap:.75rem;margin-top:1.5rem">
       <button onclick="cm('mQg')" class="btn-secondary" style="flex:1">Cancelar</button>
-      <button onclick="qgSaveRec()" class="btn-accent" style="flex:1">Salvar</button>
+      <button onclick="qgSaveRec()" class="btn-accent" style="flex:1" id="btnQgSaveRec">Salvar</button>
     </div>
   </div>
 </div>
@@ -691,7 +691,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
         <h2 style="font-size:1rem;font-weight:700;color:#2C1810" id="qgApBoletoTtl">Importar Boleto</h2>
         <p style="font-size:.75rem;color:#9B6B50;margin-top:.15rem">Leitura automática de linha digitável ou PDF</p>
       </div>
-      <button onclick="hideMagnifier();cm('mQgApBoleto')" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
+      <button onclick="qgCloseApBoleto()" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:2px;border:1px solid var(--border);background:#FAF7F4;cursor:pointer;font-size:1rem;color:#7A4F3A;font-weight:700">×</button>
     </div>
     <!-- Step 1 -->
     <div id="qgApS1">
@@ -712,7 +712,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
       </label>
       <input type="file" id="qgApPDF" accept=".pdf" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px" onchange="document.getElementById('qgApPDFNm').textContent=this.files[0]?this.files[0].name:'Nenhum arquivo selecionado'" />
       <div style="display:flex;gap:.75rem;margin-top:1.5rem">
-        <button onclick="hideMagnifier();cm('mQgApBoleto')" class="btn-secondary" style="flex:1">Cancelar</button>
+        <button onclick="qgCloseApBoleto()" class="btn-secondary" style="flex:1">Cancelar</button>
         <button onclick="qgParseApBoleto()" class="btn-primary" style="flex:2">Analisar Boleto →</button>
       </div>
     </div>
@@ -1822,24 +1822,49 @@ function editRec(id){
   document.getElementById('rf_dp').value=r.dp||'';document.getElementById('rf_st').value=effStatus(r.st,r.dv,r.dp);
   var _mr=document.getElementById('mRec');document.body.appendChild(_mr);_mr.style.display='flex';
 }
+let _savingRec=false;
 async function saveRec(){
-  const lo=g('rf_lo'),fo=g('rf_fo'),dv=g('rf_dv'),vn=g('rf_vn');
-  if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
-  const rec={lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,vn:+vn||0,mk:+g('rf_mk')||0,pr:+g('rf_pr')||0,sv:+g('rf_sv')||0,st:g('rf_st'),dp:g('rf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0};
-  let rowIdx=null;
-  const editId=S.editId?parseInt(S.editId):null;
-  if(editId){
-    const i=S.recs.findIndex(x=>parseInt(x._id)===editId);
-    if(i<0){toast('Erro: registro não encontrado.','err');return;}
-    rowIdx=S.recs[i]._id;rec._id=editId;S.recs[i]={...S.recs[i],...rec};
-  }else{
-    rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
-    S.recs.push(rec);
-    S.lastId=rec._id;
+  // Trava contra clique duplo/duplo-submit: sem isso, dois cliques rápidos
+  // no Salvar (comum em telas mais lentas) disparam saveRec() duas vezes
+  // antes da primeira gravação terminar, e as duas viram "add" no Sheets
+  // -- exatamente como um lançamento duplicado.
+  if(_savingRec)return;
+  _savingRec=true;
+  const btn=document.getElementById('btnSaveRec');
+  if(btn)btn.disabled=true;
+  try{
+    const lo=g('rf_lo'),fo=g('rf_fo'),dv=g('rf_dv'),vn=g('rf_vn');
+    if(!lo||!fo||!dv||!vn){toast('Preencha: Loja, Fornecedor, Vencimento e Valor.','warn');return;}
+    const rec={lo,fo,nn:g('rf_nn'),de:g('rf_de'),dv,vn:+vn||0,mk:+g('rf_mk')||0,pr:+g('rf_pr')||0,sv:+g('rf_sv')||0,st:g('rf_st'),dp:g('rf_dp'),mv:dv?new Date(dv+'T12:00').getMonth()+1:0};
+    let rowIdx=null;
+    const editId=S.editId?parseInt(S.editId):null;
+    if(editId){
+      const i=S.recs.findIndex(x=>parseInt(x._id)===editId);
+      if(i<0){toast('Erro: registro não encontrado.','err');return;}
+      // Só manda rowIndex (update) se esse registro já foi confirmado no
+      // Sheets alguma vez -- um rascunho cujo _id é só um palpite local
+      // (ex: add anterior que falhou) tem que ir como "add", senão
+      // sobrescreve uma linha real de outro lançamento.
+      rowIdx=S.recs[i]._synced?S.recs[i]._id:null;
+      rec._id=S.recs[i]._id;
+      S.recs[i]={...S.recs[i],...rec};
+    }else{
+      rec._id=Math.max(0,...S.recs.map(x=>x._id))+1;
+      S.recs.push(rec);
+      S.lastId=rec._id;
+    }
+    svData();
+    const ok=await push2Sheets(rec,rowIdx);
+    if(ok){
+      const updIdx=S.recs.findIndex(x=>x._id===rec._id||x._id===editId);
+      if(updIdx>=0){if(rec._id)S.recs[updIdx]._id=rec._id;S.recs[updIdx]._synced=true;svData();}
+    }
+    cm('mRec');applyF();
+    toast((editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
+  }finally{
+    _savingRec=false;
+    if(btn)btn.disabled=false;
   }
-  svData();const ok=await push2Sheets(rec,rowIdx);
-  cm('mRec');applyF();
-  toast((S.editId?'Conta atualizada!':'Conta adicionada!')+(ok?' ✓ Google Sheets':''));
 }
 function delRec(id){
   const rec=S.recs.find(x=>x._id===id);
@@ -2866,6 +2891,26 @@ async function confirmBoleto(){
     }
   }
   if(btn){btn.disabled=false;btn.textContent='✓ Confirmar este boleto';}
+}
+
+// Fecha o modal de importação de boleto. Se ainda houver boleto(s) não
+// confirmados na fila (ex: usuário revisou mas não clicou em "Confirmar
+// este boleto" em alguma aba — comum quando falta o vencimento e o
+// formulário não deixa salvar), avisa antes de descartar, em vez de
+// fechar direto e perder o lançamento sem o usuário perceber.
+function closeBoletoModal(){
+  const pending=(S.boletoQueue||[]).filter(b=>!b._confirmed).length;
+  const doClose=()=>{cm('mBoleto');S.pdfTxt=null;S.pdfPages=[];S.pdfDoc=null;S.boletoQueue=[];S.fileQueue=[];S.fileQueueIdx=0;};
+  if(pending>0){
+    confirmDel(
+      'Ainda há '+pending+' boleto'+(pending>1?'s':'')+' não confirmado'+(pending>1?'s':'')+' nesta fila. Fechar mesmo assim?',
+      doClose,
+      'Esse'+(pending>1?'s':'')+' boleto'+(pending>1?'s':'')+' <strong>não foi'+(pending>1?'ram':'')+' salvo'+(pending>1?'s':'')+'</strong> e será'+(pending>1?'ão':'')+' perdido'+(pending>1?'s':'')+' se você sair agora.',
+      {icon:'⚠️',title:'Boleto(s) não confirmado(s)',btnText:'Sair sem salvar',btnColor:'#8B1A1A'}
+    );
+  }else{
+    doClose();
+  }
 }
 
 async function renderPDF(pdfDoc){
@@ -4530,66 +4575,80 @@ function qgEditRec(id){
   var _m=document.getElementById('mQg');document.body.appendChild(_m);_m.style.display='flex';
 }
 
+let _qgSavingRec=false;
 async function qgSaveRec(){
-  const viewKey=S.qg.view;
-  const view=QG_VIEWS[viewKey];
-  const recs=S.qg.recs[viewKey];
-  const rec={};
-  const missing=[];
-  view.fields.forEach(function(f){
-    if(f.readonly)return; // campo gerado pelo sistema (ex: Lançado em) — não lê do DOM
-    const el=document.getElementById('qgf_'+f.key);
-    if(!el)return;
-    let v=el.value;
-    if(f.type==='money'||f.type==='number'||f.type==='month'||f.type==='percent'){
-      v=v===''?0:(+v||0);
+  // Trava contra clique duplo/duplo-submit: sem isso, dois cliques rápidos
+  // no Salvar disparam qgSaveRec() duas vezes antes da primeira gravação
+  // marcar o registro como _synced, e as duas viram "add" no Sheets --
+  // exatamente como um lançamento duplicado.
+  if(_qgSavingRec)return;
+  _qgSavingRec=true;
+  const btn=document.getElementById('btnQgSaveRec');
+  if(btn)btn.disabled=true;
+  try{
+    const viewKey=S.qg.view;
+    const view=QG_VIEWS[viewKey];
+    const recs=S.qg.recs[viewKey];
+    const rec={};
+    const missing=[];
+    view.fields.forEach(function(f){
+      if(f.readonly)return; // campo gerado pelo sistema (ex: Lançado em) — não lê do DOM
+      const el=document.getElementById('qgf_'+f.key);
+      if(!el)return;
+      let v=el.value;
+      if(f.type==='money'||f.type==='number'||f.type==='month'||f.type==='percent'){
+        v=v===''?0:(+v||0);
+      }
+      if(f.required&&(v===''||v==null))missing.push(f.label);
+      rec[f.key]=v;
+    });
+    if(missing.length){toast('Preencha: '+missing.join(', ')+'.','warn');return;}
+    let rowIdx=null;
+    // Fallback: se S.qg.editId for null/undefined, tenta ler do campo oculto do formulário
+    const _formIdEl=document.getElementById('qgf_id');
+    const _formId=_formIdEl&&_formIdEl.value!==''?+_formIdEl.value:null;
+    const editId=S.qg.editId!=null?S.qg.editId:_formId;
+    // Aviso de possível duplicata: só ao criar um lançamento novo (edição
+    // não entra aqui). Compara com os já existentes ignorando status/valor
+    // pago/data de pagamento — são justamente os campos que costumam diferir
+    // numa duplicata (ver dupFields de cada view).
+    if(editId==null&&view.dupFields&&view.dupFields.length){
+      const match=qgFindBestMatch(rec,recs,view);
+      if(match&&match.score>=QG_DUP_THRESHOLD){
+        const proceed=await qgConfirmDupSave(match,view);
+        if(!proceed)return;
+      }
     }
-    if(f.required&&(v===''||v==null))missing.push(f.label);
-    rec[f.key]=v;
-  });
-  if(missing.length){toast('Preencha: '+missing.join(', ')+'.','warn');return;}
-  let rowIdx=null;
-  // Fallback: se S.qg.editId for null/undefined, tenta ler do campo oculto do formulário
-  const _formIdEl=document.getElementById('qgf_id');
-  const _formId=_formIdEl&&_formIdEl.value!==''?+_formIdEl.value:null;
-  const editId=S.qg.editId!=null?S.qg.editId:_formId;
-  // Aviso de possível duplicata: só ao criar um lançamento novo (edição
-  // não entra aqui). Compara com os já existentes ignorando status/valor
-  // pago/data de pagamento — são justamente os campos que costumam diferir
-  // numa duplicata (ver dupFields de cada view).
-  if(editId==null&&view.dupFields&&view.dupFields.length){
-    const match=qgFindBestMatch(rec,recs,view);
-    if(match&&match.score>=QG_DUP_THRESHOLD){
-      const proceed=await qgConfirmDupSave(match,view);
-      if(!proceed)return;
-    }
-  }
-  if(editId!=null){
-    // Usa == (igualdade solta) para tolerar _id string vs number após JSON round-trip
-    const i=recs.findIndex(function(x){return x._id==editId;});
-    if(i<0){toast('Erro: registro não encontrado.','err');return;}
-    rowIdx=recs[i]._synced?recs[i]._id:null; // só manda rowIdx ao Sheets se o rec já estava lá
-    rec._id=recs[i]._id;
-    recs[i]=Object.assign({},recs[i],rec);
-  }else{
-    rec._id=Math.max(0,...recs.map(function(x){return x._id||0;}))+1;
-    if(view.fields.some(function(f){return f.key==='criadoEm';}))rec.criadoEm=qgNowStr();
-    recs.push(rec);
-  }
-  qgSaveData(viewKey);
-  cm('mQg');qgApplyF();
-  S.qg.dupCache[viewKey]=null; // dados mudaram — invalida o cache de duplicatas
-  let ok=false;
-  if(!view.noSync){
-    ok=await qgPush2Sheets(viewKey,rec,rowIdx);
-    if(ok){
-      // Propaga _id (pode ter mudado p/ rowIndex do Sheets) e _synced de volta ao array
-      const updIdx=recs.findIndex(function(x){return x._id==rec._id||x._id==editId;});
-      if(updIdx>=0){if(rec._id)recs[updIdx]._id=rec._id;recs[updIdx]._synced=true;}
+    if(editId!=null){
+      // Usa == (igualdade solta) para tolerar _id string vs number após JSON round-trip
+      const i=recs.findIndex(function(x){return x._id==editId;});
+      if(i<0){toast('Erro: registro não encontrado.','err');return;}
+      rowIdx=recs[i]._synced?recs[i]._id:null; // só manda rowIdx ao Sheets se o rec já estava lá
+      rec._id=recs[i]._id;
+      recs[i]=Object.assign({},recs[i],rec);
+    }else{
+      rec._id=Math.max(0,...recs.map(function(x){return x._id||0;}))+1;
+      if(view.fields.some(function(f){return f.key==='criadoEm';}))rec.criadoEm=qgNowStr();
+      recs.push(rec);
     }
     qgSaveData(viewKey);
+    cm('mQg');qgApplyF();
+    S.qg.dupCache[viewKey]=null; // dados mudaram — invalida o cache de duplicatas
+    let ok=false;
+    if(!view.noSync){
+      ok=await qgPush2Sheets(viewKey,rec,rowIdx);
+      if(ok){
+        // Propaga _id (pode ter mudado p/ rowIndex do Sheets) e _synced de volta ao array
+        const updIdx=recs.findIndex(function(x){return x._id==rec._id||x._id==editId;});
+        if(updIdx>=0){if(rec._id)recs[updIdx]._id=rec._id;recs[updIdx]._synced=true;}
+      }
+      qgSaveData(viewKey);
+    }
+    toast((editId!=null?'Lançamento atualizado!':'Lançamento adicionado!')+(ok?' ✓ Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
+  }finally{
+    _qgSavingRec=false;
+    if(btn)btn.disabled=false;
   }
-  toast((editId!=null?'Lançamento atualizado!':'Lançamento adicionado!')+(ok?' ✓ Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
 }
 
 function qgDelRec(id){
@@ -5395,6 +5454,24 @@ async function qgConfirmApBoleto(){
     qgApplyF();
     const totalN=qgApQueue.length;
     toast((totalN>1?(totalN+' boletos importados'):'Boleto importado')+' ✓'+(ok?' Google Sheets':(S.url&&!view.noSync?' (Sheets não sincronizado — verifique a conexão)':'')));
+  }
+}
+
+// Mesma ideia do closeBoletoModal() de Lojas Próprias: avisa antes de
+// fechar se ainda houver boleto(s) não confirmados na fila, em vez de
+// descartar sem o usuário perceber.
+function qgCloseApBoleto(){
+  const pending=(qgApQueue||[]).filter(function(b){return !b._confirmed;}).length;
+  const doClose=function(){hideMagnifier();cm('mQgApBoleto');qgApPdfTxt='';qgApPdfDoc=null;qgApPdfPages=[];qgApQueue=[];qgApQueueIdx=0;};
+  if(pending>0){
+    confirmDel(
+      'Ainda há '+pending+' boleto'+(pending>1?'s':'')+' não confirmado'+(pending>1?'s':'')+' nesta fila. Fechar mesmo assim?',
+      doClose,
+      'Esse'+(pending>1?'s':'')+' boleto'+(pending>1?'s':'')+' <strong>não foi'+(pending>1?'ram':'')+' salvo'+(pending>1?'s':'')+'</strong> e será'+(pending>1?'ão':'')+' perdido'+(pending>1?'s':'')+' se você sair agora.',
+      {icon:'⚠️',title:'Boleto(s) não confirmado(s)',btnText:'Sair sem salvar',btnColor:'#8B1A1A'}
+    );
+  }else{
+    doClose();
   }
 }
 
