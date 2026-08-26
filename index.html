@@ -387,6 +387,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
               <button id="qgImportNFBtn" class="btn-accent" onclick="qgOpenNF()" style="display:none">📄 Importar NF</button>
               <button id="qgImportBoletoBtn" class="btn-accent" onclick="qgOpenApBoleto()" style="display:none">📎 Importar Boleto</button>
               <button id="qgImportPedidoBtn" class="btn-accent" onclick="qgOpenPedido()" style="display:none">🛒 Importar Pedido</button>
+              <button id="qgLembretesBtn" class="btn-accent" onclick="qgEnviarLembretes()" style="display:none">📧 Enviar lembretes</button>
               <button class="btn-secondary" onclick="qgExportCSV()">⬇ Exportar CSV</button>
               <button class="btn-secondary" onclick="qgOpenExcluidos()">🗑 Excluídos</button>
               <button id="qgDupBtn" class="btn-secondary" onclick="qgToggleDupFilter()" title="Procura lançamentos com pelo menos 80% dos dados de identidade iguais (categoria/vencimento/descrição/valor etc. — ignora status e valor pago)" style="display:none">🔁 Duplicatas</button>
@@ -3638,6 +3639,8 @@ const AR_FIELDS=[
   {key:'boletoUrlFran',label:'PDF Franchising',type:'text',section:'Boletos Emitidos',hideInTable:true},
   {key:'boletoCodFran',label:'Linha Digit. Franchising',type:'text',wide:true,section:'Boletos Emitidos',hideInTable:true},
   {key:'criadoEm',label:'Lançado em',type:'datetime',readonly:true,section:'Sistema'},
+  {key:'lemb1',label:'Lembrete Parcela 1',type:'text',readonly:true,section:'Sistema',hideInTable:true},
+  {key:'lemb2',label:'Lembrete Parcela 2',type:'text',readonly:true,section:'Sistema',hideInTable:true},
 ];
 
 // LOJA_FIELDS: esquema do "Cadastro" (lojas + fornecedores externos)
@@ -3923,6 +3926,102 @@ function qgFmtVal(rec,f){
   }
 }
 
+// ------------------------------------------------------------
+// LEMBRETES DE VENCIMENTO ("A receber") — botão "📧 Enviar
+// lembretes". Cada parcela (dv1/dv2) guarda em lemb1/lemb2 o
+// estágio do último aviso já enviado: 0=nenhum, 1=prévio (até 3
+// dias antes), 2=vence hoje, 3=atrasado (enviado uma única vez).
+// Só reenvia quando o estágio atual for maior que o já salvo.
+// ------------------------------------------------------------
+function qgEstagioLembrete(st,dv,dp){
+  if(st==='pago'||dp)return 0;
+  if(!dv)return 0;
+  const today=toISO(new Date());
+  if(dv<today)return 3;
+  if(dv===today)return 2;
+  const lim=new Date();lim.setDate(lim.getDate()+3);
+  if(dv<=toISO(lim))return 1;
+  return 0;
+}
+function qgLembreteLabel(v){
+  const m={'0':'— nenhum aviso enviado —','1':'Prévio (3 dias antes) enviado','2':'Aviso de vencimento enviado','3':'Aviso de atraso enviado'};
+  return m[String(v||'0')]||m['0'];
+}
+// Boletos cobertos por cada parcela: 1ª parcela cobre Marketing,
+// Franchising e Brilhante/Fábrica 1ª (todos vencem em dv1); 2ª
+// parcela cobre só Brilhante/Fábrica 2ª (vence em dv2).
+function qgLembreteItens(rec,n){
+  const itens=[];
+  if(n===1){
+    if(parseFloat(rec.boletoMkt))itens.push({label:'Marketing',valor:rec.boletoMkt,url:rec.boletoUrlMkt});
+    if(parseFloat(rec.boletoFran))itens.push({label:'Franchising',valor:rec.boletoFran,url:rec.boletoUrlFran});
+    if(parseFloat(rec.boletoBri1))itens.push({label:'Brilhante/Fábrica 1ª Parcela',valor:rec.boletoBri1,url:rec.boletoUrlBri1});
+  }else{
+    if(parseFloat(rec.boletoBri2))itens.push({label:'Brilhante/Fábrica 2ª Parcela',valor:rec.boletoBri2,url:rec.boletoUrlBri2});
+  }
+  return itens;
+}
+function qgLembreteMontarEmail(rec,n,estagio){
+  const dv=rec['dv'+n];
+  const itens=qgLembreteItens(rec,n);
+  const linhas=itens.length?itens.map(function(it){
+    let l='- '+it.label+(it.valor?': '+fBRL(it.valor):'');
+    if(it.url)l+=' | PDF: '+it.url;
+    return l;
+  }).join('\n'):'- Parcela '+n+'ª (valor a confirmar)';
+  const situacao={1:'vence em breve',2:'vence hoje',3:'está vencido'}[estagio];
+  const assunto='Rasteirissima — Boleto '+situacao+' ('+fDt(dv)+')';
+  const corpo='Olá, '+(rec.loja||'')+',\n\n'+
+    'O boleto referente à nota '+(rec.nota||'-')+' '+situacao+' (vencimento '+fDt(dv)+'):\n\n'+
+    linhas+'\n\n'+
+    (estagio===3?'Caso o pagamento já tenha sido feito, por favor desconsidere este aviso.\n\n':'')+
+    'Qualquer dúvida, entre em contato.\n\nRasteirissima';
+  return {assunto:assunto,corpo:corpo};
+}
+async function qgEnviarLembretes(){
+  if(!S.url){toast('Configure a URL do Apps Script para enviar lembretes.','warn');return;}
+  await qgLoadData('lojas');
+  const recs=S.qg.recs.areceber||[];
+  const lojasCadastro=S.qg.recs.lojas||[];
+  const pendentes=[];
+  recs.forEach(function(rec){
+    [1,2].forEach(function(n){
+      const estagio=qgEstagioLembrete(rec['st'+n],rec['dv'+n],rec['dp'+n]);
+      const salvo=parseInt(rec['lemb'+n])||0;
+      if(estagio>0&&estagio>salvo)pendentes.push({rec:rec,n:n,estagio:estagio});
+    });
+  });
+  if(!pendentes.length){toast('Nenhum lembrete pendente de envio.');return;}
+  confirmDel(
+    pendentes.length+' lembrete(s) de vencimento serão avaliados para envio.',
+    function(){qgEnviarLembretesExec(pendentes,lojasCadastro);},
+    'Só é enviado e-mail para lojas com endereço cadastrado em Cadastro. Continuar?',
+    {icon:'📧',title:'Enviar lembretes de vencimento',btnText:'Enviar',btnColor:'#1A6B3A'}
+  );
+}
+async function qgEnviarLembretesExec(pendentes,lojasCadastro){
+  showLoading('Enviando lembretes...');
+  let enviados=0,semEmail=0,erros=0;
+  try{
+    for(const p of pendentes){
+      const rec=p.rec,n=p.n,estagio=p.estagio;
+      const lojaRec=lojasCadastro.find(function(l){return l.kind==='Loja'&&norm(l.loja)===norm(rec.loja);});
+      if(!lojaRec||!lojaRec.email){semEmail++;continue;}
+      const msg=qgLembreteMontarEmail(rec,n,estagio);
+      try{
+        const res=await fetch(S.url,{method:'POST',body:JSON.stringify({action:'sendEmail',to:lojaRec.email,subject:msg.assunto,body:msg.corpo})});
+        const j=await res.json();
+        if(j.error)throw new Error(j.error);
+        rec['lemb'+n]=String(estagio);
+        await qgPush2Sheets('areceber',rec,rec._id>1000000?null:rec._id,true);
+        qgSaveData('areceber');
+        enviados++;
+      }catch(e){erros++;}
+    }
+  }finally{hideLoading();}
+  qgApplyF();
+  toast(enviados+' lembrete(s) enviado(s)'+(semEmail?', '+semEmail+' sem e-mail cadastrado':'')+(erros?', '+erros+' com erro':''),erros?'warn':'ok');
+}
 function qgDistinct(recs,key){
   const set=new Set();
   recs.forEach(r=>{if(r[key]!==undefined&&r[key]!==null&&r[key]!=='')set.add(r[key]);});
@@ -3957,6 +4056,8 @@ function qgSwitchTab(view){
   if(nfBtn)nfBtn.style.display=view==='areceber'?'':'none';
   const pedBtn=document.getElementById('qgImportPedidoBtn');
   if(pedBtn)pedBtn.style.display=view==='areceber'?'':'none';
+  const lembBtn=document.getElementById('qgLembretesBtn');
+  if(lembBtn)lembBtn.style.display=view==='areceber'?'':'none';
   const apViews=['brilhante','marketing','franchising'];
   const boletoBtn=document.getElementById('qgImportBoletoBtn');
   if(boletoBtn)boletoBtn.style.display=apViews.includes(view)?'':'none';
@@ -4426,6 +4527,7 @@ function qgUpdateSelBar(){
       actions+='<button class="btn-accent" style="font-size:.78rem;padding:.45rem .9rem" onclick="qgBulkMarkPaid(\''+f.key+'\',\''+f.payKey+'\')">✓ Baixar '+(i+1)+'ª parcela</button>';
     });
   }
+  actions+='<button style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#2C5F8A;border:none;border-radius:3px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:700" onclick="qgExportPdf()">📄 Gerar PDF</button>';
   actions+='<button style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#8B1A1A;border:none;border-radius:3px;cursor:pointer;font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:700" onclick="qgBulkDelete()">🗑 Excluir selecionados</button>';
   document.getElementById('qgSelActions').innerHTML=actions;
 }
@@ -4459,6 +4561,60 @@ function qgBulkMarkPaid(stKey,dpKey){
       toast(pend.length+' lançamento(s) marcado(s) como pago ✓'+(canSync?' ('+synced+' de '+pend.length+' sincronizados com o Sheets)':''));
     }finally{hideLoading();}
   },'A data de pagamento será definida como hoje.',{icon:'✅',title:'Confirmar Pagamento',btnText:'Confirmar',btnColor:'#2E7D32'});
+}
+
+function qgExportPdf(){
+  const viewKey=S.qg.view;
+  const view=QG_VIEWS[viewKey];
+  const recs=S.qg.recs[viewKey]||[];
+  const sel=recs.filter(function(r){return S.qg.selIds.has(r._id);});
+  if(!sel.length){toast('Nenhum lançamento selecionado.','warn');return;}
+  const cols=view.fields.filter(function(f){return !f.hideInTable;});
+  const thead='<tr>'+cols.map(function(f){return '<th>'+f.label+'</th>';}).join('')+'</tr>';
+  const tbody=sel.map(function(r){
+    const isPago=view.statusFields&&view.statusFields.length&&view.statusFields.every(function(sk){
+      const sf=view.fields.find(function(fld){return fld.key===sk;});
+      return qgEffStatus(r[sk],sf&&sf.dueKey?r[sf.dueKey]:null,sf&&sf.payKey?r[sf.payKey]:null)==='pago';
+    });
+    const rowStyle=isPago?' style="background:#E8F5E9"':'';
+    return '<tr'+rowStyle+'>'+cols.map(function(f){
+      // Formata valor de forma simplificada (sem HTML de badges)
+      var v=r[f.key];
+      if(f.type==='money')return '<td style="text-align:right">'+fBRL(v)+'</td>';
+      if(f.type==='date')return '<td>'+fDt(v)+'</td>';
+      if(f.type==='month')return '<td>'+(MESES[v]||'')+'</td>';
+      if(f.type==='status'){
+        var sf=view.fields.find(function(fld){return fld.key===f.key;});
+        var eff=qgEffStatus(v,sf&&sf.dueKey?r[sf.dueKey]:null,sf&&sf.payKey?r[sf.payKey]:null);
+        var stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
+        return '<td>'+(stL[eff]||eff||'')+'</td>';
+      }
+      return '<td>'+(v!=null?String(v):'')+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  const sums=(view.sumFields||[]).map(function(k){
+    var lbls={va:'A Pagar',vp:'Pago',vNota:'Valor Nota',totalNota:'Total Nota'};
+    var sum=sel.reduce(function(s,r){return s+(r[k]||0);},0);
+    return '<strong>'+(lbls[k]||k)+':</strong> '+fBRL(sum);
+  }).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+  var hoje=new Date().toLocaleDateString('pt-BR');
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+view.label+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#1a1a1a}'
+    +'h2{font-size:15px;margin:0 0 2px}p.sub{color:#666;margin:0 0 14px;font-size:10px}'
+    +'table{border-collapse:collapse;width:100%}th{background:#F2EAE0;padding:6px 8px;'
+    +'text-align:left;border:1px solid #ccc;font-size:10px;font-weight:700}'
+    +'td{padding:5px 8px;border:1px solid #e0e0e0;font-size:10px;vertical-align:top}'
+    +'tr:nth-child(even) td{background:#FAF7F4}.sums{margin-top:10px;font-size:11px}'
+    +'@media print{@page{margin:12mm}}</style></head><body>'
+    +'<h2>Rasteirissima — '+view.label+'</h2>'
+    +'<p class="sub">'+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+' · '+hoje+'</p>'
+    +'<table><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'
+    +(sums?'<div class="sums">'+sums+'</div>':'')
+    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else toast('Popup bloqueado pelo navegador. Libere popups para esta página.','warn');
 }
 
 function qgBulkDelete(){
@@ -4504,7 +4660,8 @@ function qgFieldInputHtml(f,val,allFields){
     // Campo gerado pelo sistema (ex: "Lançado em") — mostra só leitura,
     // sem <input>: qgSaveRec() nem tenta ler o DOM pra esses campos.
     return '<div class="inp" style="background:#FAF7F4;color:#9B6B50;cursor:default;display:flex;align-items:center">'+
-      (f.type==='datetime'?xe(qgFmtDatetime(val))||'<span style="color:#C8A882">— será preenchido ao salvar —</span>':xe(val))+'</div>';
+      (f.type==='datetime'?xe(qgFmtDatetime(val))||'<span style="color:#C8A882">— será preenchido ao salvar —</span>':
+       (f.key==='lemb1'||f.key==='lemb2')?xe(qgLembreteLabel(val)):xe(val))+'</div>';
   }
   switch(f.type){
     case 'money':
