@@ -1763,50 +1763,73 @@ function updateSelBar(){
 function lpExportPdf(){
   const sel=S.recs.filter(r=>S.selIds.has(r._id));
   if(!sel.length){toast('Nenhum lançamento selecionado.','warn');return;}
-  const stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
-  const thead='<tr><th>Loja</th><th>Fornecedor</th><th>Nota</th><th>Emissão</th><th>Vencimento</th><th style="text-align:right">Valor Nota</th><th style="text-align:right">MKT</th><th style="text-align:right">Produto</th><th style="text-align:right">Serviço</th><th>Status</th><th>Dt. Pag.</th></tr>';
-  const tbody=sel.map(function(r){
-    var eff=effStatus(r.st,r.dv,r.dp);
-    var isPago=eff==='pago';
-    var rs=isPago?' style="background:#E8F5E9"':'';
-    return '<tr'+rs+'>'
-      +'<td>'+xe(r.lo||'')+'</td>'
-      +'<td>'+xe(r.fo||'')+'</td>'
-      +'<td style="font-family:monospace">'+xe(r.nn||'')+'</td>'
-      +'<td>'+fDt(r.de)+'</td>'
-      +'<td style="font-weight:700">'+fDt(r.dv)+'</td>'
-      +'<td style="text-align:right;font-weight:700">'+fBRL(r.vn)+'</td>'
-      +'<td style="text-align:right">'+fBRL(r.mk)+'</td>'
-      +'<td style="text-align:right">'+fBRL(r.pr)+'</td>'
-      +'<td style="text-align:right">'+fBRL(r.sv)+'</td>'
-      +'<td>'+(stL[eff]||eff||'')+'</td>'
-      +'<td>'+fDt(r.dp)+'</td>'
+  // Agrupa por fornecedor
+  var byForn={};
+  sel.forEach(function(r){
+    var fo=r.fo||'(sem fornecedor)';
+    if(!byForn[fo])byForn[fo]=[];
+    byForn[fo].push(r);
+  });
+  // Para cada fornecedor, gera uma seção com tabela de lojas
+  var sections='';
+  Object.keys(byForn).sort().forEach(function(fo){
+    var recs=byForn[fo];
+    // Agrupa por loja dentro do fornecedor
+    var byLoja={};
+    recs.forEach(function(r){
+      var lo=r.lo||'(sem loja)';
+      if(!byLoja[lo])byLoja[lo]={mk:0,pr:0,sv:0};
+      byLoja[lo].mk+=r.mk||0;
+      byLoja[lo].pr+=r.pr||0;
+      byLoja[lo].sv+=r.sv||0;
+    });
+    var lojas=Object.keys(byLoja).sort();
+    var totMk=0,totPr=0,totSv=0;
+    lojas.forEach(function(lo){totMk+=byLoja[lo].mk;totPr+=byLoja[lo].pr;totSv+=byLoja[lo].sv;});
+    var rows=lojas.map(function(lo){
+      var d=byLoja[lo];
+      return '<tr><td>'+xe(lo)+'</td>'
+        +'<td class="num">'+fBRL(d.mk)+'</td>'
+        +'<td class="num">'+fBRL(d.pr)+'</td>'
+        +'<td class="num">'+fBRL(d.sv)+'</td>'
+        +'<td class="num bold">'+fBRL(d.mk+d.pr+d.sv)+'</td>'
+        +'</tr>';
+    }).join('');
+    var totalRow='<tr class="tot"><td><strong>TOTAL</strong></td>'
+      +'<td class="num"><strong>'+fBRL(totMk)+'</strong></td>'
+      +'<td class="num"><strong>'+fBRL(totPr)+'</strong></td>'
+      +'<td class="num"><strong>'+fBRL(totSv)+'</strong></td>'
+      +'<td class="num"><strong>'+fBRL(totMk+totPr+totSv)+'</strong></td>'
       +'</tr>';
-  }).join('');
-  var mk=sel.reduce(function(s,r){return s+(r.mk||0);},0);
-  var pr=sel.reduce(function(s,r){return s+(r.pr||0);},0);
-  var sv=sel.reduce(function(s,r){return s+(r.sv||0);},0);
-  var total=mk+pr+sv;
-  var tfoot='<tr style="background:#F2EAE0;font-weight:700">'
-    +'<td colspan="5" style="text-align:right;font-size:10px">TOTAIS</td>'
-    +'<td style="text-align:right">'+fBRL(sel.reduce(function(s,r){return s+(r.vn||0);},0))+'</td>'
-    +'<td style="text-align:right">'+fBRL(mk)+'</td>'
-    +'<td style="text-align:right">'+fBRL(pr)+'</td>'
-    +'<td style="text-align:right">'+fBRL(sv)+'</td>'
-    +'<td colspan="2" style="text-align:right">Soma: '+fBRL(total)+'</td>'
-    +'</tr>';
+    sections+='<div class="sec">'
+      +'<div class="fo-title">'+xe(fo)+'</div>'
+      +'<table><thead><tr>'
+      +'<th>Loja</th><th class="num">MKT</th><th class="num">Produto</th><th class="num">Serviço</th><th class="num">Total</th>'
+      +'</tr></thead><tbody>'+rows+'</tbody><tfoot>'+totalRow+'</tfoot></table>'
+      +'</div>';
+  });
   var hoje=new Date().toLocaleDateString('pt-BR');
-  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rasteirissima — Lojas Próprias</title>'
-    +'<style>body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#1a1a1a}'
-    +'h2{font-size:15px;margin:0 0 2px}p.sub{color:#666;margin:0 0 14px;font-size:10px}'
-    +'table{border-collapse:collapse;width:100%}th{background:#F2EAE0;padding:5px 7px;'
-    +'text-align:left;border:1px solid #ccc;font-size:9px;font-weight:700}'
-    +'td{padding:4px 7px;border:1px solid #e0e0e0;font-size:10px;vertical-align:top}'
-    +'tr:nth-child(even) td{background:#FAF7F4}'
-    +'@media print{@page{margin:12mm;size:landscape}}</style></head><body>'
-    +'<h2>Rasteirissima — Mercadorias a Pagar · Lojas Próprias</h2>'
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumo — Rasteirissima</title>'
+    +'<style>'
+    +'body{font-family:Arial,sans-serif;font-size:11px;margin:24px;color:#1a1a1a}'
+    +'h2{font-size:16px;margin:0 0 2px;color:#1a3a5c}'
+    +'p.sub{color:#666;margin:0 0 22px;font-size:10px}'
+    +'.sec{margin-bottom:28px}'
+    +'.fo-title{font-size:12px;font-weight:700;color:#1565C0;padding:5px 10px;'
+    +'background:#EFF6FF;border-left:4px solid #1565C0;margin-bottom:6px}'
+    +'table{border-collapse:collapse;width:100%}'
+    +'th{background:#2C5F8A;color:#fff;padding:6px 10px;border:1px solid #1a4a70;font-size:10px;font-weight:700}'
+    +'th.num{text-align:right}'
+    +'td{padding:5px 10px;border:1px solid #dde6f0;font-size:11px}'
+    +'td.num{text-align:right}'
+    +'td.bold{font-weight:700}'
+    +'tr:nth-child(even) td{background:#F5F9FF}'
+    +'tfoot tr.tot td{background:#DBEAFE;color:#1a3a5c}'
+    +'@media print{@page{margin:14mm}.sec{page-break-inside:avoid}}'
+    +'</style></head><body>'
+    +'<h2>Rasteirissima — Resumo por Fornecedor</h2>'
     +'<p class="sub">'+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+' · '+hoje+'</p>'
-    +'<table><thead>'+thead+'</thead><tbody>'+tbody+'</tbody><tfoot>'+tfoot+'</tfoot></table>'
+    +sections
     +'<script>window.onload=function(){window.print();}<\/script>'
     +'</body></html>';
   var w=window.open('','_blank');
