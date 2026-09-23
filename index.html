@@ -340,6 +340,7 @@ body.theme-lp [style*="border:1.5px solid #DDD0BC"]{border-color:#C9DFEB!importa
       <div style="display:flex;gap:.5rem;align-items:center">
         <button onclick="bulkMarkPaid()" class="btn-accent" style="font-size:.78rem;padding:.45rem .9rem">✓ Dar baixa (marcar como pago)</button>
         <button onclick="deselectPedidos()" class="btn-secondary" style="font-size:.78rem;padding:.45rem .9rem">✕ Tirar "Pedido" da seleção</button>
+        <button onclick="lpExportPdf()" style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#2C5F8A;border:none;border-radius:3px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">📄 Gerar PDF</button>
         <button onclick="bulkDeleteSelected()" style="font-size:.78rem;padding:.45rem .9rem;color:#fff;background:#8B1A1A;border:none;border-radius:3px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">🗑 Excluir selecionados</button>
         <button onclick="clearSel()" style="font-size:.75rem;padding:.4rem .7rem;color:#6B5500;background:transparent;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;text-decoration:underline">✕ Limpar seleção</button>
       </div>
@@ -1757,6 +1758,60 @@ function updateSelBar(){
   bar.style.display='flex';
   document.getElementById('selCount').textContent=sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'');
   document.getElementById('selSums').innerHTML='MKT: <strong>'+fBRL(mk)+'</strong> · Produto: <strong>'+fBRL(pr)+'</strong> · Serviço: <strong>'+fBRL(sv)+'</strong> · Soma total: <strong>'+fBRL(mk+pr+sv)+'</strong>';
+}
+
+function lpExportPdf(){
+  const sel=S.recs.filter(r=>S.selIds.has(r._id));
+  if(!sel.length){toast('Nenhum lançamento selecionado.','warn');return;}
+  const stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
+  const thead='<tr><th>Loja</th><th>Fornecedor</th><th>Nota</th><th>Emissão</th><th>Vencimento</th><th style="text-align:right">Valor Nota</th><th style="text-align:right">MKT</th><th style="text-align:right">Produto</th><th style="text-align:right">Serviço</th><th>Status</th><th>Dt. Pag.</th></tr>';
+  const tbody=sel.map(function(r){
+    var eff=effStatus(r.st,r.dv,r.dp);
+    var isPago=eff==='pago';
+    var rs=isPago?' style="background:#E8F5E9"':'';
+    return '<tr'+rs+'>'
+      +'<td>'+xe(r.lo||'')+'</td>'
+      +'<td>'+xe(r.fo||'')+'</td>'
+      +'<td style="font-family:monospace">'+xe(r.nn||'')+'</td>'
+      +'<td>'+fDt(r.de)+'</td>'
+      +'<td style="font-weight:700">'+fDt(r.dv)+'</td>'
+      +'<td style="text-align:right;font-weight:700">'+fBRL(r.vn)+'</td>'
+      +'<td style="text-align:right">'+fBRL(r.mk)+'</td>'
+      +'<td style="text-align:right">'+fBRL(r.pr)+'</td>'
+      +'<td style="text-align:right">'+fBRL(r.sv)+'</td>'
+      +'<td>'+(stL[eff]||eff||'')+'</td>'
+      +'<td>'+fDt(r.dp)+'</td>'
+      +'</tr>';
+  }).join('');
+  var mk=sel.reduce(function(s,r){return s+(r.mk||0);},0);
+  var pr=sel.reduce(function(s,r){return s+(r.pr||0);},0);
+  var sv=sel.reduce(function(s,r){return s+(r.sv||0);},0);
+  var total=mk+pr+sv;
+  var tfoot='<tr style="background:#F2EAE0;font-weight:700">'
+    +'<td colspan="5" style="text-align:right;font-size:10px">TOTAIS</td>'
+    +'<td style="text-align:right">'+fBRL(sel.reduce(function(s,r){return s+(r.vn||0);},0))+'</td>'
+    +'<td style="text-align:right">'+fBRL(mk)+'</td>'
+    +'<td style="text-align:right">'+fBRL(pr)+'</td>'
+    +'<td style="text-align:right">'+fBRL(sv)+'</td>'
+    +'<td colspan="2" style="text-align:right">Soma: '+fBRL(total)+'</td>'
+    +'</tr>';
+  var hoje=new Date().toLocaleDateString('pt-BR');
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rasteirissima — Lojas Próprias</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#1a1a1a}'
+    +'h2{font-size:15px;margin:0 0 2px}p.sub{color:#666;margin:0 0 14px;font-size:10px}'
+    +'table{border-collapse:collapse;width:100%}th{background:#F2EAE0;padding:5px 7px;'
+    +'text-align:left;border:1px solid #ccc;font-size:9px;font-weight:700}'
+    +'td{padding:4px 7px;border:1px solid #e0e0e0;font-size:10px;vertical-align:top}'
+    +'tr:nth-child(even) td{background:#FAF7F4}'
+    +'@media print{@page{margin:12mm;size:landscape}}</style></head><body>'
+    +'<h2>Rasteirissima — Mercadorias a Pagar · Lojas Próprias</h2>'
+    +'<p class="sub">'+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+' · '+hoje+'</p>'
+    +'<table><thead>'+thead+'</thead><tbody>'+tbody+'</tbody><tfoot>'+tfoot+'</tfoot></table>'
+    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else toast('Popup bloqueado pelo navegador. Libere popups para esta página.','warn');
 }
 
 function bulkMarkPaid(){
