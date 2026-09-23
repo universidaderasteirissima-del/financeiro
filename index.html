@@ -1649,7 +1649,11 @@ function scrd(lb,val,sub,tc,bc,bg){
 }
 
 function rtable(){
-  const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
+  // Se filtro reduz resultados, mostra tudo na página (sem paginação)
+  const _filtered=S.filt.length<S.recs.length;
+  const _pp=_filtered?S.filt.length:S.pp;
+  const _pg=_filtered?1:S.pg;
+  const st=(_pg-1)*_pp,rows=S.filt.slice(st,st+_pp);
   document.getElementById('recCnt').textContent=S.filt.length+' registro'+(S.filt.length!==1?'s':'');
   const stC={'pago':'sp','vencida':'sv','em aberto':'sa','vence hoje':'sh'};
   const stL={'pago':'✓ Pago','vencida':'Vencida','em aberto':'Em aberto','vence hoje':'Vence hoje'};
@@ -1689,7 +1693,9 @@ function rtable(){
 }
 
 function rpg(){
-  const tot=S.filt.length,tp=Math.ceil(tot/S.pp),bar=document.getElementById('pgBar');
+  const tot=S.filt.length,bar=document.getElementById('pgBar');
+  const _filtered=S.filt.length<S.recs.length;
+  const tp=_filtered?1:Math.ceil(tot/S.pp);
   if(tp<=1){bar.innerHTML='<span style="color:#9B6B50">'+tot+' registro'+(tot!==1?'s':'')+'</span>';return;}
   const s=(S.pg-1)*S.pp+1,e=Math.min(S.pg*S.pp,tot);
   const btn=(l,p,d)=>'<button onclick="goPg('+p+')"'+(d?' disabled':'')+' style="padding:.3rem .7rem;border-radius:2px;border:1px solid '+(d?'#EAD9C8':'#D4B499')+';background:'+(d?'#FAF7F4':'#fff')+';color:'+(d?'#C8A882':'#5C3D2E')+';cursor:'+(d?'default':'pointer')+';font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;font-size:.78rem">'+l+'</button>';
@@ -4494,7 +4500,12 @@ function qgRenderStats(){
 function qgRenderTable(){
   const view=QG_VIEWS[S.qg.view];
   const cols=view.fields.filter(function(f){return !f.hideInTable;});
-  const st=(S.qg.pg-1)*S.qg.pp,rows=S.qg.filt.slice(st,st+S.qg.pp);
+  // Se filtro reduz resultados, mostra tudo na página (sem paginação)
+  const _totalRecs=(S.qg.recs[S.qg.view]||[]).length;
+  const _filtered=S.qg.filt.length<_totalRecs;
+  const _pp=_filtered?S.qg.filt.length:S.qg.pp;
+  const _pg=_filtered?1:S.qg.pg;
+  const st=(_pg-1)*_pp,rows=S.qg.filt.slice(st,st+_pp);
   document.getElementById('qgRecCnt').textContent=S.qg.filt.length+' registro'+(S.qg.filt.length!==1?'s':'');
   qgUpdateDupBtn();
   const dupMap=S.qg.dupCache[S.qg.view]||new Map(); // usa o que já foi calculado; não força o cálculo aqui
@@ -4552,7 +4563,10 @@ function qgRenderTable(){
 }
 
 function qgRenderPg(){
-  const tot=S.qg.filt.length,tp=Math.ceil(tot/S.qg.pp),bar=document.getElementById('qgPgBar');
+  const tot=S.qg.filt.length,bar=document.getElementById('qgPgBar');
+  const _totalRecs=(S.qg.recs[S.qg.view]||[]).length;
+  const _filtered=tot<_totalRecs;
+  const tp=_filtered?1:Math.ceil(tot/S.qg.pp);
   if(tp<=1){bar.innerHTML='<span style="color:#9B6B50">'+tot+' registro'+(tot!==1?'s':'')+'</span>';return;}
   const s=(S.qg.pg-1)*S.qg.pp+1,e=Math.min(S.qg.pg*S.qg.pp,tot);
   const btn=function(l,p,d){return '<button onclick="qgGoPg('+p+')"'+(d?' disabled':'')+' style="padding:.3rem .7rem;border-radius:2px;border:1px solid '+(d?'#EAD9C8':'#D4B499')+';background:'+(d?'#FAF7F4':'#fff')+';color:'+(d?'#C8A882':'#5C3D2E')+';cursor:'+(d?'default':'pointer')+';font-family:\'Plus Jakarta Sans\',sans-serif;font-weight:600;font-size:.78rem">'+l+'</button>';};
