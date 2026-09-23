@@ -1727,7 +1727,8 @@ function toggleSelRow(id,checked){
 }
 
 function toggleSelAll(checked){
-  const st=(S.pg-1)*S.pp,rows=S.filt.slice(st,st+S.pp);
+  const _filtered=S.filt.length<S.recs.length;
+  const rows=_filtered?S.filt:S.filt.slice((S.pg-1)*S.pp,S.pg*S.pp);
   rows.forEach(r=>{if(checked)S.selIds.add(r._id);else S.selIds.delete(r._id);});
   rtable();
 }
@@ -4590,7 +4591,9 @@ function qgToggleSelRow(id,checked){
 }
 
 function qgToggleSelAll(checked){
-  const st=(S.qg.pg-1)*S.qg.pp,rows=S.qg.filt.slice(st,st+S.qg.pp);
+  const _totalRecs=(S.qg.recs[S.qg.view]||[]).length;
+  const _filtered=S.qg.filt.length<_totalRecs;
+  const rows=_filtered?S.qg.filt:S.qg.filt.slice((S.qg.pg-1)*S.qg.pp,S.qg.pg*S.qg.pp);
   rows.forEach(function(r){if(checked)S.qg.selIds.add(r._id);else S.qg.selIds.delete(r._id);});
   qgRenderTable();
 }
