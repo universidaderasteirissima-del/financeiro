@@ -1770,18 +1770,44 @@ function updateSelBar(){
 function lpExportPdf(){
   const sel=S.recs.filter(r=>S.selIds.has(r._id));
   if(!sel.length){toast('Nenhum lançamento selecionado.','warn');return;}
-  // Agrupa por fornecedor
+
+  // ── Agrupa por fornecedor ──────────────────────────────────────────
   var byForn={};
   sel.forEach(function(r){
     var fo=r.fo||'(sem fornecedor)';
     if(!byForn[fo])byForn[fo]=[];
     byForn[fo].push(r);
   });
-  // Para cada fornecedor, gera uma seção com tabela de lojas
+  var fornNames=Object.keys(byForn).sort();
+
+  // ── Dados gráfico pizza: total por fornecedor ──────────────────────
+  var pieLabels=fornNames;
+  var pieData=fornNames.map(function(fo){
+    return byForn[fo].reduce(function(s,r){return s+(r.mk||0)+(r.pr||0)+(r.sv||0);},0);
+  });
+  var pieColors=['#2C5F8A','#1E88E5','#42A5F5','#0D47A1','#1976D2','#64B5F6','#1565C0','#90CAF9','#1A237E','#BBDEFB'];
+
+  // ── Dados gráfico barras: total a pagar por mês (campo dv) ────────
+  var byMonth={};
+  sel.forEach(function(r){
+    if(!r.dv)return;
+    var m=String(r.dv).substring(0,7);
+    if(!byMonth[m])byMonth[m]=0;
+    byMonth[m]+=(r.mk||0)+(r.pr||0)+(r.sv||0);
+  });
+  var sortedMonths=Object.keys(byMonth).sort();
+  var barLabels=sortedMonths.map(function(m){
+    var p=m.split('-');
+    var nomes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return nomes[parseInt(p[1],10)-1]+'/'+p[0].substring(2);
+  });
+  var barData=sortedMonths.map(function(m){return byMonth[m];});
+
+  // ── Seções por fornecedor + acumula total geral ────────────────────
   var sections='';
-  Object.keys(byForn).sort().forEach(function(fo){
+  var grandMk=0,grandPr=0,grandSv=0;
+  fornNames.forEach(function(fo){
     var recs=byForn[fo];
-    // Agrupa por loja dentro do fornecedor
     var byLoja={};
     recs.forEach(function(r){
       var lo=r.lo||'(sem loja)';
@@ -1793,6 +1819,7 @@ function lpExportPdf(){
     var lojas=Object.keys(byLoja).sort();
     var totMk=0,totPr=0,totSv=0;
     lojas.forEach(function(lo){totMk+=byLoja[lo].mk;totPr+=byLoja[lo].pr;totSv+=byLoja[lo].sv;});
+    grandMk+=totMk;grandPr+=totPr;grandSv+=totSv;
     var rows=lojas.map(function(lo){
       var d=byLoja[lo];
       return '<tr><td>'+xe(lo)+'</td>'
@@ -1802,7 +1829,7 @@ function lpExportPdf(){
         +'<td class="num bold">'+fBRL(d.mk+d.pr+d.sv)+'</td>'
         +'</tr>';
     }).join('');
-    var totalRow='<tr class="tot"><td><strong>TOTAL</strong></td>'
+    var totalRow='<tr class="tot"><td><strong>TOTAL '+xe(fo)+'</strong></td>'
       +'<td class="num"><strong>'+fBRL(totMk)+'</strong></td>'
       +'<td class="num"><strong>'+fBRL(totPr)+'</strong></td>'
       +'<td class="num"><strong>'+fBRL(totSv)+'</strong></td>'
@@ -1815,13 +1842,29 @@ function lpExportPdf(){
       +'</tr></thead><tbody>'+rows+'</tbody><tfoot>'+totalRow+'</tfoot></table>'
       +'</div>';
   });
+
+  // ── Bloco de total geral ───────────────────────────────────────────
+  var grandBlock='<div class="grand-wrap">'
+    +'<table class="grand-tbl"><tfoot><tr class="grand">'
+    +'<td><strong>TOTAL GERAL ('+sel.length+' lançamento'+(sel.length!==1?'s':'')+')</strong></td>'
+    +'<td class="num"><strong>'+fBRL(grandMk)+'</strong></td>'
+    +'<td class="num"><strong>'+fBRL(grandPr)+'</strong></td>'
+    +'<td class="num"><strong>'+fBRL(grandSv)+'</strong></td>'
+    +'<td class="num"><strong>'+fBRL(grandMk+grandPr+grandSv)+'</strong></td>'
+    +'</tr></tfoot></table>'
+    +'</div>';
+
   var hoje=new Date().toLocaleDateString('pt-BR');
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumo — Rasteirissima</title>'
+    +'<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>'
     +'<style>'
     +'body{font-family:Arial,sans-serif;font-size:11px;margin:24px;color:#1a1a1a}'
     +'h2{font-size:16px;margin:0 0 2px;color:#1a3a5c}'
-    +'p.sub{color:#666;margin:0 0 22px;font-size:10px}'
-    +'.sec{margin-bottom:28px}'
+    +'p.sub{color:#666;margin:0 0 20px;font-size:10px}'
+    +'.charts{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}'
+    +'.chart-box{background:#F0F6FF;border:1px solid #DBEAFE;border-radius:5px;padding:12px}'
+    +'.chart-title{font-size:10px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}'
+    +'.sec{margin-bottom:24px}'
     +'.fo-title{font-size:12px;font-weight:700;color:#1565C0;padding:5px 10px;'
     +'background:#EFF6FF;border-left:4px solid #1565C0;margin-bottom:6px}'
     +'table{border-collapse:collapse;width:100%}'
@@ -1832,13 +1875,40 @@ function lpExportPdf(){
     +'td.bold{font-weight:700}'
     +'tr:nth-child(even) td{background:#F5F9FF}'
     +'tfoot tr.tot td{background:#DBEAFE;color:#1a3a5c}'
-    +'th,.fo-title,tfoot tr.tot td{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    +'@media print{@page{margin:14mm}.sec{page-break-inside:avoid}}'
+    +'.grand-wrap{margin-top:18px}'
+    +'.grand-tbl{width:auto;margin-left:auto}'
+    +'.grand-tbl tfoot tr.grand td{background:#1565C0;color:#fff;font-size:12px;padding:8px 14px}'
+    +'th,.fo-title,tfoot tr.tot td,.grand-tbl tfoot tr.grand td,'
+    +'.chart-box{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'@media print{'
+    +'@page{margin:14mm}'
+    +'.sec{page-break-inside:avoid}'
+    +'.charts{page-break-inside:avoid}'
+    +'.grand-wrap{page-break-inside:avoid}'
+    +'}'
     +'</style></head><body>'
     +'<h2>Rasteirissima — Resumo por Fornecedor</h2>'
     +'<p class="sub">'+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+' · '+hoje+'</p>'
+    +'<div class="charts">'
+    +'<div class="chart-box"><div class="chart-title">Total por Fornecedor</div><canvas id="cPie"></canvas></div>'
+    +'<div class="chart-box"><div class="chart-title">Total a Pagar por Mês</div><canvas id="cBar"></canvas></div>'
+    +'</div>'
     +sections
-    +'<script>window.onload=function(){window.print();}<\/script>'
+    +grandBlock
+    +'<script>'
+    +'(function(){'
+    +'var pLabels='+JSON.stringify(pieLabels)+';'
+    +'var pData='+JSON.stringify(pieData)+';'
+    +'var pColors='+JSON.stringify(pieColors)+';'
+    +'var bLabels='+JSON.stringify(barLabels)+';'
+    +'var bData='+JSON.stringify(barData)+';'
+    +'function drawCharts(){'
+    +'new Chart(document.getElementById("cPie"),{type:"pie",data:{labels:pLabels,datasets:[{data:pData,backgroundColor:pColors.slice(0,pLabels.length),borderColor:"#fff",borderWidth:2}]},options:{animation:false,plugins:{legend:{position:"bottom",labels:{font:{size:9},padding:6,boxWidth:12}}}}});'
+    +'new Chart(document.getElementById("cBar"),{type:"bar",data:{labels:bLabels,datasets:[{label:"Total",data:bData,backgroundColor:"#2C5F8A",borderRadius:3}]},options:{animation:false,plugins:{legend:{display:false}},scales:{y:{ticks:{font:{size:8},callback:function(v){return"R$"+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:0});}},grid:{color:"#e3edfa"}},x:{ticks:{font:{size:9}},grid:{display:false}}}}});'
+    +'}'
+    +'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){drawCharts();setTimeout(function(){window.print();},900);});}else{drawCharts();setTimeout(function(){window.print();},900);}'
+    +'})();'
+    +'<\/script>'
     +'</body></html>';
   var w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
