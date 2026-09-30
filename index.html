@@ -1889,12 +1889,12 @@ function lpExportPdf(){
     +'</style></head><body>'
     +'<h2>Rasteirissima — Resumo por Fornecedor</h2>'
     +'<p class="sub">'+sel.length+' lançamento'+(sel.length!==1?'s':'')+' selecionado'+(sel.length!==1?'s':'')+' · '+hoje+'</p>'
-    +'<div class="charts">'
-    +'<div class="chart-box"><div class="chart-title">Total por Fornecedor</div><canvas id="cPie"></canvas></div>'
-    +'<div class="chart-box"><div class="chart-title">Total a Pagar por Mês</div><canvas id="cBar"></canvas></div>'
-    +'</div>'
     +sections
     +grandBlock
+    +'<div class="charts">'
+    +'<div class="chart-box"><div class="chart-title">Total por Fornecedor</div><canvas id="cPie" height="130"></canvas></div>'
+    +'<div class="chart-box"><div class="chart-title">Total a Pagar por Mês</div><canvas id="cBar" height="130"></canvas></div>'
+    +'</div>'
     +'<script>'
     +'(function(){'
     +'var pLabels='+JSON.stringify(pieLabels)+';'
