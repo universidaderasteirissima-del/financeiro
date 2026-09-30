@@ -1785,7 +1785,7 @@ function lpExportPdf(){
   var pieData=fornNames.map(function(fo){
     return byForn[fo].reduce(function(s,r){return s+(r.mk||0)+(r.pr||0)+(r.sv||0);},0);
   });
-  var pieColors=['#2C5F8A','#1E88E5','#42A5F5','#0D47A1','#1976D2','#64B5F6','#1565C0','#90CAF9','#1A237E','#BBDEFB'];
+  var pieColors=['#2C5F8A','#E53935','#43A047','#FB8C00','#8E24AA','#00ACC1','#F4511E','#3949AB','#00897B','#C0CA33','#D81B60','#6D4C41'];
 
   // ── Dados gráfico barras: total a pagar por mês (campo dv) ────────
   var byMonth={};
