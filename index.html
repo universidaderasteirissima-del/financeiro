@@ -2415,16 +2415,28 @@ function extractFaturaParcelas(txt){
   var sec=fatIdx>=0?nt.substring(fatIdx,fatIdx+3000):nt;
 
   // ── Estratégia 0: "89286 1/3 15/12/2026 2.164,00" ───────────────────────
-  // DANFE Redak/JRTi: NF# + fração X/Y + data + valor.
-  // Roda no texto COMPLETO para não depender da janela FATURA.
-  // Valida fração: denominador entre 2 e 12, numerador <= denominador.
+  // DANFE Redak/JRTi: NF# + fração X/Y + data + valor no texto completo.
+  // Deduplicação por chave (num/den/data) para evitar repetição de seções.
+  // Agrupa por denominador e retorna o grupo mais completo (1/N … N/N).
   var re0=/(?:\d+\s+)?(\d+)\/(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  var grp0={};var seen0={};
   while((m=re0.exec(nt))!==null){
     var den=parseInt(m[2],10),num=parseInt(m[1],10);
     if(den>=2&&den<=12&&num>=1&&num<=den){
-      out.push({nn:m[1],dv:br2iso(m[3]),vn:m[4].replace(/\./g,'').replace(',','.')});
+      var k0=num+'|'+den+'|'+m[3];
+      if(!seen0[k0]){
+        seen0[k0]=1;
+        if(!grp0[den])grp0[den]=[];
+        grp0[den].push({nn:m[1],dv:br2iso(m[3]),vn:m[4].replace(/\./g,'').replace(',','.')});
+      }
     }
   }
+  // Pega o grupo onde número de parcelas encontradas == denominador (conjunto completo)
+  Object.keys(grp0).forEach(function(d){
+    if(grp0[d].length==parseInt(d)&&!out.length){
+      out=grp0[d].slice().sort(function(a,b){return parseInt(a.nn)-parseInt(b.nn);});
+    }
+  });
   if(out.length)return out;
 
   // ── Estratégia 1: linha por linha ────────────────────────────────────────
@@ -3522,11 +3534,12 @@ function extractNFData(txt){
     if(mn)prs.nn=String(parseInt(mn[1],10)||mn[1]);
   }
 
-  // Emission date — busca bidirecional com janela ampliada.
-  // PDF.js pode extrair o valor da data antes do rótulo (ordem de colunas).
-  m=txt.match(/[Ee]miss[aã]o\s*[\s:]\s*(\d{2}\/\d{2}\/\d{4})/i)
-   ||txt.match(/EMISS[ÃA]O[\s\S]{0,500}?(\d{2}\/\d{2}\/\d{4})/i)
-   ||txt.match(/(\d{2}\/\d{2}\/\d{4})[\s\S]{0,200}?DATA\s+D[AE]\s+EMISS[ÃA]O/i);
+  // Emission date — 4 padrões em ordem de especificidade.
+  m=txt.match(/DATA\s+D[AE]\s+EMISS[ÃA]O[\s\S]{0,600}?(\d{2}\/\d{2}\/\d{4})/i)
+   ||txt.match(/(\d{2}\/\d{2}\/\d{4})[\s\S]{0,300}?DATA\s+D[AE]\s+EMISS[ÃA]O/i)
+   ||txt.match(/EMISS[ÃA]O[\s\S]{0,600}?(\d{2}\/\d{2}\/\d{4})/i)
+   ||txt.match(/[Ee]miss[aã]o[\s:,]+(\d{2}\/\d{2}\/\d{4})/i);
+  /* DEBUG */ console.log('[NF-DEBUG] emissão m='+JSON.stringify(m?m[0].substring(0,100):null));
   if(m)prs.de=br2iso(m[1]);
 
   // Total value — pega o MAIOR valor nos 400 chars após "VALOR TOTAL DA NOTA".
