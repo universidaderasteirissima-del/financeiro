@@ -2402,16 +2402,50 @@ function findDocNumber(txt,bk){
 
 // FATURA/DUPLICATA — DANFE/NF-e style table listing one or more
 // vencimentos (ex: "NÚMERO 001 VENCTO 02/07/2026 VALOR 894,40").
-// This is checked as the DEFAULT location for vencimentos in boletos,
-// since some suppliers send the NF/DANFE itself as the payment document.
+// Extrai parcelas da seção FATURA/DUPLICATA de um DANFE.
+// Tenta 3 estratégias em sequência para lidar com variações de layout
+// e com a forma como o PDF.js lê tabelas multi-coluna.
 function extractFaturaParcelas(txt){
-  var nt=norm(txt);
+  var nt=norm(txt); // sem acentos, maiúsculas
   var out=[];
-  var re=/NUMERO[\s\S]{0,6}?(\d{2,4})[\s\S]{0,10}?VENCTO[\s\S]{0,6}?(\d{2}\/\d{2}\/\d{4})[\s\S]{0,10}?VALOR[\s\S]{0,6}?(\d{1,3}(?:\.\d{3})*,\d{2})/g;
   var m;
-  while((m=re.exec(nt))!==null){
-    out.push({nn:m[1],dv:br2iso(m[2]),vn:parseFloat(m[3].replace(/\./g,'').replace(',','.')).toFixed(2)});
+
+  // ── Estratégia 1: linha por linha ────────────────────────────────────────
+  // NUMERO/NUM … (nn) … VENCTO/VENCIMENTO/VCT … (data) … VALOR … (valor)
+  var re1=/NUM(?:ERO)?[\s\S]{0,30}?(\d{1,4})[\s\S]{0,35}?VENC(?:TO|IMENTO|\.)?[\s\S]{0,30}?(\d{2}\/\d{2}\/\d{4})[\s\S]{0,35}?VALOR[\s\S]{0,30}?(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  while((m=re1.exec(nt))!==null){
+    out.push({nn:m[1],dv:br2iso(m[2]),vn:m[3].replace(/\./g,'').replace(',','.')});
   }
+  if(out.length)return out;
+
+  // ── Estratégia 2: triplet (número, data, valor) na seção FATURA ──────────
+  // Cobre PDFs onde PDF.js extrai a tabela em ordem sequencial mas sem rótulos
+  var fatIdx=nt.search(/FATURA|DUPLICATA/);
+  if(fatIdx>=0){
+    var sec=nt.substring(fatIdx,fatIdx+700);
+    var re2=/\b(\d{1,4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\b/g;
+    while((m=re2.exec(sec))!==null){
+      out.push({nn:m[1],dv:br2iso(m[2]),vn:m[3].replace(/\./g,'').replace(',','.')});
+    }
+    if(out.length)return out;
+
+    // ── Estratégia 3: colunas embaralhadas ────────────────────────────────
+    // PDF.js às vezes gera: "DATA1 DATA2 DATA3 VLR1 VLR2 VLR3"
+    // Coleta datas e valores separadamente e emparelha por índice.
+    var allDates=[],allAmts=[];
+    var drx=/(\d{2}\/\d{2}\/\d{4})/g;
+    var arx=/\b(\d{1,3}(?:\.\d{3})*,\d{2})\b/g;
+    while((m=drx.exec(sec))!==null)allDates.push(m[1]);
+    while((m=arx.exec(sec))!==null)allAmts.push(m[1]);
+    if(allDates.length>=2&&allAmts.length>=allDates.length){
+      // Se há mais valores que datas, descarta o(s) primeiro(s) (provavelmente total da NF)
+      var skip=allAmts.length-allDates.length;
+      allDates.forEach(function(d,i){
+        out.push({nn:String(i+1),dv:br2iso(d),vn:allAmts[skip+i].replace(/\./g,'').replace(',','.')});
+      });
+    }
+  }
+
   return out;
 }
 
@@ -3524,11 +3558,31 @@ function extractNFData(txt){
     prs.vencimentos=parcelas.map(p=>p.dv);
     prs.parcelaVals=parcelas.map(p=>parseFloat(p.vn));
   }else{
+    // Fallback: procura datas (e valores próximos) em INFORMAÇÕES ADICIONAIS
     const addIdx=txt.search(/INFORMA[ÇC][ÕO]ES ADICIONAIS/i);
     if(addIdx>=0){
-      const section=txt.substring(addIdx,addIdx+600);
+      const section=txt.substring(addIdx,addIdx+900);
       const dates=section.match(/\d{2}\/\d{2}\/\d{4}/g);
-      if(dates&&dates.length)prs.vencimentos=dates.map(d=>br2iso(d));
+      if(dates&&dates.length){
+        prs.vencimentos=dates.map(d=>br2iso(d));
+        // Tenta extrair valores próximos a cada data
+        const vals=[];
+        dates.forEach(function(d){
+          const pos=section.indexOf(d);
+          const win=section.substring(pos,pos+60);
+          const vm=win.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
+          vals.push(vm?parseFloat(vm[1].replace(/\./g,'').replace(',','.')):null);
+        });
+        if(vals.some(function(v){return v!==null;}))prs.parcelaVals=vals;
+      }
+    }
+    // Fallback final: qualquer tabela com data+valor no documento inteiro
+    if(!prs.vencimentos){
+      const allP=extractFaturaParcelas(txt.replace(/\n/g,' '));
+      if(allP.length>1){
+        prs.vencimentos=allP.map(p=>p.dv);
+        prs.parcelaVals=allP.map(p=>parseFloat(p.vn));
+      }
     }
   }
 
