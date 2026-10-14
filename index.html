@@ -3522,7 +3522,51 @@ async function renderNFPDF(pdfDoc){
   viewer.onmouseleave=hideMagnifier;
 }
 
+// Parser para Orçamento/Pedido (formato: "Orçamento Nº ORC-XXXXX · dd/mm/aaaa")
+function extractOrcData(txt){
+  const prs={};
+  // Data de emissão: "Nº ORC-00007 · 08/10/2026"
+  var mDe=txt.match(/ORC-\d+\s*[·•\-]\s*(\d{2}\/\d{2}\/\d{4})/i)
+           ||txt.match(/[Oo]r[çc]amento[^\n]{0,80}?(\d{2}\/\d{2}\/\d{4})/);
+  if(mDe)prs.de=br2iso(mDe[1]);
+  // Total: "Total líquido R$ 888,50"
+  var mVn=txt.match(/Total\s+l[íi]quido\s+R\$\s*([\d.,]+)/i)
+          ||txt.match(/Total\s+do\s+or[çc]amento\s+R\$\s*([\d.,]+)/i)
+          ||txt.match(/Total\s+l[íi]quido\s+([\d.,]+)/i);
+  if(mVn)prs.vn=tof(mVn[1]);
+  // Número: usa "ORC-NNNNN" como referência
+  var mNn=txt.match(/ORC-(\d+)/i);
+  if(mNn)prs.nn='ORC-'+String(parseInt(mNn[1],10));
+  // Fornecedor: texto depois de "LOJA" até CNPJ/CPF ou outro campo
+  var mFo=txt.match(/\bLOJA\b[\s\S]{0,5}?([A-Za-zÀ-ú][A-Za-zÀ-ú\s\.]+?)(?:CNPJ|CPF|\d{2}\.\d{3})/i);
+  if(mFo){
+    var foRaw=mFo[1].trim();
+    // Tenta casar com fornecedor já cadastrado
+    var matched=false;
+    var foN=norm(foRaw).trim();
+    for(var i=0;i<S.forns.length;i++){
+      var fn=norm(S.forns[i]).trim();
+      if(fn.length>2&&(foN.includes(fn)||fn.includes(foN))){prs.fo=S.forns[i];matched=true;break;}
+    }
+    if(!matched)prs.fo=foRaw;
+  }
+  // Loja: RASTEIRISSIMA [NOME] na seção CLIENTE
+  var mLo=txt.match(/RASTEIRISSIMA\s+([A-ZÁÂÃÀÉÊÍÓÔÕÚ\s]+?)(?:\n|CNPJ|CPF|\d)/i);
+  if(mLo){
+    var loRaw=mLo[1].trim();
+    var loN=norm(loRaw).trim();
+    for(var j=0;j<S.lojas.length;j++){
+      var ln=norm(S.lojas[j]).trim();
+      if(ln.length>2&&(loN.includes(ln)||ln.includes(loN))){prs.lo=S.lojas[j];break;}
+    }
+  }
+  return prs;
+}
+
 function extractNFData(txt){
+  // Delega para parser de orçamento quando detectado
+  if(/or[çc]amento/i.test(txt.substring(0,300)))return extractOrcData(txt);
+
   const prs={};
   const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ');
 
@@ -3719,6 +3763,7 @@ async function confirmNF(){
     const dv=r.querySelector('.nf-venc-date').value;
     const val=parseFloat((r.querySelector('.nf-venc-val').value||'0').replace(',','.'));
     if(!dv){toast('Preencha todas as datas de vencimento','warn');valid=false;return;}
+    if(de&&dv<de){toast('Vencimento '+fDt(dv)+' é anterior à emissão ('+fDt(de)+'). Verifique o ano.','warn');valid=false;return;}
     vencs.push({dv,vn:val});
   });
   if(!valid)return;
