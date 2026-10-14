@@ -3635,9 +3635,15 @@ async function parseNF(){
   // Auto-calcula split do fornecedor
   if(prs.fo&&prs.vn)calcFornSplitNF();
 
-  // Vencimentos — sempre 1 entrada inicial (data em branco, valor = total NF)
+  // Vencimentos — 1 entrada inicial com data = emissão + 30 dias
   document.getElementById('nfVencs').innerHTML='';
   nfAddVenc();
+  if(prs.de){
+    const d=new Date(prs.de+'T00:00:00');
+    d.setDate(d.getDate()+30);
+    const firstDate=document.querySelector('#nfVencs .nf-venc-date');
+    if(firstDate)firstDate.value=d.toISOString().substring(0,10);
+  }
   nfCalcValues();
 
   // Info bar
