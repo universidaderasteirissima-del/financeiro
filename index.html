@@ -3539,7 +3539,6 @@ function extractNFData(txt){
    ||txt.match(/(\d{2}\/\d{2}\/\d{4})[\s\S]{0,300}?DATA\s+D[AE]\s+EMISS[ÃA]O/i)
    ||txt.match(/EMISS[ÃA]O[\s\S]{0,600}?(\d{2}\/\d{2}\/\d{4})/i)
    ||txt.match(/[Ee]miss[aã]o[\s:,]+(\d{2}\/\d{2}\/\d{4})/i);
-  /* DEBUG */ console.log('[NF-DEBUG] emissão m='+JSON.stringify(m?m[0].substring(0,100):null));
   if(m)prs.de=br2iso(m[1]);
 
   // Total value — pega o MAIOR valor nos 400 chars após "VALOR TOTAL DA NOTA".
@@ -3585,40 +3584,6 @@ function extractNFData(txt){
   if(!prs.lo){
     for(const loja of S.lojas){
       if(norm(loja).trim().length>3&&norm(txt).includes(norm(loja).trim())){prs.lo=loja;break;}
-    }
-  }
-
-  // Vencimentos — FATURA/DUPLICATA first (DANFE-style), then INFORMAÇÕES ADICIONAIS
-  const parcelas=extractFaturaParcelas(txt);
-  if(parcelas.length>0){
-    prs.vencimentos=parcelas.map(p=>p.dv);
-    prs.parcelaVals=parcelas.map(p=>parseFloat(p.vn));
-  }else{
-    // Fallback: procura datas (e valores próximos) em INFORMAÇÕES ADICIONAIS
-    const addIdx=txt.search(/INFORMA[ÇC][ÕO]ES ADICIONAIS/i);
-    if(addIdx>=0){
-      const section=txt.substring(addIdx,addIdx+900);
-      const dates=section.match(/\d{2}\/\d{2}\/\d{4}/g);
-      if(dates&&dates.length){
-        prs.vencimentos=dates.map(d=>br2iso(d));
-        // Tenta extrair valores próximos a cada data
-        const vals=[];
-        dates.forEach(function(d){
-          const pos=section.indexOf(d);
-          const win=section.substring(pos,pos+60);
-          const vm=win.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/);
-          vals.push(vm?parseFloat(vm[1].replace(/\./g,'').replace(',','.')):null);
-        });
-        if(vals.some(function(v){return v!==null;}))prs.parcelaVals=vals;
-      }
-    }
-    // Fallback final: qualquer tabela com data+valor no documento inteiro
-    if(!prs.vencimentos){
-      const allP=extractFaturaParcelas(txt.replace(/\n/g,' '));
-      if(allP.length>1){
-        prs.vencimentos=allP.map(p=>p.dv);
-        prs.parcelaVals=allP.map(p=>parseFloat(p.vn));
-      }
     }
   }
 
@@ -3670,20 +3635,10 @@ async function parseNF(){
   // Auto-calcula split do fornecedor
   if(prs.fo&&prs.vn)calcFornSplitNF();
 
-  // Vencimentos
+  // Vencimentos — sempre 1 entrada inicial (data em branco, valor = total NF)
   document.getElementById('nfVencs').innerHTML='';
-  if(prs.vencimentos&&prs.vencimentos.length>0){
-    prs.vencimentos.forEach(()=>nfAddVenc());
-    document.querySelectorAll('.nf-venc-date').forEach((el,i)=>{if(prs.vencimentos[i])el.value=prs.vencimentos[i];});
-    if(prs.parcelaVals&&prs.parcelaVals.length){
-      // use exact per-installment values from FATURA/DUPLICATA table
-      document.querySelectorAll('.nf-venc-val').forEach((el,i)=>{
-        if(prs.parcelaVals[i]!=null)el.value=prs.parcelaVals[i].toFixed(2).replace('.',',');
-      });
-    }else{nfCalcValues();}
-  }else{
-    nfAddVenc();nfCalcValues();
-  }
+  nfAddVenc();
+  nfCalcValues();
 
   // Info bar
   const parts=[];
@@ -3698,10 +3653,21 @@ async function parseNF(){
 
 function nfAddVenc(){
   const container=document.getElementById('nfVencs');
+  // Se já existem linhas, auto-preenche a nova data = última data + 30 dias
+  var nextDate='';
+  const existingDates=container.querySelectorAll('.nf-venc-date');
+  if(existingDates.length>0){
+    const lastVal=existingDates[existingDates.length-1].value;
+    if(lastVal){
+      const d=new Date(lastVal+'T00:00:00');
+      d.setDate(d.getDate()+30);
+      nextDate=d.toISOString().substring(0,10);
+    }
+  }
   const div=document.createElement('div');
   div.style.cssText='display:flex;gap:.5rem;align-items:center;margin-bottom:.45rem';
   div.innerHTML='<span style="font-size:.7rem;font-weight:700;color:#9B6B50;min-width:18px;flex-shrink:0" class="nf-venc-num"></span>'
-    +'<input type="date" class="inp nf-venc-date" style="flex:1;font-size:.8rem" oninput="nfCalcValues()" />'
+    +'<input type="date" class="inp nf-venc-date" style="flex:1;font-size:.8rem" oninput="nfCalcValues()" value="'+nextDate+'" />'
     +'<input type="text" class="inp nf-venc-val" placeholder="R$" style="width:100px;font-size:.8rem" />'
     +'<button onclick="this.parentNode.remove();nfCalcValues();nfNumVencs()" style="width:26px;height:26px;border:1px solid var(--border);border-radius:2px;background:#FAF7F4;cursor:pointer;color:#7A4F3A;font-weight:700;font-size:.9rem;flex-shrink:0">×</button>';
   container.appendChild(div);
