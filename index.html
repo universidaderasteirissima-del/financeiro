@@ -3672,6 +3672,8 @@ async function parseNF(){
 
   const prs=extractNFData(nfPdfTxt||'');
   nfProdNF=prs.vp||null;
+  // Valor Total também usa o "Valor total dos produtos" da NF, quando encontrado
+  if(prs.vp)prs.vn=prs.vp;
 
   // Preenche campos
   document.getElementById('nfNN').value=prs.nn||'';
