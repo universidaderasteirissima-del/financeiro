@@ -3467,10 +3467,10 @@ async function deletePDFFromGitHub(rawUrl){
 // ============================================================
 // NOTA FISCAL
 // ============================================================
-let nfPdfTxt='',nfPdfDoc=null;
+let nfPdfTxt='',nfPdfDoc=null,nfProdNF=null; // nfProdNF = "VALOR TOTAL DOS PRODUTOS" lido da NF
 
 function openNF(){
-  nfPdfTxt='';nfPdfDoc=null;
+  nfPdfTxt='';nfPdfDoc=null;nfProdNF=null;
   document.getElementById('nfPDF').value='';
   document.getElementById('nfPDFNm').textContent='Nenhum arquivo selecionado';
   document.getElementById('nfVencs').innerHTML='';
@@ -3601,6 +3601,10 @@ function extractNFData(txt){
     if(m)prs.vn=tof(m[1]);
   }
 
+  // Valor total dos produtos — vai para a coluna "Produto" (no lugar do total da nota)
+  var mVp=txt.match(/VALOR\s+TOTAL\s+DOS\s+PRODUTOS\s+(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+  if(mVp)prs.vp=tof(mVp[1]);
+
   // Fornecedor — compara com lista cadastrada
   for(const fo of S.forns){
     const foN=norm(fo).trim();
@@ -3643,6 +3647,8 @@ function calcFornSplitNF(){
     if(s.pr!=null)document.getElementById('nfPR').value=s.pr.toFixed(2);
     if(s.sv!=null)document.getElementById('nfSV').value=s.sv.toFixed(2);
   }
+  // Produto = "Valor total dos produtos" da NF, quando encontrado no PDF
+  if(nfProdNF)document.getElementById('nfPR').value=nfProdNF.toFixed(2);
   nfCalcValues();
 }
 
@@ -3665,13 +3671,14 @@ async function parseNF(){
   }
 
   const prs=extractNFData(nfPdfTxt||'');
+  nfProdNF=prs.vp||null;
 
   // Preenche campos
   document.getElementById('nfNN').value=prs.nn||'';
   document.getElementById('nfDE').value=prs.de||'';
   document.getElementById('nfVN').value=prs.vn||'';
   document.getElementById('nfMK').value='0';
-  document.getElementById('nfPR').value='0';
+  document.getElementById('nfPR').value=prs.vp?prs.vp.toFixed(2):'0';
   document.getElementById('nfSV').value='0';
   if(prs.fo){const el=document.getElementById('nfFO');if(el)el.value=prs.fo;}
   if(prs.lo){const el=document.getElementById('nfLO');if(el)el.value=prs.lo;}
